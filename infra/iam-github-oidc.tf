@@ -63,46 +63,135 @@ resource "aws_iam_role" "github_actions" {
 }
 
 # --- Permissions granted to the role ---------------------------------------
+#
+# Scoped to the specific actions Terraform actually invokes when planning
+# or applying changes to the resources defined in this module, plus the
+# AWS CLI calls the deploy workflow makes (lightsail:GetInstance).
+#
+# Lightsail has very limited ARN-level scoping (most actions accept only
+# `*` as a resource), so the lightsail block uses *. IAM and S3 calls
+# are scoped to the resources this role actually owns.
 
-# Scope is intentionally broad-ish (lightsail:* + the TF state bucket) so
-# the role can manage the full infra lifecycle. For a more locked-down
-# setup, split into separate read-only and apply roles and gate apply
-# behind GitHub Environments + required reviewers.
+locals {
+  # Resources this role is allowed to touch.
+  tf_state_bucket_arn = "arn:aws:s3:::pso-server-tfstate-${data.aws_caller_identity.current.account_id}"
+  role_arn            = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/github-actions-${var.instance_name}"
+  oidc_provider_arn   = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
+  backup_user_arn     = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/${var.instance_name}-backup"
+}
+
+data "aws_caller_identity" "current" {}
+
 data "aws_iam_policy_document" "github_actions" {
-  # Full Lightsail control for this account (Lightsail does not support
-  # fine-grained resource ARNs for most actions, so * is conventional).
+  # Lightsail: only the actions we observed Terraform + deploy.yml call.
+  # Lightsail doesn't honor resource-level ARNs for most actions, so
+  # the resource has to stay as *.
   statement {
-    sid       = "LightsailFullAccess"
-    actions   = ["lightsail:*"]
+    sid = "Lightsail"
+    actions = [
+      "lightsail:GetRegions",
+      "lightsail:GetBundles",
+      "lightsail:GetBlueprints",
+      "lightsail:GetInstance",
+      "lightsail:GetInstances",
+      "lightsail:CreateInstances",
+      "lightsail:DeleteInstance",
+      "lightsail:GetInstanceState",
+      "lightsail:GetInstancePortStates",
+      "lightsail:PutInstancePublicPorts",
+      "lightsail:OpenInstancePublicPorts",
+      "lightsail:CloseInstancePublicPorts",
+      "lightsail:EnableAddOn",
+      "lightsail:DisableAddOn",
+      "lightsail:GetStaticIp",
+      "lightsail:GetStaticIps",
+      "lightsail:AllocateStaticIp",
+      "lightsail:ReleaseStaticIp",
+      "lightsail:AttachStaticIp",
+      "lightsail:DetachStaticIp",
+      "lightsail:GetKeyPair",
+      "lightsail:GetKeyPairs",
+      "lightsail:CreateKeyPair",
+      "lightsail:ImportKeyPair",
+      "lightsail:DeleteKeyPair",
+      "lightsail:TagResource",
+      "lightsail:UntagResource",
+    ]
     resources = ["*"]
   }
 
-  # Terraform state in S3. Bucket name is supplied at `terraform init` via
-  # -backend-config, so we don't have it as a TF-managed resource. The
-  # role needs to read/write the state object and the lockfile alongside it.
+  # Terraform remote state in S3.
   statement {
-    sid = "TerraformState"
+    sid = "TerraformStateBucket"
     actions = [
       "s3:ListBucket",
+      "s3:GetBucketLocation",
+      "s3:GetBucketVersioning",
+    ]
+    resources = [local.tf_state_bucket_arn]
+  }
+  statement {
+    sid = "TerraformStateObject"
+    actions = [
       "s3:GetObject",
       "s3:PutObject",
       "s3:DeleteObject",
     ]
-    # Intentionally broad — the bootstrap bucket name is not known to TF.
-    # Tighten this by replacing with the actual bucket ARN once stable.
-    resources = ["*"]
+    resources = ["${local.tf_state_bucket_arn}/*"]
   }
 
-  # IAM read access so the role can refresh itself on apply.
+  # IAM: scope to the role/user/OIDC-provider this module owns. Read
+  # access for `terraform refresh`; write access for `terraform apply`
+  # to update policies and tags on the role itself.
   statement {
-    sid = "IAMReadSelf"
+    sid = "IAMOwnedRole"
     actions = [
       "iam:GetRole",
       "iam:GetRolePolicy",
       "iam:ListRolePolicies",
       "iam:ListAttachedRolePolicies",
-      "iam:GetOpenIDConnectProvider",
+      "iam:ListInstanceProfilesForRole",
+      "iam:ListRoleTags",
+      "iam:UpdateAssumeRolePolicy",
+      "iam:UpdateRoleDescription",
+      "iam:PutRolePolicy",
+      "iam:DeleteRolePolicy",
+      "iam:TagRole",
+      "iam:UntagRole",
     ]
+    resources = [local.role_arn]
+  }
+  statement {
+    sid = "IAMOIDCProviderRead"
+    actions = [
+      "iam:GetOpenIDConnectProvider",
+      "iam:ListOpenIDConnectProviderTags",
+    ]
+    resources = [local.oidc_provider_arn]
+  }
+  statement {
+    sid = "IAMBackupUser"
+    actions = [
+      "iam:GetUser",
+      "iam:ListUserTags",
+      "iam:ListAccessKeys",
+      "iam:CreateAccessKey",
+      "iam:DeleteAccessKey",
+      "iam:GetUserPolicy",
+      "iam:ListUserPolicies",
+      "iam:PutUserPolicy",
+      "iam:DeleteUserPolicy",
+      "iam:ListAttachedUserPolicies",
+      "iam:TagUser",
+      "iam:UntagUser",
+    ]
+    resources = [local.backup_user_arn]
+  }
+
+  # sts: GetCallerIdentity is implicitly called by every aws CLI invocation.
+  statement {
+    sid       = "STSReadSelf"
+    actions   = ["sts:GetCallerIdentity"]
     resources = ["*"]
   }
 }
