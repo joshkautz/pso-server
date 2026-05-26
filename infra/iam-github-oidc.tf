@@ -33,11 +33,14 @@ data "aws_iam_policy_document" "github_actions_assume" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # Restricts which workflows can assume the role. By default we trust
-    # only the main branch of the configured repo. Use sub claims like
-    #   repo:OWNER/REPO:ref:refs/heads/main
-    #   repo:OWNER/REPO:environment:production
-    #   repo:OWNER/REPO:pull_request
+    # Restricts which workflows can assume the role. GitHub's sub claim
+    # varies by trigger:
+    #   - branch push: repo:OWNER/REPO:ref:refs/heads/BRANCH
+    #   - pull_request: repo:OWNER/REPO:pull_request
+    #   - job with environment: repo:OWNER/REPO:environment:ENV_NAME
+    # When a job uses `environment: foo`, the env claim REPLACES the
+    # branch claim — so any workflow that targets an environment needs
+    # the environment claim listed here even if it also runs on main.
     # See https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect#configuring-the-oidc-trust-with-the-cloud
     condition {
       test     = "StringLike"
@@ -47,6 +50,7 @@ data "aws_iam_policy_document" "github_actions_assume" {
         ] : [
         "repo:${var.github_repo}:ref:refs/heads/${var.github_oidc_branch}",
         "repo:${var.github_repo}:pull_request",
+        "repo:${var.github_repo}:environment:production",
       ]
     }
   }
