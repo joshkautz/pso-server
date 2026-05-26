@@ -28,7 +28,7 @@ resource "aws_lightsail_instance" "pso" {
   blueprint_id      = var.blueprint_id
   bundle_id         = var.instance_bundle_id
   key_pair_name     = aws_lightsail_key_pair.deploy.name
-  user_data         = file("${path.module}/../server/cloud-init.yaml")
+  user_data         = file("${path.module}/../server/cloud-init.sh")
 
   dynamic "add_on" {
     for_each = var.enable_auto_snapshots ? [1] : []

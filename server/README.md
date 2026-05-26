@@ -10,8 +10,10 @@ What runs on the Lightsail instance.
   are intentionally small so future upstream changes are easy to merge.
 - **`docker-compose.yml`** — runs the prebuilt `ghcr.io/joshkautz/pso-server`
   image with `./` bind-mounted at `/newserv/system` inside the container.
-- **`cloud-init.yaml`** — first-boot setup (installs Docker, makes
+- **`cloud-init.sh`** — first-boot setup (installs Docker, makes
   directories). Runs *once* per instance via Lightsail's user-data hook.
+  Lightsail only accepts shell scripts for user_data, not cloud-init
+  YAML, so this is plain bash even though the name suggests otherwise.
 
 ## How a deploy works
 
