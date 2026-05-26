@@ -1,0 +1,49 @@
+#cloud-config
+#
+# Runs once on the Lightsail instance's first boot. Installs Docker and
+# prepares the directory layout that the deploy workflow expects.
+#
+# IMPORTANT: cloud-init is a one-shot. Changes to this file do NOT re-run
+# on existing instances. To re-bootstrap, either taint and recreate the
+# Lightsail instance via terraform, or SSH in and run the equivalent
+# commands manually.
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - rsync
+
+write_files:
+  # Marker file the deploy workflow checks for before starting.
+  - path: /etc/pso-server-bootstrap.version
+    content: "1\n"
+    permissions: "0644"
+
+runcmd:
+  # --- Install Docker from the official Docker apt repo ---
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - |
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable" \
+      > /etc/apt/sources.list.d/docker.list
+  - apt-get update
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  - usermod -aG docker ubuntu
+  - systemctl enable --now docker
+
+  # --- Prepare directory layout for the deploy workflow ---
+  - install -d -o ubuntu -g ubuntu /home/ubuntu/pso-server
+  - install -d -o ubuntu -g ubuntu /home/ubuntu/pso-server/system
+  - install -d -o ubuntu -g ubuntu /home/ubuntu/pso-server/system/accounts
+
+  # --- Allow our ubuntu user to manage the systemd unit without sudo ---
+  # (Docker daemon access is enough; we don't run anything as root.)
+
+  # --- Mark bootstrap complete ---
+  - touch /home/ubuntu/pso-server/.cloud-init-done
+  - chown ubuntu:ubuntu /home/ubuntu/pso-server/.cloud-init-done

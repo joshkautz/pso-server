@@ -1,0 +1,37 @@
+services:
+  newserv:
+    # Image is built and pushed by .github/workflows/build-image.yml
+    # The :main tag is overwritten on every successful build from main.
+    # Pin to a specific SHA tag (ghcr.io/joshkautz/pso-server:sha-abc1234) for
+    # reproducible deploys.
+    image: ghcr.io/joshkautz/pso-server:main
+    container_name: newserv
+    restart: unless-stopped
+    pull_policy: always
+
+    # Bind-mount the system directory from the host so config changes
+    # don't require an image rebuild. The deploy workflow rsyncs the
+    # contents of ./server/ to /home/ubuntu/pso-server/system/ on the
+    # instance before running `docker compose up`.
+    volumes:
+      - /home/ubuntu/pso-server/system:/newserv/system
+
+    # Lightsail's host firewall is what actually gates traffic; this just
+    # routes the published ports from the host to the container.
+    # UDP 53 is bound on the host as a privileged port — docker handles that.
+    ports:
+      # DNS
+      - "53:53/udp"
+      # PSO GC game/login range
+      - "9000-9204:9000-9204/tcp"
+      # Uncomment for PSO PC / Xbox / BB support:
+      # - "9300:9300/tcp"
+      # - "9500:9500/tcp"
+      # - "10000-12001:10000-12001/tcp"
+
+    # Sensible production defaults.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
