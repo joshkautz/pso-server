@@ -101,6 +101,21 @@ jobs:
                ghcr.io/joshkautz/pso-server:main \
                -c "cp -rn /newserv/system/. /host-system/ && chown -R 1000:1000 /host-system"'
 
+      - name: substitute instance IP into config.json
+        run: |
+          # newserv's DNS server returns the literal value of ExternalAddress
+          # (or LocalAddress for clients on the same subnet) as the IP that
+          # PSO should connect to. The repo's config.json has 0.0.0.0 as a
+          # placeholder so it's never tied to a specific instance; we patch
+          # in the real IP at deploy time.
+          IP="${{ steps.lightsail.outputs.ip }}"
+          sed -i.bak \
+            -e "s|\"LocalAddress\": \"0\.0\.0\.0\"|\"LocalAddress\": \"$IP\"|" \
+            -e "s|\"ExternalAddress\": \"0\.0\.0\.0\"|\"ExternalAddress\": \"$IP\"|" \
+            server/config.json
+          rm server/config.json.bak
+          grep -E '"(Local|External)Address"' server/config.json
+
       - name: rsync overrides to instance
         run: |
           # No --delete: image-provided files in /home/ubuntu/pso-server/system
