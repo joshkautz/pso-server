@@ -1,0 +1,106 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - ".github/workflows/deploy.yml"
+  workflow_run:
+    workflows: ["build-image"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Skip if triggered by a failed build-image run.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: discover instance IP
+        id: lightsail
+        run: |
+          IP=$(aws lightsail get-instance \
+            --instance-name "${{ vars.LIGHTSAIL_INSTANCE_NAME }}" \
+            --query 'instance.publicIpAddress' \
+            --output text)
+          if [ -z "$IP" ] || [ "$IP" = "None" ]; then
+            echo "::error::could not resolve instance public IP"
+            exit 1
+          fi
+          echo "ip=$IP" >> "$GITHUB_OUTPUT"
+          echo "Instance IP: $IP"
+
+      - name: configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H "${{ steps.lightsail.outputs.ip }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: wait for cloud-init
+        run: |
+          # On a freshly-created instance, cloud-init may still be
+          # installing Docker. Block until it's done (or timeout).
+          for i in $(seq 1 60); do
+            if ssh -i ~/.ssh/deploy -o ConnectTimeout=5 ubuntu@${{ steps.lightsail.outputs.ip }} \
+              'test -f /home/ubuntu/pso-server/.cloud-init-done'; then
+              echo "cloud-init complete"
+              exit 0
+            fi
+            echo "($i/60) cloud-init not done yet, waiting 10s..."
+            sleep 10
+          done
+          echo "::error::cloud-init did not finish in 10 minutes"
+          exit 1
+
+      - name: rsync server/ to instance
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy" \
+            --exclude='README.md' \
+            --exclude='docker-compose.yml' \
+            server/ \
+            ubuntu@${{ steps.lightsail.outputs.ip }}:/home/ubuntu/pso-server/system/
+
+      - name: upload docker-compose.yml
+        run: |
+          scp -i ~/.ssh/deploy \
+            server/docker-compose.yml \
+            ubuntu@${{ steps.lightsail.outputs.ip }}:/home/ubuntu/pso-server/docker-compose.yml
+
+      - name: pull and restart container
+        run: |
+          ssh -i ~/.ssh/deploy ubuntu@${{ steps.lightsail.outputs.ip }} \
+            'cd /home/ubuntu/pso-server && \
+             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin && \
+             docker compose pull && \
+             docker compose up -d --remove-orphans && \
+             docker image prune -f'
+
+      - name: health check
+        run: |
+          # Give newserv a few seconds to start up, then check the
+          # container is running and the DNS port is bound.
+          sleep 10
+          ssh -i ~/.ssh/deploy ubuntu@${{ steps.lightsail.outputs.ip }} \
+            'docker ps --filter name=newserv --format "{{.Status}}" | grep -q "Up" && \
+             docker logs --tail=20 newserv'
