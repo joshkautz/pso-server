@@ -72,27 +72,51 @@ jobs:
           echo "::error::cloud-init did not finish in 10 minutes"
           exit 1
 
-      - name: rsync server/ to instance
-        run: |
-          rsync -avz --delete \
-            -e "ssh -i ~/.ssh/deploy" \
-            --exclude='README.md' \
-            --exclude='docker-compose.yml' \
-            server/ \
-            ubuntu@${{ steps.lightsail.outputs.ip }}:/home/ubuntu/pso-server/system/
-
       - name: upload docker-compose.yml
         run: |
           scp -i ~/.ssh/deploy \
             server/docker-compose.yml \
             ubuntu@${{ steps.lightsail.outputs.ip }}:/home/ubuntu/pso-server/docker-compose.yml
 
-      - name: pull and restart container
+      - name: pull image
+        run: |
+          ssh -i ~/.ssh/deploy ubuntu@${{ steps.lightsail.outputs.ip }} \
+            'echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin && \
+             cd /home/ubuntu/pso-server && \
+             docker compose pull'
+
+      - name: seed system/ from image (no-clobber)
+        run: |
+          # The newserv image bundles a fully-populated /newserv/system
+          # directory (blueburst keys, ep3 data, default quests, etc.).
+          # docker-compose bind-mounts /home/ubuntu/pso-server/system over
+          # that path, which shadows the image-provided files. We seed the
+          # host dir with cp -rn so the image's files exist there before
+          # our overrides land. -n (no-clobber) preserves anything our
+          # rsync already wrote.
+          ssh -i ~/.ssh/deploy ubuntu@${{ steps.lightsail.outputs.ip }} \
+            'docker run --rm \
+               -v /home/ubuntu/pso-server/system:/host-system \
+               --entrypoint sh \
+               ghcr.io/joshkautz/pso-server:main \
+               -c "cp -rn /newserv/system/. /host-system/ && chown -R 1000:1000 /host-system"'
+
+      - name: rsync overrides to instance
+        run: |
+          # No --delete: image-provided files in /home/ubuntu/pso-server/system
+          # would be wiped on every deploy otherwise.
+          rsync -avz \
+            -e "ssh -i ~/.ssh/deploy" \
+            --exclude='README.md' \
+            --exclude='docker-compose.yml' \
+            --exclude='cloud-init.sh' \
+            server/ \
+            ubuntu@${{ steps.lightsail.outputs.ip }}:/home/ubuntu/pso-server/system/
+
+      - name: restart container
         run: |
           ssh -i ~/.ssh/deploy ubuntu@${{ steps.lightsail.outputs.ip }} \
             'cd /home/ubuntu/pso-server && \
-             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin && \
-             docker compose pull && \
              docker compose up -d --remove-orphans && \
              docker image prune -f'
 

@@ -48,6 +48,23 @@ apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin do
 usermod -aG docker ubuntu
 systemctl enable --now docker
 
+# --- Free up UDP/TCP port 53 for newserv ---------------------------------
+# Ubuntu 24.04 ships systemd-resolved with its DNS stub listener bound to
+# 127.0.0.53:53. Docker's 0.0.0.0:53 port binding conflicts with it, so
+# starting the newserv container fails with "address already in use".
+# Disabling just the stub frees port 53 while leaving systemd-resolved
+# running as the local DNS cache. /etc/resolv.conf gets repointed at the
+# generated upstream resolver list.
+
+mkdir -p /etc/systemd/resolved.conf.d
+cat > /etc/systemd/resolved.conf.d/disable-stub.conf <<'EOF'
+[Resolve]
+DNSStubListener=no
+EOF
+
+ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+systemctl restart systemd-resolved
+
 # --- Prepare directory layout for the deploy workflow --------------------
 
 install -d -o ubuntu -g ubuntu /home/ubuntu/pso-server
