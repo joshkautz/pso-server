@@ -1,0 +1,13 @@
+[Unit]
+Description=newserv state backup to S3
+Documentation=https://github.com/joshkautz/pso-server
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/pso-backup.sh
+User=root
+# Make a failed backup attempt visible in systemctl status pso-backup
+StandardOutput=journal
+StandardError=journal

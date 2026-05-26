@@ -1,0 +1,15 @@
+[Unit]
+Description=Run pso-backup.service nightly
+Documentation=https://github.com/joshkautz/pso-server
+
+[Timer]
+# 08:15 UTC — 15 minutes after the Lightsail auto-snapshot, so they
+# don't overlap on the disk. Adjust if your players are in a region
+# where this falls in the middle of evening play.
+OnCalendar=*-*-* 08:15:00
+RandomizedDelaySec=300
+Persistent=true
+Unit=pso-backup.service
+
+[Install]
+WantedBy=timers.target

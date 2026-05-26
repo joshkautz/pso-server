@@ -27,3 +27,20 @@ output "github_oidc_provider_arn" {
   value       = aws_iam_openid_connect_provider.github.arn
   description = "ARN of the GitHub OIDC provider (one per AWS account)."
 }
+
+output "backup_bucket_name" {
+  value       = aws_s3_bucket.backups.id
+  description = "S3 bucket name receiving nightly backups."
+}
+
+output "backup_access_key_id" {
+  value       = aws_iam_access_key.backup.id
+  sensitive   = true
+  description = "Access key ID for the backup IAM user. Sensitive — propagated to the instance via deploy.yml."
+}
+
+output "backup_secret_access_key" {
+  value       = aws_iam_access_key.backup.secret
+  sensitive   = true
+  description = "Secret access key for the backup IAM user. Sensitive — propagated to the instance via deploy.yml."
+}
