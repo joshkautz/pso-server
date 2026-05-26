@@ -20,6 +20,11 @@ concurrency:
   group: deploy
   cancel-in-progress: false
 
+env:
+  # Opt every JavaScript action into Node 24 even if it advertises Node 20.
+  # GitHub forces this default starting June 2026.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   deploy:
     # Skip if triggered by a failed build-image run.
@@ -27,9 +32,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -134,6 +139,54 @@ jobs:
             'cd /home/ubuntu/pso-server && \
              docker compose up -d --remove-orphans && \
              docker image prune -f'
+
+      - name: install backup pipeline (script + systemd timer)
+        env:
+          BACKUP_BUCKET: ${{ vars.BACKUP_BUCKET }}
+          BACKUP_KEY_ID: ${{ secrets.AWS_BACKUP_ACCESS_KEY_ID }}
+          BACKUP_SECRET: ${{ secrets.AWS_BACKUP_SECRET_ACCESS_KEY }}
+        run: |
+          # Bail with a helpful message if the backup secrets/vars aren't
+          # set yet. terraform apply creates the IAM user; the secrets
+          # have to be pushed to GitHub manually (see infra/README.md).
+          if [ -z "$BACKUP_BUCKET" ] || [ -z "$BACKUP_KEY_ID" ] || [ -z "$BACKUP_SECRET" ]; then
+            echo "::warning::backup secrets/vars not set — skipping backup install"
+            echo "::warning::run 'terraform output backup_*' locally and push to GH"
+            exit 0
+          fi
+
+          IP="${{ steps.lightsail.outputs.ip }}"
+
+          # Upload script + unit files
+          scp -i ~/.ssh/deploy \
+            server/backup/pso-backup.sh \
+            server/backup/pso-backup.service \
+            server/backup/pso-backup.timer \
+            ubuntu@$IP:/tmp/
+
+          # Install in /etc and /usr/local/bin, write env file, start timer
+          ssh -i ~/.ssh/deploy ubuntu@$IP "sudo bash -s" <<EOF
+            set -euo pipefail
+            install -m 0755 /tmp/pso-backup.sh /usr/local/bin/pso-backup.sh
+            install -m 0644 /tmp/pso-backup.service /etc/systemd/system/pso-backup.service
+            install -m 0644 /tmp/pso-backup.timer /etc/systemd/system/pso-backup.timer
+            rm -f /tmp/pso-backup.{sh,service,timer}
+
+            # Write env file with backup credentials. Mode 0600 so only
+            # root reads it.
+            umask 077
+            cat > /etc/pso-backup.env <<ENV
+          PSO_BACKUP_BUCKET="$BACKUP_BUCKET"
+          AWS_ACCESS_KEY_ID="$BACKUP_KEY_ID"
+          AWS_SECRET_ACCESS_KEY="$BACKUP_SECRET"
+          AWS_DEFAULT_REGION="${{ vars.AWS_REGION }}"
+          ENV
+            chmod 0600 /etc/pso-backup.env
+
+            systemctl daemon-reload
+            systemctl enable --now pso-backup.timer
+            systemctl list-timers pso-backup.timer --no-pager
+          EOF
 
       - name: health check
         run: |
