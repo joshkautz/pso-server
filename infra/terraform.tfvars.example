@@ -6,9 +6,17 @@
 
 ssh_public_key = "ssh-ed25519 AAAA... pso-server deploy"
 
+# DNS server allowlist. Add a /32 for each player's home public IP.
+# Update when a friend joins, when an ISP rotates someone's IP, or when
+# someone takes their setup to a new location.
+allowed_dns_cidrs = [
+  "73.242.54.43/32", # josh - home
+  # "1.2.3.4/32", # friend name
+]
+
 # Optional overrides:
 # aws_region         = "us-east-1"
 # availability_zone  = "us-east-1a"
 # instance_bundle_id = "small_3_0"
 # allowed_admin_cidr = "203.0.113.42/32"   # your home IP, for SSH lockdown
-# allowed_dns_cidr   = "0.0.0.0/0"          # tighten if you want to block DNS abuse
+# allowed_game_cidr  = "0.0.0.0/0"         # PSO game ports — open by default

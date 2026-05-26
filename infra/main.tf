@@ -74,7 +74,7 @@ resource "aws_lightsail_instance_public_ports" "pso" {
     from_port = 53
     to_port   = 53
     protocol  = "udp"
-    cidrs     = [var.allowed_dns_cidr]
+    cidrs     = var.allowed_dns_cidrs
   }
 
   # PSO GC game/login ports. The exact port used depends on the disc

@@ -53,10 +53,18 @@ variable "allowed_admin_cidr" {
   description = "CIDR allowed to SSH (TCP 22). Lock to your home IP for safety, e.g. 203.0.113.42/32."
 }
 
-variable "allowed_dns_cidr" {
-  type        = string
-  default     = "0.0.0.0/0"
-  description = "CIDR allowed to query the DNS server (UDP 53). Lock to friends' IPs to avoid DNS reflection abuse."
+variable "allowed_dns_cidrs" {
+  type        = list(string)
+  description = <<-EOT
+    List of CIDR ranges allowed to query the DNS server (UDP 53). newserv's
+    DNS server resolves any query to the server's public IP, which makes it
+    a candidate for DNS reflection attacks if left open to the internet.
+    Set this to the public IPv4 of each PSO player's home network (in /32
+    form, e.g. ["73.242.54.43/32", "204.27.40.0/24"]).
+    Update when a friend joins, when an ISP rotates someone's IP, or when
+    someone takes their Switch to a new house. To open to the world (not
+    recommended), set this to ["0.0.0.0/0"].
+  EOT
 }
 
 variable "allowed_game_cidr" {
@@ -87,4 +95,10 @@ variable "auto_snapshot_time_utc" {
   type        = string
   default     = "08:00"
   description = "UTC time for daily auto-snapshot. Format HH:00. Pick an off-peak hour for your players."
+}
+
+variable "backup_retention_days" {
+  type        = number
+  default     = 30
+  description = "Number of days to keep nightly S3 backups before lifecycle expiration."
 }
