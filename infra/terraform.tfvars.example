@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+#
+# Generate a deploy key first:
+#   ssh-keygen -t ed25519 -f ~/.ssh/pso-server-deploy -C 'pso-server deploy' -N ''
+# Then paste the contents of ~/.ssh/pso-server-deploy.pub below.
+
+ssh_public_key = "ssh-ed25519 AAAA... pso-server deploy"
+
+# Optional overrides:
+# aws_region         = "us-east-1"
+# availability_zone  = "us-east-1a"
+# instance_bundle_id = "small_3_0"
+# allowed_admin_cidr = "203.0.113.42/32"   # your home IP, for SSH lockdown
+# allowed_dns_cidr   = "0.0.0.0/0"          # tighten if you want to block DNS abuse
