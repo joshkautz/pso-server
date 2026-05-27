@@ -62,7 +62,12 @@ jobs:
 
       - name: terraform plan
         id: plan
+        # pipefail propagates terraform's exit code through the tee pipe.
+        # Without it, a tee success masks a plan failure and the step
+        # reports green even when the plan errored.
+        shell: bash
         run: |
+          set -o pipefail
           terraform plan -no-color -out=tfplan -var "ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}" 2>&1 | tee plan.txt
         continue-on-error: true
 

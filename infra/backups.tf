@@ -69,12 +69,25 @@ resource "aws_iam_user" "backup" {
 }
 
 data "aws_iam_policy_document" "backup_user" {
-  # PutObject only — the backup script never needs to read or list
-  # existing backups (humans do that via the console or local AWS CLI).
+  # Write-only — the backup script never reads existing backups (humans
+  # do that via the console or local AWS CLI with their own credentials).
+  # The IAM action s3:PutObject is supposed to cover all multipart
+  # operations per AWS docs, but in practice CreateMultipartUpload is
+  # checked independently when --expected-size is supplied to the CLI.
+  # Grant the multipart trio explicitly.
   statement {
-    sid       = "WriteBackups"
-    actions   = ["s3:PutObject"]
+    sid = "WriteObjects"
+    actions = [
+      "s3:PutObject",
+      "s3:AbortMultipartUpload",
+      "s3:ListMultipartUploadParts",
+    ]
     resources = ["${aws_s3_bucket.backups.arn}/*"]
+  }
+  statement {
+    sid       = "ListInProgressMultipartUploads"
+    actions   = ["s3:ListBucketMultipartUploads"]
+    resources = [aws_s3_bucket.backups.arn]
   }
 }
 
