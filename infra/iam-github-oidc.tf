@@ -75,6 +75,7 @@ resource "aws_iam_role" "github_actions" {
 locals {
   # Resources this role is allowed to touch.
   tf_state_bucket_arn = "arn:aws:s3:::pso-server-tfstate-${data.aws_caller_identity.current.account_id}"
+  backup_bucket_arn   = "arn:aws:s3:::${var.instance_name}-backups-${data.aws_caller_identity.current.account_id}"
   role_arn            = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/github-actions-${var.instance_name}"
   oidc_provider_arn   = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
   backup_user_arn     = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/${var.instance_name}-backup"
@@ -138,6 +139,43 @@ data "aws_iam_policy_document" "github_actions" {
       "s3:DeleteObject",
     ]
     resources = ["${local.tf_state_bucket_arn}/*"]
+  }
+
+  # Backup bucket: TF manages it; this role plans/applies changes to it.
+  # Read access is needed during refresh; write to apply lifecycle, tags,
+  # encryption, etc. Object-level access is NOT granted — the dedicated
+  # backup IAM user has s3:PutObject for writes, and humans use the
+  # console / their own credentials to read.
+  statement {
+    sid = "BackupBucketManage"
+    actions = [
+      "s3:CreateBucket",
+      "s3:DeleteBucket",
+      "s3:ListBucket",
+      "s3:GetBucketLocation",
+      "s3:GetBucketVersioning",
+      "s3:PutBucketVersioning",
+      "s3:GetBucketAcl",
+      "s3:GetBucketPolicy",
+      "s3:GetBucketTagging",
+      "s3:PutBucketTagging",
+      "s3:GetBucketPublicAccessBlock",
+      "s3:PutBucketPublicAccessBlock",
+      "s3:GetEncryptionConfiguration",
+      "s3:PutEncryptionConfiguration",
+      "s3:GetLifecycleConfiguration",
+      "s3:PutLifecycleConfiguration",
+      "s3:GetBucketCORS",
+      "s3:GetBucketLogging",
+      "s3:GetBucketWebsite",
+      "s3:GetBucketRequestPayment",
+      "s3:GetBucketObjectLockConfiguration",
+      "s3:GetBucketOwnershipControls",
+      "s3:GetReplicationConfiguration",
+      "s3:GetAccelerateConfiguration",
+      "s3:GetBucketNotification",
+    ]
+    resources = [local.backup_bucket_arn]
   }
 
   # IAM: scope to the role/user/OIDC-provider this module owns. Read
