@@ -66,9 +66,14 @@ jobs:
         # Without it, a tee success masks a plan failure and the step
         # reports green even when the plan errored.
         shell: bash
+        env:
+          ALLOWED_DNS_CIDRS_JSON: ${{ vars.ALLOWED_DNS_CIDRS_JSON }}
         run: |
           set -o pipefail
-          terraform plan -no-color -out=tfplan -var "ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}" 2>&1 | tee plan.txt
+          terraform plan -no-color -out=tfplan \
+            -var "ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}" \
+            -var "allowed_dns_cidrs=${ALLOWED_DNS_CIDRS_JSON}" \
+            2>&1 | tee plan.txt
         continue-on-error: true
 
       - name: comment plan on PR

@@ -55,15 +55,18 @@ variable "allowed_admin_cidr" {
 
 variable "allowed_dns_cidrs" {
   type        = list(string)
+  default     = ["0.0.0.0/0"] # See the description below — overriding this is strongly recommended.
   description = <<-EOT
     List of CIDR ranges allowed to query the DNS server (UDP 53). newserv's
     DNS server resolves any query to the server's public IP, which makes it
     a candidate for DNS reflection attacks if left open to the internet.
+    The default is 0.0.0.0/0 ONLY so terraform doesn't prompt interactively
+    when the variable is unset (which would hang CI). The actual production
+    value is supplied at plan/apply time via a -var flag — locally from
+    terraform.tfvars, and in CI from the ALLOWED_DNS_CIDRS_JSON GitHub
+    Actions variable. See infra/README.md and the operations runbook.
     Set this to the public IPv4 of each PSO player's home network (in /32
     form, e.g. ["73.242.54.43/32", "204.27.40.0/24"]).
-    Update when a friend joins, when an ISP rotates someone's IP, or when
-    someone takes their Switch to a new house. To open to the world (not
-    recommended), set this to ["0.0.0.0/0"].
   EOT
 }
 
