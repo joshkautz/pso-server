@@ -119,24 +119,42 @@ Players follow [docs/client-setup.md](docs/client-setup.md).
 Drop to `nano_3_0` ($5) if you want to gamble on 512MB being enough for
 your player count.
 
-## Security notes
+## Documentation
 
-- The `production` GitHub Environment is referenced in workflows. **Add
-  yourself as a required reviewer in repo settings** to gate `apply` and
-  `deploy` behind a manual approval click.
-- The IAM role granted to GH Actions has `lightsail:*` and broad S3
-  access. Narrow if you care; see [`infra/README.md`](infra/README.md).
-- UDP 53 defaults to open to the world. To prevent your DNS server from
-  being abused for reflection, set `allowed_dns_cidr` in
-  `terraform.tfvars` to a comma-separated list of your friends' public
-  IPs (or `203.0.113.0/24` etc).
-- Account data lives at `/home/ubuntu/pso-server/system/accounts/` on the
-  Lightsail instance. Daily snapshots cover this. For extra paranoia,
-  add a cron that uploads `accounts/` to S3.
+| Doc | Audience |
+|---|---|
+| [`docs/operations.md`](docs/operations.md) | Day-to-day operator (you and Josh). Adding friends, editing config, viewing logs, granting in-game admin, restoring from backup, upgrading newserv, cost management, emergency recovery |
+| [`docs/client-setup.md`](docs/client-setup.md) | Each player. Configures Dolphin on Batocera + sets up PSO's in-game network |
+| [`infra/README.md`](infra/README.md) | Anyone bootstrapping this from scratch (e.g. forking) |
+| [`server/README.md`](server/README.md) | Understanding what runs on the instance and how |
 
-## Upstream
+For PSO mechanics (item drops, quest format, chat commands, etc.), the
+upstream [`fuzziqersoftware/newserv`](https://github.com/fuzziqersoftware/newserv)
+README is canonical. This repo is just the deployment glue around it.
 
-newserv: https://github.com/fuzziqersoftware/newserv (MIT). Upstream
-README is the canonical reference for everything PSO-specific.
+## Security posture
 
-This repo is just the deployment glue around it.
+The infrastructure ships with reasonable defaults baked in:
+
+- **Backups**: Nightly tarball of `/home/ubuntu/pso-server/system/` →
+  dedicated S3 bucket with 30-day retention, AES-256 SSE, public access
+  blocked, versioning enabled. Backup IAM user has `s3:PutObject` only.
+- **DNS allowlist**: UDP 53 is restricted to `allowed_dns_cidrs` in
+  `infra/terraform.tfvars` — your home IP only by default. See
+  [operations runbook](docs/operations.md#add-a-friends-ip-to-the-dns-allowlist)
+  for adding friends.
+- **OIDC role**: GH Actions has the minimum AWS actions needed for the
+  workflows. Scoped to the specific role, bucket, and user this stack
+  owns; not broad `lightsail:*` + `s3:*`.
+- **Image tag pinning**: `docker-compose.yml` uses `:main` (latest from
+  upstream master), but every build also pushes a `:sha-XXXX` tag for
+  rollback.
+
+Worth doing manually:
+
+- **Add yourself as a required reviewer** for the `production` GitHub
+  Environment (Settings → Environments → production → Required reviewers).
+  Gates infra `apply` and `deploy` behind a manual click — your only
+  defense against a bad commit auto-deploying.
+- **Rotate the IAM CLI password** if you ever pasted it somewhere it
+  shouldn't have lived.
