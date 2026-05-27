@@ -65,13 +65,13 @@ directly. No virtual interfaces, no `tapserver` daemon — just works.
 
 ```bash
 mkdir -p /userdata/system/configs/dolphin-emu/GameSettings
-cat > /userdata/system/configs/dolphin-emu/GameSettings/GPSE8P.ini <<'EOF'
+cat > /userdata/system/configs/dolphin-emu/GameSettings/GPOE8P.ini <<'EOF'
 [Core]
 SerialPort1 = 12
 EOF
 ```
 
-Why `GPSE8P`? That's the 6-character game ID for "PSO Episode I & II Plus
+Why `GPOE8P`? That's the 6-character game ID for "PSO Episode I & II Plus
 (USA)". Dolphin reads game-specific settings from
 `GameSettings/<game-id>.ini` and they override the global Dolphin.ini.
 You can confirm the ID by booting the game once and pressing **Tab** in
@@ -103,7 +103,7 @@ fi
 Either approach: confirm by reading the file back:
 
 ```bash
-cat /userdata/system/configs/dolphin-emu/GameSettings/GPSE8P.ini
+cat /userdata/system/configs/dolphin-emu/GameSettings/GPOE8P.ini
 # or
 cat /userdata/system/configs/dolphin-emu/Dolphin.ini
 ```
@@ -257,5 +257,5 @@ public IP changes. Two options:
 - **Server static IP:** `54.173.68.119`
 - **Default game port** (PSO US Plus Rev 2 talks to TCP `9103`)
 - **Dolphin's HLE BBA SerialPort1 value:** `12`
-- **PSO Episode I & II Plus (USA) game ID:** `GPSE8P`
+- **PSO Episode I & II Plus (USA) game ID:** `GPOE8P`
 - **Server admin's contact:** josh@joshkautz.com
