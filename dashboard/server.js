@@ -27,6 +27,18 @@ const NEWSERV_API =
 const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS ?? '5000', 10);
 const CACHE_TTL_MS = parseInt(process.env.CACHE_TTL_MS ?? '10000', 10);
 
+// Commit SHA of the running newserv build. Set by docker-compose from
+// the .env file deploy.yml writes after reading the image's OCI label.
+// "unknown" when no label is available — the dashboard handles this and
+// shows "newserv —" instead of a bogus comparison.
+const NEWSERV_REV = process.env.NEWSERV_REV ?? 'unknown';
+const NEWSERV_UPSTREAM_REPO = 'fuzziqersoftware/newserv';
+const NEWSERV_UPSTREAM_BRANCH = 'master';
+// GitHub unauth rate limit is 60/hr per IP. We make at most 2 calls
+// per cache miss (commits/master + compare), so 1h TTL keeps us at
+// ~2 calls/hr — comfortably under budget even with sporadic restarts.
+const BUILD_INFO_TTL_MS = 60 * 60 * 1000;
+
 // =========================================================================
 // Safe-endpoint allowlist
 //
@@ -118,7 +130,12 @@ async function fetchCached(key, url) {
 // Routes
 // =========================================================================
 
-app.get('/api/:resource', async (req, res) => {
+app.get('/api/:resource', async (req, res, next) => {
+  // Reserved sub-resources are handled by dedicated routes registered
+  // below; defer to Express's router so /api/build hits its dedicated
+  // handler instead of falling through the allowlist (which it isn't
+  // in — /api/build doesn't proxy newserv, it queries GitHub).
+  if (req.params.resource === 'build') return next();
   const route = ALLOWLIST.get(req.params.resource);
   if (!route) {
     return res.status(404).json({ error: 'unknown resource' });
@@ -129,6 +146,87 @@ app.get('/api/:resource', async (req, res) => {
   } catch (err) {
     console.error(`[api/${req.params.resource}] ${err.message}`);
     res.status(502).json({ error: 'upstream unavailable', resource: req.params.resource });
+  }
+});
+
+// =========================================================================
+// /api/build — surfaces the running newserv SHA and how far behind it is
+// from fuzziqersoftware/newserv master.
+// =========================================================================
+
+let buildInfoCache = null;
+
+async function fetchBuildInfo() {
+  const headers = {
+    'User-Agent': 'pso-dashboard',
+    Accept: 'application/vnd.github+json',
+  };
+
+  let upstream = null;
+  let behindBy = null;
+  let upstreamError = null;
+
+  try {
+    const headRes = await fetch(
+      `https://api.github.com/repos/${NEWSERV_UPSTREAM_REPO}/commits/${NEWSERV_UPSTREAM_BRANCH}`,
+      { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
+    );
+
+    if (!headRes.ok) {
+      upstreamError = `github commits api: ${headRes.status}`;
+    } else {
+      const head = await headRes.json();
+      upstream = typeof head?.sha === 'string' ? head.sha : null;
+
+      if (upstream && NEWSERV_REV !== 'unknown') {
+        if (NEWSERV_REV === upstream) {
+          behindBy = 0;
+        } else {
+          // base=local, head=upstream → ahead_by is commits in upstream
+          // not in local, i.e. how far our deploy is behind master.
+          const cmpRes = await fetch(
+            `https://api.github.com/repos/${NEWSERV_UPSTREAM_REPO}/compare/${NEWSERV_REV}...${upstream}`,
+            { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
+          );
+          if (cmpRes.ok) {
+            const cmp = await cmpRes.json();
+            behindBy = typeof cmp?.ahead_by === 'number' ? cmp.ahead_by : null;
+          } else {
+            upstreamError = `github compare api: ${cmpRes.status}`;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    upstreamError = err.message;
+  }
+
+  return {
+    local: NEWSERV_REV,
+    upstream,
+    behindBy,
+    upstreamError,
+    commitUrl:
+      NEWSERV_REV !== 'unknown'
+        ? `https://github.com/${NEWSERV_UPSTREAM_REPO}/commit/${NEWSERV_REV}`
+        : null,
+    compareUrl:
+      upstream && NEWSERV_REV !== 'unknown' && NEWSERV_REV !== upstream
+        ? `https://github.com/${NEWSERV_UPSTREAM_REPO}/compare/${NEWSERV_REV}...${upstream}`
+        : null,
+  };
+}
+
+app.get('/api/build', async (_req, res) => {
+  try {
+    const now = Date.now();
+    if (!buildInfoCache || now - buildInfoCache.at > BUILD_INFO_TTL_MS) {
+      buildInfoCache = { at: now, data: await fetchBuildInfo() };
+    }
+    res.json(buildInfoCache.data);
+  } catch (err) {
+    console.error(`[api/build] ${err.message}`);
+    res.status(502).json({ error: 'build info unavailable' });
   }
 });
 
@@ -146,4 +244,5 @@ app.use(express.static(__dirname, { extensions: ['html'] }));
 app.listen(PORT, () => {
   console.log(`[dashboard] listening on :${PORT}`);
   console.log(`[dashboard] proxying ${ALLOWLIST.size} routes to ${NEWSERV_API}`);
+  console.log(`[dashboard] newserv revision: ${NEWSERV_REV}`);
 });

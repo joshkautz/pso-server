@@ -53,8 +53,10 @@ jobs:
         id: meta
         working-directory: newserv
         run: |
-          SHA=$(git rev-parse --short=12 HEAD)
+          SHA=$(git rev-parse HEAD)
+          SHA_SHORT=$(git rev-parse --short=12 HEAD)
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "sha_short=$SHA_SHORT" >> "$GITHUB_OUTPUT"
 
       - uses: docker/build-push-action@v6
         with:
@@ -65,6 +67,15 @@ jobs:
           # sha-XXXX = immutable, use this for production rollbacks
           tags: |
             ${{ env.IMAGE_NAME }}:main
-            ${{ env.IMAGE_NAME }}:sha-${{ steps.meta.outputs.sha }}
+            ${{ env.IMAGE_NAME }}:sha-${{ steps.meta.outputs.sha_short }}
+          # OCI labels — the dashboard reads .Config.Labels.revision at
+          # deploy time and exposes it through /api/build for the "newserv
+          # <sha> (up to date)" indicator. Full 40-char SHA so the GitHub
+          # compare URL works exactly.
+          labels: |
+            org.opencontainers.image.revision=${{ steps.meta.outputs.sha }}
+            org.opencontainers.image.source=https://github.com/fuzziqersoftware/newserv
+            org.opencontainers.image.url=https://github.com/fuzziqersoftware/newserv
+            org.opencontainers.image.title=newserv
           cache-from: type=gha
           cache-to: type=gha,mode=max

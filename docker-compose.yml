@@ -60,6 +60,12 @@ services:
       # The dashboard backend reaches newserv via the docker network using
       # the service name + the HTTPListen port from server/config.json.
       NEWSERV_API: "http://newserv:8081"
+      # The deployed newserv commit SHA. deploy.yml writes this into .env
+      # on the host by reading the OCI org.opencontainers.image.revision
+      # label off the pulled image, and compose substitutes it here.
+      # Defaults to "unknown" so the dashboard still boots cleanly when
+      # the label is missing (e.g. images built before the label landed).
+      NEWSERV_REV: "${NEWSERV_REV:-unknown}"
 
     # No published ports — Caddy is in front and reaches us via the
     # internal network at http://dashboard:8080.

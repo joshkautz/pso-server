@@ -1253,7 +1253,7 @@ const MOCK_QUESTS = [
   // Community
   { id: 'c01', name: 'Phantasmal World #1',  number: 'q201', episode: 1, source: 'community', description: 'Ephinea community quest. Atmospheric forest exploration with rare drops.', completions: 19, total: 42 },
   { id: 'c02', name: 'Phantasmal World #2',  number: 'q202', episode: 2, source: 'community', description: 'Ephinea community quest. Episode 2 narrative continuation.', completions: 14, total: 42 },
-  { id: 'c03', name: 'Doctor''s Mission',    number: 'q203', episode: 1, source: 'community', description: 'GC-Forever community quest. Medical emergency in the Mines.', completions: 8, total: 42 },
+  { id: 'c03', name: "Doctor's Mission",     number: 'q203', episode: 1, source: 'community', description: 'GC-Forever community quest. Medical emergency in the Mines.', completions: 8, total: 42 },
   { id: 'c04', name: 'Survival Trial',       number: 'q204', episode: 2, source: 'community', description: 'Ultimate-difficulty endurance quest. Survive 30 minutes against escalating waves.', completions: 4, total: 42 },
 
   // Custom (our server's own)
@@ -1519,6 +1519,69 @@ function startRareDropsStream() {
   return;
 }
 
+// ---------- Build info ----------
+//
+// Fetched once on load and re-polled hourly. The backend already caches
+// /api/build for 1 hour (GitHub API rate-limit hygiene), so polling more
+// often is wasted bytes.
+
+function renderBuildInfo(info) {
+  const el = document.getElementById('server-build');
+  if (!el) return;
+  el.replaceChildren(); // clear without innerHTML
+
+  if (!info?.local || info.local === 'unknown') {
+    el.textContent = 'newserv —';
+    return;
+  }
+
+  const sha = info.local.substring(0, 7);
+  el.appendChild(document.createTextNode('newserv '));
+
+  // Always link the SHA to the upstream commit so it's a click to inspect.
+  if (info.commitUrl) {
+    const link = document.createElement('a');
+    link.href = info.commitUrl;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = sha;
+    el.appendChild(link);
+  } else {
+    el.appendChild(document.createTextNode(sha));
+  }
+
+  // Status suffix: "(up to date)" in green when even with master,
+  // "(N behind)" linking to the GitHub compare view in warning yellow.
+  if (info.behindBy === 0) {
+    const span = document.createElement('span');
+    span.style.color = 'var(--success)';
+    span.textContent = ' (up to date)';
+    el.appendChild(span);
+  } else if (Number.isInteger(info.behindBy) && info.behindBy > 0 && info.compareUrl) {
+    el.appendChild(document.createTextNode(' ('));
+    const link = document.createElement('a');
+    link.href = info.compareUrl;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.style.color = 'var(--warning)';
+    link.textContent = `${info.behindBy} behind`;
+    el.appendChild(link);
+    el.appendChild(document.createTextNode(')'));
+  }
+  // behindBy === null (e.g. GitHub rate-limited) → no status suffix
+}
+
+async function refreshBuildInfo() {
+  try {
+    const info = await fetchJSON('build');
+    renderBuildInfo(info);
+  } catch (err) {
+    // Keep whatever's already rendered; transient errors shouldn't
+    // wipe the build row.
+    console.warn('[build] refresh failed:', err.message);
+  }
+}
+
 // ---------- Countdown to July 20, 2026 ----------
 //
 // Targets local midnight on the destination day so the visible day count
@@ -1604,6 +1667,12 @@ document.addEventListener('DOMContentLoaded', () => {
   refreshLive();
   setInterval(refreshLive, REFRESH_INTERVAL_MS);
   startRareDropsStream();
+
+  // Build info changes only when a new image is deployed. Once per hour
+  // is plenty — the backend already serves it from a 1-hour cache. A
+  // hard reload always picks up the latest if needed.
+  refreshBuildInfo();
+  setInterval(refreshBuildInfo, 60 * 60 * 1000);
 });
 </script>
 
