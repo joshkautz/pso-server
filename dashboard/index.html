@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PSO Josh — Server Dashboard</title>
-<meta name="description" content="Status, quests, and live activity on the PSO Josh private Phantasy Star Online server.">
+<title>Surly — Phantasy Star Online server</title>
+<meta name="description" content="Status, quests, and live activity on Surly — a private Phantasy Star Online server.">
 <meta name="theme-color" content="#0a0e1a">
 
 <!--
@@ -179,6 +179,10 @@
 
   /* =================================================================
      Top nav
+     - Uses the same .container as the body so left/right padding aligns
+       perfectly with main content at every breakpoint.
+     - Wraps gracefully under ~640px so the nav drops below the brand/
+       status row instead of overflowing.
      ================================================================= */
   .topbar {
     border-bottom: 1px solid var(--line-soft);
@@ -191,8 +195,29 @@
   .topbar__inner {
     display: flex;
     align-items: center;
-    gap: var(--space-5);
+    flex-wrap: wrap;
+    column-gap: var(--space-4);
+    row-gap: var(--space-3);
     padding: var(--space-4) 0;
+  }
+  /* Status pill sits between brand and nav by default; on small screens
+     it wraps to a new line cleanly. The brand takes equal priority. */
+  .topbar__inner .nav { margin-left: auto; }
+
+  /* Below ~640px, drop the nav to a second row spanning the full width
+     so it doesn't collide with the brand. Brand + status share row 1. */
+  @media (max-width: 640px) {
+    .topbar__inner { row-gap: var(--space-2); }
+    .topbar__inner .nav {
+      margin-left: 0;
+      width: 100%;
+      justify-content: space-between;
+      gap: var(--space-1);
+    }
+    .topbar__inner .nav a {
+      padding: var(--space-2);
+      font-size: 0.85rem;
+    }
   }
   .brand {
     display: flex;
@@ -375,9 +400,20 @@
 
   /* =================================================================
      Section heads
+     - scroll-margin-top reserves space for the sticky header when an
+       anchor link is followed, so the section title isn't hidden
+       behind the topbar.
      ================================================================= */
-  section { padding: var(--space-8) 0; border-bottom: 1px solid var(--line-subtle); }
+  section {
+    padding: var(--space-8) 0;
+    border-bottom: 1px solid var(--line-subtle);
+    scroll-margin-top: 84px;
+  }
   section:last-child { border-bottom: none; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
 
   .section-head {
     display: flex;
@@ -810,9 +846,9 @@
 <!-- ================================================================ -->
 <header class="topbar" role="banner">
   <div class="container topbar__inner">
-    <a class="brand" href="#main" aria-label="PSO Josh — home">
+    <a class="brand" href="#main" aria-label="Surly — home">
       <span class="brand__mark" aria-hidden="true">⌬</span>
-      <span class="brand__name">PSO Josh</span>
+      <span class="brand__name">Surly</span>
     </a>
 
     <span class="status-pill" data-status="online" role="status" aria-live="polite">
@@ -825,6 +861,7 @@
       <a href="#quests">Quests</a>
       <a href="#features">Features</a>
       <a href="#join">Join</a>
+      <a href="#resources">Resources</a>
     </nav>
   </div>
 </header>
@@ -855,7 +892,7 @@
       <dl class="identity" aria-label="Server identity">
         <div class="identity__row">
           <dt>Server name</dt>
-          <dd id="server-name">PSO Josh</dd>
+          <dd id="server-name">Surly</dd>
         </div>
         <div class="identity__row">
           <dt>Login host</dt>
@@ -1029,18 +1066,131 @@
     <div class="container">
       <div class="section-head">
         <h2 id="join-title">Joining</h2>
+        <span class="section-head__hint">Pick your client</span>
       </div>
-      <div class="panel">
-        <p style="margin-top: 0;">
-          Three steps. Send Josh your public IP first
-          (<a href="https://ifconfig.io" rel="noopener">ifconfig.io</a>) — that's required for the
-          DNS allowlist. Then:
+
+      <div class="panel" style="margin-bottom: var(--space-5);">
+        <p style="margin: 0; color: var(--text-mid);">
+          <strong style="color: var(--text-high);">First:</strong> send Surly's admin
+          your public IP from <a href="https://ifconfig.io" rel="noopener">ifconfig.io</a>.
+          The server's DNS only answers for allowlisted addresses — without this,
+          every other step will silently fail.
         </p>
-        <ol style="line-height: 1.8; color: var(--text-mid); padding-left: 1.5rem;">
-          <li><strong>Real GameCube + Broadband Adapter:</strong> set Primary DNS to <code>54.173.68.119</code> in PSO's network setup screen.</li>
-          <li><strong>Dolphin (desktop):</strong> add <code>BBA_BUILTIN_DNS = 54.173.68.119</code> under <code>[Core]</code> in your global <code>Dolphin.ini</code>. See <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-dolphin.md">client-setup-dolphin.md</a>.</li>
-          <li><strong>Batocera:</strong> same Dolphin setting, paths in <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup.md">client-setup.md</a>.</li>
-        </ol>
+      </div>
+
+      <div class="features" role="list">
+        <article class="feature" role="listitem">
+          <h3>Dolphin (desktop)</h3>
+          <p>One line in <code>Dolphin.ini</code> + a per-game config for the
+          memory card. Works on macOS, Windows, and Linux.</p>
+          <p style="margin-top: var(--space-3);">
+            <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-dolphin.md">Setup guide →</a>
+          </p>
+        </article>
+
+        <article class="feature" role="listitem">
+          <h3>Batocera + Dolphin</h3>
+          <p>For Batocera Linux handhelds or HTPCs running standalone Dolphin.
+          Same setting, different config paths.</p>
+          <p style="margin-top: var(--space-3);">
+            <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup.md">Setup guide →</a>
+          </p>
+        </article>
+
+        <article class="feature" role="listitem">
+          <h3>Real GameCube + BBA</h3>
+          <p>Plug a Broadband Adapter into the GameCube's serial port. Set
+          Primary DNS to <code>54.173.68.119</code> inside PSO's network setup
+          screen. No emulator-side config involved.</p>
+          <p style="margin-top: var(--space-3);">
+            <em style="color: var(--text-low); font-size: 0.85rem;">Dedicated guide coming.</em>
+          </p>
+        </article>
+
+        <article class="feature" role="listitem">
+          <h3>PSO Blue Burst (PC)</h3>
+          <p>The PC continuation of PSO. Different protocol and version family
+          than the GameCube discs — uses a separate config block on the server
+          side. Friends with BB clients (Tethealla, etc.) are welcome but the
+          server-side setup is its own thing.</p>
+          <p style="margin-top: var(--space-3);">
+            <em style="color: var(--text-low); font-size: 0.85rem;">Setup guide coming.</em>
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- Resources                                                       -->
+  <!-- ============================================================== -->
+  <section id="resources" aria-labelledby="resources-title">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="resources-title">Resources</h2>
+        <span class="section-head__hint">For new hunters</span>
+      </div>
+
+      <div class="features" role="list" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+        <article class="feature" role="listitem">
+          <h3>Learn the game</h3>
+          <ul style="margin: 0; padding-left: 1.25rem; line-height: 1.8; color: var(--text-mid); font-size: 0.9rem;">
+            <li><a href="https://www.pso-world.com/items.php">PSO-World item database</a></li>
+            <li><a href="https://wiki.pioneer2.net/w/Main_Page">Pioneer 2 wiki (Ephinea)</a></li>
+            <li><a href="https://wiki.pioneer2.net/w/Section_IDs">Section IDs explained</a></li>
+            <li><a href="https://gamefaqs.gamespot.com/gamecube/516243-phantasy-star-online-episode-i-and-ii/faqs">GameFAQs walkthroughs</a></li>
+          </ul>
+        </article>
+
+        <article class="feature" role="listitem">
+          <h3>Quest archives</h3>
+          <ul style="margin: 0; padding-left: 1.25rem; line-height: 1.8; color: var(--text-mid); font-size: 0.9rem;">
+            <li><a href="https://wiki.pioneer2.net/w/Quests">Ephinea wiki — quest catalog</a></li>
+            <li><a href="https://github.com/b0n3zx/PSOquest">b0n3zx PSOquest (GCI files)</a></li>
+            <li><a href="https://www.pso-world.com/download.php?cat=Download+Quests">PSO-World quest downloads</a></li>
+            <li><a href="https://psopalace.sylverant.net/rdo.html">PSO Palace (Sylverant archive)</a></li>
+          </ul>
+        </article>
+
+        <article class="feature" role="listitem">
+          <h3>Calculators &amp; tools</h3>
+          <ul style="margin: 0; padding-left: 1.25rem; line-height: 1.8; color: var(--text-mid); font-size: 0.9rem;">
+            <li><a href="https://eleriaqueen.github.io/pso-simple-section-id-calculator/">Section ID calculator</a></li>
+            <li><a href="http://www.pso-world.com/secid_BB.php">PSO-World section calc</a></li>
+            <li><a href="https://github.com/Lemonilla/MagAi">MAG feeding plan generator</a></li>
+            <li><a href="https://www.phantasmal.world/#/viewer/">Phantasmal model viewer</a></li>
+          </ul>
+        </article>
+
+        <article class="feature" role="listitem">
+          <h3>Other private servers</h3>
+          <ul style="margin: 0; padding-left: 1.25rem; line-height: 1.8; color: var(--text-mid); font-size: 0.9rem;">
+            <li><a href="https://ephinea.pioneer2.net/">Ephinea</a> — PSO BB, largest active community</li>
+            <li><a href="https://schtserv.com/">Schtserv</a> — PSO GC + DC + BB, the oldest</li>
+            <li><a href="https://sylverant.net/">Sylverant</a> — PSO GC + DC</li>
+            <li><a href="https://www.phantasystaronline.net/">Ultima</a> — PSO BB</li>
+          </ul>
+        </article>
+
+        <article class="feature" role="listitem">
+          <h3>Community forums</h3>
+          <ul style="margin: 0; padding-left: 1.25rem; line-height: 1.8; color: var(--text-mid); font-size: 0.9rem;">
+            <li><a href="https://www.pioneer2.net/community/">Pioneer 2</a> — the most active forum</li>
+            <li><a href="https://www.pso-world.com/forums/forumdisplay.php?7-Phantasy-Star-Online">PSO-World</a> — classic</li>
+            <li><a href="https://schtserv.com/forums/index.php">Schtserv forum</a></li>
+            <li><a href="https://github.com/tcardlab/awesome-pso">awesome-pso</a> — curated everything</li>
+          </ul>
+        </article>
+
+        <article class="feature" role="listitem">
+          <h3>What's running this server</h3>
+          <ul style="margin: 0; padding-left: 1.25rem; line-height: 1.8; color: var(--text-mid); font-size: 0.9rem;">
+            <li><a href="https://github.com/fuzziqersoftware/newserv">newserv</a> — the server software</li>
+            <li><a href="https://github.com/joshkautz/pso-server">Surly's deployment</a> — Terraform + Docker scaffolding</li>
+            <li><a href="https://dolphin-emu.org/">Dolphin emulator</a> — most common client</li>
+            <li><a href="https://retroachievements.org/game/5404">RA achievements for Plus</a></li>
+          </ul>
+        </article>
       </div>
     </div>
   </section>
