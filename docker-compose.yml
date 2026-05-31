@@ -61,12 +61,42 @@ services:
       # the service name + the HTTPListen port from server/config.json.
       NEWSERV_API: "http://newserv:8081"
 
-    # Public dashboard. The container listens internally on 8080; we
-    # publish to the host's port 80 for plain HTTP. HTTPS termination
-    # happens at Cloudflare's edge if you point the domain through them
-    # (recommended) — no change required here in either case.
+    # No published ports — Caddy is in front and reaches us via the
+    # internal network at http://dashboard:8080.
+    networks:
+      - internal
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  caddy:
+    # Public HTTPS layer for the dashboard. Listens on 80 + 443 on the
+    # host, terminates TLS via Let's Encrypt, and reverse-proxies to the
+    # dashboard container on the internal network. Auto-renews certs.
+    image: caddy:2-alpine
+    container_name: pso-caddy
+    restart: unless-stopped
+    depends_on:
+      - dashboard
+
     ports:
-      - "80:8080"
+      # Both required: 80 is used for the ACME HTTP-01 challenge AND for
+      # the HTTP -> HTTPS redirect; 443 serves the dashboard over TLS.
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      # Bind-mount the Caddyfile from the host so config changes don't
+      # require rebuilding anything.
+      - /home/ubuntu/pso-server/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Persistent storage for issued certificates + ACME account state.
+      # Without these volumes, every container restart re-fetches certs
+      # and you'll hit Let's Encrypt rate limits.
+      - caddy_data:/data
+      - caddy_config:/config
 
     networks:
       - internal
@@ -76,6 +106,10 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  caddy_data:
+  caddy_config:
 
 # Isolated bridge network so newserv's REST API on :8081 is reachable
 # only from sibling containers, never from the host or the internet.

@@ -86,14 +86,21 @@ resource "aws_lightsail_instance_public_ports" "pso" {
     cidrs     = [var.allowed_game_cidr]
   }
 
-  # Public HTTP for the dashboard (pso.joshkautz.com). The dashboard
-  # container terminates plain HTTP here; HTTPS termination happens at
-  # Cloudflare's edge when DNS is proxied through them. If you decide
-  # later to terminate HTTPS on the box itself, add a port_info block
-  # for 443 below and put a caddy/nginx sidecar in docker-compose.yml.
+  # Public HTTP for the dashboard. Caddy uses port 80 for the Let's
+  # Encrypt ACME HTTP-01 challenge and for redirecting HTTP -> HTTPS.
   port_info {
     from_port = 80
     to_port   = 80
+    protocol  = "tcp"
+    cidrs     = ["0.0.0.0/0"]
+  }
+
+  # Public HTTPS for the dashboard. Caddy terminates TLS here and
+  # reverse-proxies to the dashboard container on the internal docker
+  # network.
+  port_info {
+    from_port = 443
+    to_port   = 443
     protocol  = "tcp"
     cidrs     = ["0.0.0.0/0"]
   }

@@ -7,6 +7,7 @@ on:
       - "server/**"
       - "dashboard/**"
       - "docker-compose.yml"
+      - "Caddyfile"
       - ".github/workflows/deploy.yml"
   workflow_run:
     workflows: ["build-image", "build-dashboard"]
@@ -79,14 +80,15 @@ jobs:
           echo "::error::cloud-init did not finish in 10 minutes"
           exit 1
 
-      - name: upload docker-compose.yml
+      - name: upload docker-compose.yml + Caddyfile
         run: |
-          # docker-compose.yml lives at the repo root so both newserv and
-          # dashboard build contexts are reachable via simple relative
-          # paths on the deploy host.
+          # Both live at the repo root; both end up at
+          # /home/ubuntu/pso-server/ on the deploy host. Caddy's
+          # bind-mount reads Caddyfile from there.
           scp -i ~/.ssh/deploy \
             docker-compose.yml \
-            ubuntu@${{ steps.lightsail.outputs.ip }}:/home/ubuntu/pso-server/docker-compose.yml
+            Caddyfile \
+            ubuntu@${{ steps.lightsail.outputs.ip }}:/home/ubuntu/pso-server/
 
       - name: pull image
         run: |

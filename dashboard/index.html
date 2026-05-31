@@ -198,7 +198,10 @@
     flex-wrap: wrap;
     column-gap: var(--space-4);
     row-gap: var(--space-3);
-    padding: var(--space-4) 0;
+    /* padding-block, not padding shorthand — the `padding: ... 0`
+       shorthand was clobbering .container's horizontal padding and
+       letting the nav bleed to the viewport edge. */
+    padding-block: var(--space-4);
   }
   /* Status pill sits between brand and nav by default; on small screens
      it wraps to a new line cleanly. The brand takes equal priority. */
@@ -846,11 +849,6 @@
 <!-- ================================================================ -->
 <header class="topbar" role="banner">
   <div class="container topbar__inner">
-    <a class="brand" href="#main" aria-label="PSO Server — home">
-      <span class="brand__mark" aria-hidden="true">⌬</span>
-      <span class="brand__name">PSO Server</span>
-    </a>
-
     <span class="status-pill" data-status="online" role="status" aria-live="polite">
       <span class="status-pill__dot" aria-hidden="true"></span>
       <span>Server online</span>

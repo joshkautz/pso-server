@@ -1,0 +1,34 @@
+# Caddy config for the public dashboard.
+#
+# Caddy listens on 80 + 443, auto-provisions a Let's Encrypt cert for the
+# hostname below the first time it's reached, redirects HTTP -> HTTPS,
+# and reverse-proxies to the dashboard container on the internal docker
+# network. Certificates are persisted in the named volume `caddy_data`
+# (see docker-compose.yml) so renewals happen seamlessly and we don't
+# refetch on every restart.
+#
+# Update `pso.joshkautz.com` below if you ever move the dashboard to a
+# different hostname.
+
+pso.joshkautz.com {
+    reverse_proxy dashboard:8080
+
+    encode zstd gzip
+
+    # Sensible browser hardening defaults. None of these break the
+    # dashboard's behaviour; they just close off common XSS and
+    # clickjacking footguns.
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "interest-cohort=()"
+        -Server
+    }
+
+    log {
+        output stdout
+        format console
+    }
+}
