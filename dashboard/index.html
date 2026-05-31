@@ -889,10 +889,6 @@
 
       <dl class="identity" aria-label="Server identity">
         <div class="identity__row">
-          <dt>Server name</dt>
-          <dd id="server-name">PSO Server</dd>
-        </div>
-        <div class="identity__row">
           <dt>Login host</dt>
           <dd id="server-host">54.173.68.119</dd>
         </div>
@@ -901,12 +897,8 @@
           <dd>9100 / 9103</dd>
         </div>
         <div class="identity__row">
-          <dt>Region</dt>
-          <dd>us-east-1</dd>
-        </div>
-        <div class="identity__row">
           <dt>Build</dt>
-          <dd id="server-build">newserv 2026-05-28</dd>
+          <dd id="server-build">newserv —</dd>
         </div>
       </dl>
     </div>
@@ -927,32 +919,32 @@
           <div class="metric__label" id="m-online">
             <span aria-hidden="true">●</span> Hunters online
           </div>
-          <div class="metric__value" id="metric-online" aria-live="polite">7</div>
-          <div class="metric__delta metric__delta--up">+2 in the last hour</div>
+          <div class="metric__value" id="metric-online" aria-live="polite">—</div>
+          <div class="metric__delta" id="metric-online-delta"></div>
         </article>
 
         <article class="metric" role="listitem" aria-labelledby="m-games">
           <div class="metric__label" id="m-games">
             <span aria-hidden="true">◆</span> Active games
           </div>
-          <div class="metric__value" id="metric-games" aria-live="polite">3</div>
-          <div class="metric__delta">across 1 block</div>
+          <div class="metric__value" id="metric-games" aria-live="polite">—</div>
+          <div class="metric__delta" id="metric-games-delta"></div>
         </article>
 
-        <article class="metric" role="listitem" aria-labelledby="m-accounts">
-          <div class="metric__label" id="m-accounts">
-            <span aria-hidden="true">▲</span> Registered accounts
+        <article class="metric" role="listitem" aria-labelledby="m-uptime">
+          <div class="metric__label" id="m-uptime">
+            <span aria-hidden="true">⊙</span> Uptime
           </div>
-          <div class="metric__value" id="metric-accounts">42</div>
-          <div class="metric__delta">since the server opened</div>
+          <div class="metric__value" id="metric-uptime" aria-live="polite">—</div>
+          <div class="metric__delta" id="metric-uptime-delta"></div>
         </article>
 
         <article class="metric" role="listitem" aria-labelledby="m-quests">
           <div class="metric__label" id="m-quests">
             <span aria-hidden="true">✦</span> Available quests
           </div>
-          <div class="metric__value" id="metric-quests">128</div>
-          <div class="metric__delta">official + community</div>
+          <div class="metric__value" id="metric-quests">—</div>
+          <div class="metric__delta" id="metric-quests-delta"></div>
         </article>
       </div>
 
@@ -1230,21 +1222,13 @@ async function fetchJSON(path) {
   return res.json();
 }
 
-// ---------- Mock data (matches the shape of real API responses) ----------
+// ---------- Live data buffers ----------
+// Populated by refreshLive() from /api/lobbies and (TODO) the rare-drops
+// WebSocket. Empty by default so the page shows an honest empty state
+// before the first API response lands, not flashes of stale fake data.
 
-const MOCK_GAMES = [
-  { name: 'TTF rerun', episode: 1, difficulty: 'Very Hard', players: 4, leader: 'Sonic', mode: 'Normal' },
-  { name: 'Maximum Attack', episode: 2, difficulty: 'Ultimate', players: 3, leader: 'Tails', mode: 'Battle' },
-  { name: 'Solo Caves grind', episode: 1, difficulty: 'Hard', players: 1, leader: 'Knuckles', mode: 'Solo' },
-];
-
-const MOCK_DROPS = [
-  { item: 'Heaven Striker', player: 'RUSTY', game: 'TTF rerun', ts: '15s ago' },
-  { item: 'Psycho Wand',    player: 'AURORA', game: 'Caves grind', ts: '4m ago' },
-  { item: 'Lavis Cannon',   player: 'NEPTUNE', game: 'Maximum Attack', ts: '12m ago' },
-  { item: 'God/Battle',     player: 'SONIC', game: 'TTF rerun', ts: '18m ago' },
-  { item: 'STA/Maximum',    player: 'TAILS', game: 'Ruins party', ts: '34m ago' },
-];
+const MOCK_GAMES = [];
+const MOCK_DROPS = [];
 
 const MOCK_QUESTS = [
   // Official Government quests
@@ -1450,46 +1434,78 @@ function setupSearch() {
 
 // ---------- Live API helpers — fall back to mock data on error ----------
 
+// newserv's /y/summary returns:
+//   { Server: { ClientCount, GameCount, LobbyCount, ServerName, UptimeUsecs, ... },
+//     Games: [...], Clients: [...] }
+// /y/lobbies returns an array of lobby objects, each with IsGame, ClientIDs
+// (array of clientId-or-null), Block, ID, MaxClients, AllowedVersions, ...
+// /y/data/quests returns { Quests: [...] }.
+// Field names are PascalCase — match newserv's JSON, not our mock shape.
+
+function formatUptime(usecs) {
+  if (!Number.isFinite(usecs) || usecs <= 0) return '—';
+  const totalSec = Math.floor(usecs / 1_000_000);
+  const days  = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins  = Math.floor((totalSec % 3600) / 60);
+  const secs  = totalSec % 60;
+  if (days  > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  if (mins  > 0) return `${mins}m ${secs}s`;
+  return `${secs}s`;
+}
+
+function formatStartedAt(startTimeStr) {
+  // newserv returns "2026-05-31 22:32:32.086149" (UTC). Show as a
+  // human-friendly local date if we can parse it.
+  if (!startTimeStr) return '';
+  const iso = startTimeStr.replace(' ', 'T').replace(/\.\d+$/, '') + 'Z';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `since ${d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`;
+}
+
 async function refreshLive() {
-  // Run independently so a single failure doesn't kill the page. Each
-  // section keeps its mock data if its fetch fails.
+  // Run independently so a single failure doesn't kill the page.
   await Promise.allSettled([
     fetchJSON('summary').then((s) => {
       const set = (id, v) => {
         const el = document.getElementById(id);
         if (el && v != null) el.textContent = v;
       };
-      set('metric-online',   s.connected_clients ?? s.online ?? null);
-      set('metric-games',    s.active_games      ?? s.games  ?? null);
-      set('metric-accounts', s.account_count     ?? s.accounts ?? null);
+      const srv = s?.Server ?? {};
+      set('metric-online',         srv.ClientCount);
+      set('metric-games',          srv.GameCount);
+      set('metric-uptime',         formatUptime(srv.UptimeUsecs));
+      set('metric-uptime-delta',   formatStartedAt(srv.StartTime));
+      set('metric-games-delta',    srv.LobbyCount != null ? `across ${srv.LobbyCount} lobbies` : '');
     }),
     fetchJSON('lobbies').then((lobbies) => {
-      if (Array.isArray(lobbies)) {
-        const games = lobbies
-          .filter((l) => l.is_game || l.players?.length)
-          .map((l) => ({
-            name: l.name ?? `Game ${l.id}`,
-            episode: l.episode ?? 1,
-            difficulty: l.difficulty ?? 'Normal',
-            players: (l.players?.length ?? 0),
-            mode: l.mode ?? 'Normal',
-          }));
-        if (games.length > 0) {
-          MOCK_GAMES.splice(0, MOCK_GAMES.length, ...games);
-          renderGames();
-        }
-      }
+      if (!Array.isArray(lobbies)) return;
+      const games = lobbies
+        .filter((l) => l.IsGame === true)
+        .map((l) => ({
+          name:       l.Name       ?? `Game ${l.ID}`,
+          episode:    l.Episode    ?? 1,
+          difficulty: l.Difficulty ?? 'Normal',
+          mode:       l.Mode       ?? 'Normal',
+          players:    Array.isArray(l.ClientIDs)
+                        ? l.ClientIDs.filter((x) => x != null).length
+                        : 0,
+        }));
+      // Always render — even when there are 0 games, we want to show
+      // the empty state, not stale mock data.
+      MOCK_GAMES.splice(0, MOCK_GAMES.length, ...games);
+      renderGames();
     }),
     fetchJSON('quests').then((data) => {
-      // newserv's /y/data/quests shape may differ from our mock. For v1
-      // we keep MOCK_QUESTS as the display source until we wire the
-      // adapter and decide on quest-completion exposure (see
-      // notes/quest-completions.md when that PR lands).
-      const count = Array.isArray(data) ? data.length
-                  : data?.quests?.length
-                  ?? null;
+      // /y/data/quests shape is much richer than our quest cards need
+      // (Metadata, FloorAssignments, etc.). For v1 we surface the count
+      // only — the cards still come from MOCK_QUESTS until we wire a
+      // proper adapter + quest-completion exposure.
+      const quests = Array.isArray(data?.Quests) ? data.Quests : null;
       const el = document.getElementById('metric-quests');
-      if (el && count != null) el.textContent = count;
+      if (el && quests) el.textContent = quests.length;
     }),
   ]);
 }
