@@ -1,139 +1,122 @@
 # Dashboard
 
-Public-facing status + quest browser for the PSO Josh server.
+Public-facing status + quest browser for the private newserv PSO server.
 
-Open `index.html` in any modern browser. The prototype currently runs on
-mock data; the real newserv REST API integration points are commented
-inline in `<script>` so you can see where each section's data comes from.
+Two files do the work:
 
-## Design principles
+- **`index.html`** — the dashboard itself. All HTML, CSS, and frontend
+  JS in one self-contained file. Renders mock data immediately and
+  overlays live data from `/api/*` once the backend responds.
+- **`server.js`** — tiny Node.js + Express backend. Serves `index.html`
+  and proxies a hardcoded allowlist of newserv REST endpoints under
+  `/api/*`. Everything outside the allowlist is rejected.
 
-- **Tasteful Pioneer-2 aesthetic, not nostalgia cosplay.** Deep navy
-  surfaces, cyan as the primary, magenta as the rare-drop accent. The
-  Orbitron display font carries the sci-fi flavor in headings; Inter
-  handles all body copy for legibility; JetBrains Mono for numbers
-  and codes.
-- **WCAG 2.1 AA throughout.** Foreground/background pairings tested at
-  ≥7.6:1 for body text. Focus rings via `:focus-visible` are present
-  on every interactive element. Semantic HTML — `<header>`,
-  `<main>`, `<section>`, `<article>`, `<nav>`, `<footer>`,
-  `<fieldset>` + `<legend>` for chip groups, `<dl>` for the
-  identity panel. ARIA only where semantics aren't enough
-  (`aria-live` for the rare-drop ticker and metric counters,
-  `aria-pressed` for chip-style toggles, `aria-current` for nav).
-- **Keyboard reachable.** Tab order matches visual order. Quest cards
-  are focusable via `tabindex="0"`. Skip-link at the top.
-- **Honours `prefers-reduced-motion`.** Pulse animations and
-  transitions collapse to ~0ms.
-- **Works without JS.** Static content is in the HTML; JS only
-  hydrates dynamic sections.
-- **Mobile-first.** Single-column under 720px; the layout grows into
-  a 12-column grid as space allows.
+## How the pieces connect
 
-## Sections
+```
+public internet
+      │
+      ▼
+   Lightsail :80
+      │
+      ▼
+┌───────────────────────────┐
+│ dashboard container        │
+│   /        → index.html    │
+│   /api/*   → proxy + strip │
+└───────────────┬────────────┘
+                │ docker bridge network (private)
+                ▼
+┌───────────────────────────┐
+│ newserv container          │
+│   REST API on :8081        │
+│   (HTTPListen in           │
+│    server/config.json)     │
+└────────────────────────────┘
+```
 
-1. **Top bar** — server name, status pill (live state), nav.
-2. **Hero** — server description + identity card (host/port/region/build).
-3. **Live** — four metric cards + active games panel + rare-drop ticker.
-4. **Quest library** — search, filter by episode + source, grid of
-   quest cards with completion progress.
-5. **What this server supports** — features grid.
-6. **Joining** — three-step setup pointing at the client setup docs.
+The newserv REST API is **never** published to the host. It's only
+reachable from sibling containers on the `internal` docker network.
+The dashboard container is the only thing on that network that talks
+to it, and it only forwards `GET` requests for a small set of safe
+routes.
 
-## Mapping mock data → real newserv REST API
+## Safe-endpoint allowlist
 
-| UI section | API endpoint | Notes |
+Defined in `server.js`. As of v1:
+
+| Public path | Upstream | Sanitiser |
 |---|---|---|
-| Metric: Hunters online | `GET /y/summary.connected_clients` | Or count from `/y/clients` |
-| Metric: Active games | `GET /y/summary.active_games` | Or count from `/y/lobbies` |
-| Metric: Registered accounts | `GET /y/summary.account_count` | |
-| Metric: Available quests | `GET /y/data/quests` | Count the response |
-| Active games panel | `GET /y/lobbies` | Filter for `is_game === true` |
-| Rare drop ticker | `WS /y/rare-drops/stream` | Push events arrive as JSON |
-| Server identity | `GET /` + `GET /y/server` | Build date, revision, host |
-| Quest library | `GET /y/data/quests` | Returns metadata for every quest |
+| `GET /api/summary` | `GET /y/summary` | Drops per-client identifiers, keeps counts + names |
+| `GET /api/lobbies` | `GET /y/lobbies` | Strips player remote addresses, keeps names |
+| `GET /api/server` | `GET /y/server` | Passthrough |
+| `GET /api/quests` | `GET /y/data/quests` | Passthrough |
 
-## Quest completion tracking
+Adding new endpoints is a deliberate act — never proxy
+`/y/shell-exec` (arbitrary code execution) or `/y/accounts` (PII)
+without thinking through what gets surfaced.
 
-The dashboard mockup shows per-quest completion counts (e.g. "38 of 42
-accounts"). **This data is not exposed by newserv's current REST API.**
+## Mapping deferred to v2
 
-To make it real, you have two paths:
+Two things in the design are still "coming soon" because they need
+newserv-side work:
 
-1. **Extend newserv with a new endpoint.** Quest completion flags
-   are tracked in BB character files (and per-game flag state for
-   v1/v2/GC). Adding `GET /y/data/quests/<id>/completions` that
-   walks the account database and counts completions would be a
-   small PR to newserv. This is the right long-term move and
-   useful upstream.
+1. **Quest completion stats.** Per-quest "who completed this" + per-
+   player "what have I completed" both require new endpoints on
+   newserv that walk the saved character files and read their
+   `quest_flags` arrays (offset `0x460` in the character struct).
+   Plan: re-fork newserv when ready, add `GET /y/accounts/<id>/
+   quest-completions` + `GET /y/data/quests/<num>/completions`,
+   submit upstream as a small PR.
+2. **Rare drop ticker live data.** newserv exposes `WS /y/rare-drops
+   /stream` already; the dashboard backend just needs a WebSocket
+   proxy hop. Not in v1 because the WS bridge is more involved than
+   plain HTTP forwarding.
 
-2. **Derive from server logs.** newserv emits structured log lines
-   when quests start and end. A tiny log-tailing service on the
-   server could write per-quest completion counters into a small
-   SQLite DB the dashboard reads from.
+The frontend renders mock data for both so the page is complete-looking
+in the meantime.
 
-Path 1 is correct; path 2 is faster to ship.
+## Local development
 
-## Wiring up the real API (when ready)
+```bash
+# Install deps
+cd dashboard
+npm install
 
-newserv's REST API is **off by default** because two endpoints
-(`/y/accounts`, `/y/shell-exec`) leak sensitive data or execute
-arbitrary code. To enable it safely:
+# Start the backend pointed at a local newserv (optional — without
+# newserv running, you'll see mock data with API errors in the console).
+NEWSERV_API=http://localhost:8081 npm run dev
+```
 
-1. In `pso-server/server/config.json`, add an `HTTPListen` entry
-   bound to localhost only:
+Then open <http://localhost:8080>.
 
-   ```json
-   "HTTPListen": ["127.0.0.1:8080"]
-   ```
+If you just want to look at the design, opening `index.html` directly
+in a browser works too — the mock data is the fallback for anything
+the API can't supply.
 
-   Or, if you're running newserv inside Docker on Lightsail and the
-   dashboard backend is on the same host, you can use the docker
-   bridge address. Either way: do not bind to `0.0.0.0`.
+## Deployment
 
-2. Stand up a small backend on the same Lightsail instance (Node,
-   Python, Caddy with reverse-proxy + JSON transform, whatever) that:
-   - Polls or proxies the safe endpoints (`/y/summary`,
-     `/y/lobbies`, `/y/data/quests`)
-   - Exposes a public-facing whitelist to the dashboard
-   - Strips PII (player real-name fields, IPs)
-   - Never proxies `/y/accounts` or `/y/shell-exec`
+1. Push to `main`. GitHub Actions:
+   - `.github/workflows/build-dashboard.yml` rebuilds the container image
+     on any change under `dashboard/**` and pushes
+     `ghcr.io/joshkautz/pso-dashboard:main`.
+   - `.github/workflows/deploy.yml` pulls the new image onto the
+     Lightsail instance and runs `docker compose up -d`.
 
-3. In `index.html`, replace the `MOCK_*` constants and uncomment the
-   `refresh()` + WebSocket setup. The renderers (`renderGames`,
-   `renderDrops`, `renderQuests`) are written to accept the API's
-   actual data shapes — minimal adapter code.
+2. Open `pso.joshkautz.com` (or whatever DNS you point at the Lightsail
+   IP).
 
-## Hosting
-
-A few realistic options:
-
-- **Same Lightsail instance, served from nginx/Caddy alongside the
-  dashboard backend.** Simplest. One certificate to manage.
-- **Cloudflare Pages or GitHub Pages** with the dashboard backend
-  exposed via a separate small subdomain. Free tier covers it; CDN
-  edge caching helps if the dashboard gets shared.
-- **Bundled into newserv's static directory.** newserv has a
-  `static/` directory; you could PR an "optional dashboard" target.
-
-## Not yet built but worth considering
-
-- **Episode 3 card browser.** newserv's API has
-  `/y/data/ep3-cards` — there's a whole card game in there for
-  someone who wants to surface it.
-- **Per-player public profile.** Opt-in only — let a hunter
-  generate a shareable URL showing their character + quest
-  completions + favourite rare drop.
-- **Discord webhook for rare drops.** Same WebSocket the dashboard
-  uses can also feed a Discord bot.
-- **Weekly leaderboard.** Top hunters by quest completions, longest
-  online time, biggest rare-drop find.
+For HTTPS, the recommended path is proxying the domain through
+Cloudflare — they terminate HTTPS at their edge and connect back to
+your Lightsail box over plain HTTP. Zero server-side cert management.
+If you'd rather not use Cloudflare, add a Caddy or nginx sidecar to
+`docker-compose.yml` later; nothing about the current setup changes
+either way.
 
 ## Files
 
-- `index.html` — the entire dashboard, self-contained.
+- `Dockerfile` — Node 22 alpine. Builds in CI.
+- `package.json` — express only.
+- `server.js` — backend (proxy + allowlist + static serving).
+- `index.html` — frontend (single self-contained file).
 - `README.md` — this file.
-
-When the design is locked, split `index.html` into separate
-`index.html`, `styles.css`, `app.js`, and add a build step (Vite is
-overkill; a one-line bundler is fine).

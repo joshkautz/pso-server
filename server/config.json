@@ -102,7 +102,12 @@
   // from e.g. an in-house Web portal or Discord bot. It would be unwise to expose any of these ports to the public
   // Internet (hence why the default here is blank). The format of entries in this list is the same as for
   // IPStackListen and PPPStackListen.
-  "HTTPListen": [],
+  // HTTPListen entry below binds the REST API to port 8081 on all interfaces
+  // INSIDE the newserv container. Because we don't publish that port to the
+  // host in docker-compose.yml, only other containers on the same Docker
+  // network (i.e. the dashboard service) can reach it. The public internet
+  // cannot.
+  "HTTPListen": [8081],
 
   // Banned IP address ranges. If a client whose remote IPv4 address is in any of these ranges connects to the server,
   // they are immediately disconnected with no message. Entries in this list may be individiual IP addresses (e.g.

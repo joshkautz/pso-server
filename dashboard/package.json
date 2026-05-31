@@ -1,0 +1,18 @@
+{
+  "name": "pso-server-dashboard",
+  "version": "0.1.0",
+  "description": "Static dashboard + safe-endpoint proxy for a private newserv PSO server",
+  "private": true,
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "NODE_ENV=development node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

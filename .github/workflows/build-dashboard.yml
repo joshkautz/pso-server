@@ -1,0 +1,57 @@
+name: build-dashboard
+
+# Builds the dashboard container image and pushes it to GHCR.
+# The dashboard is a small Node.js + Express app that serves the static
+# dashboard files and proxies a strict allowlist of newserv REST
+# endpoints. See dashboard/README.md.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dashboard/**"
+      - ".github/workflows/build-dashboard.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/pso-dashboard
+  # Opt every JavaScript action into Node 24 even if it advertises Node 20.
+  # GitHub forces this default starting June 2026.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: resolve commit SHA
+        id: meta
+        run: |
+          SHA=$(git rev-parse --short=12 HEAD)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: dashboard
+          file: dashboard/Dockerfile
+          push: true
+          # main = floating "latest from main at last build"
+          # sha-XXXX = immutable, use this for production rollbacks
+          tags: |
+            ${{ env.IMAGE_NAME }}:main
+            ${{ env.IMAGE_NAME }}:sha-${{ steps.meta.outputs.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

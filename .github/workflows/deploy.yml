@@ -5,9 +5,11 @@ on:
     branches: [main]
     paths:
       - "server/**"
+      - "dashboard/**"
+      - "docker-compose.yml"
       - ".github/workflows/deploy.yml"
   workflow_run:
-    workflows: ["build-image"]
+    workflows: ["build-image", "build-dashboard"]
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -79,8 +81,11 @@ jobs:
 
       - name: upload docker-compose.yml
         run: |
+          # docker-compose.yml lives at the repo root so both newserv and
+          # dashboard build contexts are reachable via simple relative
+          # paths on the deploy host.
           scp -i ~/.ssh/deploy \
-            server/docker-compose.yml \
+            docker-compose.yml \
             ubuntu@${{ steps.lightsail.outputs.ip }}:/home/ubuntu/pso-server/docker-compose.yml
 
       - name: pull image

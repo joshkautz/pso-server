@@ -86,6 +86,18 @@ resource "aws_lightsail_instance_public_ports" "pso" {
     cidrs     = [var.allowed_game_cidr]
   }
 
+  # Public HTTP for the dashboard (pso.joshkautz.com). The dashboard
+  # container terminates plain HTTP here; HTTPS termination happens at
+  # Cloudflare's edge when DNS is proxied through them. If you decide
+  # later to terminate HTTPS on the box itself, add a port_info block
+  # for 443 below and put a caddy/nginx sidecar in docker-compose.yml.
+  port_info {
+    from_port = 80
+    to_port   = 80
+    protocol  = "tcp"
+    cidrs     = ["0.0.0.0/0"]
+  }
+
   # PSO PC, Xbox, and BB ports are intentionally NOT opened by default.
   # Uncomment if you ever want to support those clients:
   #
