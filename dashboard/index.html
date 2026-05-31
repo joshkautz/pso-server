@@ -871,7 +871,9 @@
   <section class="hero" aria-labelledby="hero-title">
     <div class="container hero__inner">
       <div>
-        <p class="hero__eyebrow">Pioneer 2 ⟶ Ragol</p>
+        <p class="hero__eyebrow" id="countdown" aria-label="Time remaining until July 20, 2026">
+          <span aria-hidden="true" id="countdown-text">—</span>
+        </p>
         <h1 id="hero-title" class="hero__title">
           A private <em>Phantasy Star Online</em> server, for friends.
         </h1>
@@ -1517,6 +1519,76 @@ function startRareDropsStream() {
   return;
 }
 
+// ---------- Countdown to July 20, 2026 ----------
+//
+// Targets local midnight on the destination day so the visible day count
+// always matches the user's wall-calendar date, regardless of timezone.
+//
+// Visible string is mono / cyan (inherited from .hero__eyebrow). Screen
+// readers get a friendly day-level label on the wrapping <p> via
+// aria-label; the numeric span is aria-hidden so AT users don't hear
+// "T minus 50 D 04 colon 22 colon 18" once per second. The label only
+// refreshes when the day count crosses, avoiding spammy re-announcements.
+//
+// The interval is paused while the tab is hidden so we're not burning a
+// timer in the background.
+
+const COUNTDOWN_TARGET = new Date(2026, 6, 20, 0, 0, 0); // July is month 6 (0-indexed)
+
+let countdownInterval = null;
+let countdownLastDay = null;
+
+function updateCountdown() {
+  const textEl = document.getElementById('countdown-text');
+  const wrapEl = document.getElementById('countdown');
+  if (!textEl || !wrapEl) return;
+
+  const diff = COUNTDOWN_TARGET.getTime() - Date.now();
+
+  if (diff <= 0) {
+    textEl.textContent = 'ARRIVED';
+    wrapEl.setAttribute('aria-label', 'Arrived: July 20, 2026');
+    stopCountdown();
+    return;
+  }
+
+  const totalSec = Math.floor(diff / 1000);
+  const days  = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins  = Math.floor((totalSec % 3600) / 60);
+  const secs  = totalSec % 60;
+  const pad2  = (n) => String(n).padStart(2, '0');
+
+  textEl.textContent = `T-${days}D ${pad2(hours)}:${pad2(mins)}:${pad2(secs)}`;
+
+  // Refresh the AT label only when the day count rolls — daily granularity
+  // is enough for screen reader users, and changing aria-label every
+  // second would hammer some AT implementations.
+  if (days !== countdownLastDay) {
+    countdownLastDay = days;
+    const dayWord = days === 1 ? 'day' : 'days';
+    wrapEl.setAttribute('aria-label', `${days} ${dayWord} until July 20, 2026`);
+  }
+}
+
+function startCountdown() {
+  if (countdownInterval) return;
+  updateCountdown();
+  countdownInterval = setInterval(updateCountdown, 1000);
+}
+
+function stopCountdown() {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopCountdown();
+  else startCountdown();
+});
+
 // ---------- Boot ----------
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1525,6 +1597,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderQuests();
   setupChipBehavior();
   setupSearch();
+  startCountdown();
 
   // Try to refresh from the live API. If the backend isn't reachable,
   // the mock data we just rendered stays visible.
