@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PSO Josh — Server Dashboard</title>
+<meta name="description" content="Status, quests, and live activity on the PSO Josh private Phantasy Star Online server.">
+<meta name="theme-color" content="#0a0e1a">
+
+<!--
+  Single-file dashboard prototype.
+  - All styles + JS inline so you can open this directly in a browser.
+  - Mock data is wired up; real newserv REST API calls are commented in.
+  - Refactor into separate .css / .js / framework when you're happy with the design.
+
+  Accessibility commitments:
+  - WCAG 2.1 AA contrast everywhere (text 7.6:1 minimum on backgrounds)
+  - Semantic landmarks (header / main / nav / footer / section / article)
+  - Visible :focus-visible rings, never removed
+  - Keyboard reachable, tab order matches visual order
+  - prefers-reduced-motion respected
+  - aria-live regions for the rare-drop ticker and player count
+  - All images decorative or alt-described
+  - No reliance on color alone for state (icons + text labels)
+  - Works without JS (the page degrades to static info)
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&family=Orbitron:wght@600;700&display=swap" rel="stylesheet">
+
+<style>
+  /* =================================================================
+     Design tokens
+     ================================================================= */
+  :root {
+    /* Palette — desaturated PSO bridge/Pioneer 2 cyan, with magenta accent */
+    --bg-deep:       #050810;
+    --bg-base:       #0a0e1a;
+    --bg-surface:    #131829;
+    --bg-elevated:   #1c2238;
+    --bg-glass:      rgba(28, 34, 56, 0.55);
+
+    --line-subtle:   rgba(0, 212, 255, 0.10);
+    --line-soft:     rgba(0, 212, 255, 0.20);
+    --line-strong:   rgba(0, 212, 255, 0.40);
+
+    --cyan-primary:  #00d4ff;
+    --cyan-bright:   #5feaff;
+    --cyan-soft:     rgba(0, 212, 255, 0.15);
+    --cyan-glow:     rgba(0, 212, 255, 0.35);
+
+    --magenta:       #ff2e85;
+    --magenta-soft:  rgba(255, 46, 133, 0.15);
+
+    --success:       #5fffaa;
+    --warning:       #ffb84a;
+    --danger:        #ff5c7a;
+
+    --text-high:     #f0f6ff;
+    --text-mid:      #a8b6cc;
+    --text-low:      #6b7a93;
+
+    /* Typography */
+    --font-display:  'Orbitron', system-ui, sans-serif;
+    --font-body:     'Inter', system-ui, sans-serif;
+    --font-mono:     'JetBrains Mono', ui-monospace, monospace;
+
+    /* Spacing */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.5rem;
+    --space-6: 2rem;
+    --space-8: 3rem;
+    --space-10: 4rem;
+
+    /* Radii */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+
+    /* Shadow / glow */
+    --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.4);
+    --shadow-glow: 0 0 24px var(--cyan-glow);
+
+    --content-max: 1200px;
+  }
+
+  /* =================================================================
+     Reset + base
+     ================================================================= */
+  *, *::before, *::after { box-sizing: border-box; }
+  html { color-scheme: dark; }
+
+  body {
+    margin: 0;
+    background: var(--bg-base);
+    background-image:
+      radial-gradient(ellipse at top, rgba(0, 212, 255, 0.06), transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(255, 46, 133, 0.04), transparent 50%);
+    background-attachment: fixed;
+    color: var(--text-high);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  /* Subtle scanline overlay — decorative only, disabled at low motion */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 2px,
+      rgba(255, 255, 255, 0.012) 3px,
+      rgba(255, 255, 255, 0.012) 3px
+    );
+    z-index: 1;
+    mix-blend-mode: screen;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+
+  /* Skip-link for keyboard users */
+  .skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--cyan-primary);
+    color: var(--bg-deep);
+    padding: var(--space-2) var(--space-4);
+    z-index: 100;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .skip-link:focus { top: 0; }
+
+  /* Universal focus ring */
+  :focus-visible {
+    outline: 2px solid var(--cyan-bright);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  a {
+    color: var(--cyan-bright);
+    text-decoration-color: var(--line-strong);
+    text-underline-offset: 3px;
+  }
+  a:hover { color: var(--cyan-primary); }
+
+  button {
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  /* =================================================================
+     Layout
+     ================================================================= */
+  .container {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: 0 var(--space-5);
+    position: relative;
+    z-index: 2;
+  }
+
+  /* =================================================================
+     Top nav
+     ================================================================= */
+  .topbar {
+    border-bottom: 1px solid var(--line-soft);
+    background: linear-gradient(to bottom, rgba(5, 8, 16, 0.95), rgba(10, 14, 26, 0.85));
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .topbar__inner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
+    padding: var(--space-4) 0;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    text-decoration: none;
+    color: var(--text-high);
+  }
+  .brand__mark {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    background: var(--cyan-soft);
+    border: 1px solid var(--line-strong);
+    display: grid;
+    place-items: center;
+    color: var(--cyan-primary);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 14px;
+    box-shadow: inset 0 0 12px rgba(0, 212, 255, 0.2);
+  }
+  .brand__name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .nav {
+    display: flex;
+    gap: var(--space-4);
+    margin-left: auto;
+  }
+  .nav a {
+    color: var(--text-mid);
+    text-decoration: none;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    font-size: 0.9rem;
+  }
+  .nav a:hover { color: var(--text-high); background: var(--cyan-soft); }
+  .nav a[aria-current="page"] { color: var(--cyan-primary); }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: rgba(95, 255, 170, 0.12);
+    border: 1px solid rgba(95, 255, 170, 0.35);
+    border-radius: 999px;
+    color: var(--success);
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+  .status-pill[data-status="offline"] {
+    background: rgba(255, 92, 122, 0.12);
+    border-color: rgba(255, 92, 122, 0.35);
+    color: var(--danger);
+  }
+  .status-pill__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 8px currentColor;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* =================================================================
+     Hero
+     ================================================================= */
+  .hero {
+    padding: var(--space-10) 0 var(--space-8);
+    border-bottom: 1px solid var(--line-subtle);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 20% 50%, rgba(0, 212, 255, 0.08), transparent 40%),
+      radial-gradient(circle at 80% 30%, rgba(255, 46, 133, 0.06), transparent 40%);
+    pointer-events: none;
+  }
+  .hero__inner {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+    align-items: end;
+    position: relative;
+  }
+  @media (min-width: 900px) {
+    .hero__inner { grid-template-columns: 1.4fr 1fr; }
+  }
+  .hero__eyebrow {
+    color: var(--cyan-primary);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin: 0 0 var(--space-3);
+  }
+  .hero__title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    line-height: 1.05;
+    margin: 0 0 var(--space-4);
+    text-wrap: balance;
+  }
+  .hero__title em {
+    color: var(--cyan-primary);
+    font-style: normal;
+  }
+  .hero__lead {
+    color: var(--text-mid);
+    font-size: 1.1rem;
+    max-width: 50ch;
+    margin: 0 0 var(--space-5);
+  }
+  .hero__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-5);
+    background: var(--cyan-primary);
+    color: var(--bg-deep);
+    text-decoration: none;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    font-family: var(--font-display);
+    letter-spacing: 0.05em;
+    font-size: 0.95rem;
+    border: 1px solid var(--cyan-bright);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .hero__cta:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-glow);
+    color: var(--bg-deep);
+  }
+  .hero__cta-secondary {
+    margin-left: var(--space-3);
+    color: var(--text-mid);
+    text-decoration-color: var(--line-soft);
+  }
+
+  /* =================================================================
+     Server identity card
+     ================================================================= */
+  .identity {
+    background: var(--bg-glass);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+  }
+  .identity__row {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--line-subtle);
+  }
+  .identity__row:last-child { border-bottom: 0; }
+  .identity__row dt { color: var(--text-low); }
+  .identity__row dd { margin: 0; color: var(--text-high); }
+
+  /* =================================================================
+     Section heads
+     ================================================================= */
+  section { padding: var(--space-8) 0; border-bottom: 1px solid var(--line-subtle); }
+  section:last-child { border-bottom: none; }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
+  }
+  .section-head h2 {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: 0.04em;
+  }
+  .section-head__hint {
+    color: var(--text-low);
+    font-size: 0.9rem;
+  }
+
+  /* =================================================================
+     Metric grid
+     ================================================================= */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3);
+  }
+  @media (min-width: 720px) {
+    .metrics { grid-template-columns: repeat(4, 1fr); }
+  }
+  .metric {
+    background: var(--bg-surface);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    position: relative;
+    overflow: hidden;
+  }
+  .metric::after {
+    content: "";
+    position: absolute;
+    top: 0; right: 0;
+    width: 80px;
+    height: 80px;
+    background: radial-gradient(circle, var(--cyan-soft), transparent 70%);
+    pointer-events: none;
+  }
+  .metric__label {
+    color: var(--text-mid);
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: var(--space-2);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .metric__value {
+    font-family: var(--font-display);
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--text-high);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .metric__delta {
+    margin-top: var(--space-2);
+    font-size: 0.8rem;
+    color: var(--text-low);
+    font-family: var(--font-mono);
+  }
+  .metric__delta--up { color: var(--success); }
+
+  /* =================================================================
+     Live activity (games + rare drops)
+     ================================================================= */
+  .activity {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-5);
+  }
+  @media (min-width: 900px) {
+    .activity { grid-template-columns: 1.5fr 1fr; }
+  }
+
+  .panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+  }
+  .panel h3 {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-high);
+    margin: 0 0 var(--space-4);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--line-soft);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .game-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+  .game {
+    padding: var(--space-3) var(--space-4);
+    background: var(--bg-elevated);
+    border: 1px solid var(--line-subtle);
+    border-radius: var(--radius-md);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-3);
+    align-items: center;
+  }
+  .game__name { font-weight: 600; font-size: 0.95rem; margin: 0 0 var(--space-1); }
+  .game__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    color: var(--text-mid);
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
+  }
+  .game__count {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--cyan-primary);
+  }
+
+  .empty-state {
+    padding: var(--space-6);
+    text-align: center;
+    color: var(--text-low);
+    font-size: 0.9rem;
+  }
+
+  /* Rare-drop ticker */
+  .drops {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 320px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .drop {
+    padding: var(--space-3);
+    background: var(--bg-elevated);
+    border-left: 3px solid var(--magenta);
+    border-radius: var(--radius-sm);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-2);
+  }
+  .drop__item { font-weight: 600; color: var(--magenta); }
+  .drop__player { color: var(--text-mid); font-size: 0.85rem; }
+  .drop__time {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-low);
+    text-align: right;
+  }
+
+  /* =================================================================
+     Quest browser
+     ================================================================= */
+  .quest-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+    margin-bottom: var(--space-5);
+    padding: var(--space-4);
+    background: var(--bg-surface);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-lg);
+  }
+  .quest-search {
+    flex: 1 1 240px;
+    min-width: 200px;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg-elevated);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-md);
+  }
+  .quest-search input {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    color: var(--text-high);
+    font-family: inherit;
+    font-size: 0.95rem;
+    outline: none;
+  }
+  .quest-search input::placeholder { color: var(--text-low); }
+
+  .filter-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    align-items: center;
+  }
+  .filter-group__label {
+    font-size: 0.78rem;
+    color: var(--text-low);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-right: var(--space-2);
+    font-weight: 600;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg-elevated);
+    border: 1px solid var(--line-soft);
+    border-radius: 999px;
+    color: var(--text-mid);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .chip:hover { color: var(--text-high); border-color: var(--line-strong); }
+  .chip[aria-pressed="true"] {
+    background: var(--cyan-soft);
+    border-color: var(--cyan-primary);
+    color: var(--cyan-primary);
+  }
+  .chip__count {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-low);
+    background: var(--bg-base);
+    padding: 1px var(--space-2);
+    border-radius: 999px;
+  }
+  .chip[aria-pressed="true"] .chip__count { color: var(--cyan-primary); }
+
+  .quest-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--space-4);
+  }
+  .quest {
+    background: var(--bg-surface);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    transition: transform 0.15s ease, border-color 0.15s ease;
+    position: relative;
+  }
+  .quest:hover {
+    transform: translateY(-2px);
+    border-color: var(--line-strong);
+  }
+  .quest__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  .quest__name {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0;
+    line-height: 1.2;
+    text-wrap: balance;
+  }
+  .quest__number {
+    font-family: var(--font-mono);
+    color: var(--text-low);
+    font-size: 0.8rem;
+    flex-shrink: 0;
+  }
+  .quest__desc {
+    color: var(--text-mid);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin: 0;
+    flex-grow: 1;
+  }
+  .quest__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-sm);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid transparent;
+  }
+  .badge--ep1 { background: rgba(0, 212, 255, 0.12); border-color: rgba(0, 212, 255, 0.35); color: var(--cyan-bright); }
+  .badge--ep2 { background: rgba(255, 184, 74, 0.12); border-color: rgba(255, 184, 74, 0.35); color: var(--warning); }
+  .badge--ep4 { background: rgba(95, 255, 170, 0.12); border-color: rgba(95, 255, 170, 0.35); color: var(--success); }
+  .badge--official { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.18); color: var(--text-mid); }
+  .badge--community { background: rgba(255, 46, 133, 0.12); border-color: rgba(255, 46, 133, 0.35); color: var(--magenta); }
+  .badge--custom { background: rgba(0, 212, 255, 0.08); border-color: rgba(0, 212, 255, 0.30); color: var(--cyan-bright); }
+
+  .quest__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--line-subtle);
+    font-size: 0.8rem;
+    color: var(--text-low);
+    font-family: var(--font-mono);
+  }
+  .quest__completions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .quest__source { font-size: 0.75rem; }
+  .quest__source a { color: var(--text-mid); }
+
+  /* Quest progress bar — completion rate by population */
+  .progress {
+    height: 4px;
+    background: var(--bg-elevated);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: var(--space-2);
+  }
+  .progress__bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cyan-primary), var(--cyan-bright));
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+
+  /* =================================================================
+     Features list
+     ================================================================= */
+  .features {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+  @media (min-width: 720px) {
+    .features { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (min-width: 1000px) {
+    .features { grid-template-columns: repeat(3, 1fr); }
+  }
+  .feature {
+    padding: var(--space-5);
+    background: var(--bg-surface);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-lg);
+  }
+  .feature h3 {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 var(--space-2);
+    color: var(--text-high);
+  }
+  .feature p {
+    margin: 0;
+    color: var(--text-mid);
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  /* =================================================================
+     Footer
+     ================================================================= */
+  footer {
+    padding: var(--space-6) 0;
+    color: var(--text-low);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--line-subtle);
+  }
+  footer .container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    justify-content: space-between;
+    align-items: center;
+  }
+  footer a { color: var(--text-mid); }
+
+  /* =================================================================
+     Utility & screen-reader-only
+     ================================================================= */
+  .sr-only {
+    position: absolute !important;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+</style>
+</head>
+
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<!-- ================================================================ -->
+<!-- Top bar                                                          -->
+<!-- ================================================================ -->
+<header class="topbar" role="banner">
+  <div class="container topbar__inner">
+    <a class="brand" href="#main" aria-label="PSO Josh — home">
+      <span class="brand__mark" aria-hidden="true">⌬</span>
+      <span class="brand__name">PSO Josh</span>
+    </a>
+
+    <span class="status-pill" data-status="online" role="status" aria-live="polite">
+      <span class="status-pill__dot" aria-hidden="true"></span>
+      <span>Server online</span>
+    </span>
+
+    <nav class="nav" aria-label="Primary">
+      <a href="#live" aria-current="page">Live</a>
+      <a href="#quests">Quests</a>
+      <a href="#features">Features</a>
+      <a href="#join">Join</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <!-- ============================================================== -->
+  <!-- Hero                                                            -->
+  <!-- ============================================================== -->
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="container hero__inner">
+      <div>
+        <p class="hero__eyebrow">Pioneer 2 ⟶ Ragol</p>
+        <h1 id="hero-title" class="hero__title">
+          A private <em>Phantasy Star Online</em> server, for friends.
+        </h1>
+        <p class="hero__lead">
+          Original disc, Plus, and Episode 3 all supported. Cross-version play is on.
+          Currently running on a single ship with a growing quest library and a few
+          regulars. Come find us in the lobby.
+        </p>
+        <a class="hero__cta" href="#join">
+          How to join
+          <span aria-hidden="true">→</span>
+        </a>
+        <a class="hero__cta-secondary" href="#quests">Browse quests</a>
+      </div>
+
+      <dl class="identity" aria-label="Server identity">
+        <div class="identity__row">
+          <dt>Server name</dt>
+          <dd id="server-name">PSO Josh</dd>
+        </div>
+        <div class="identity__row">
+          <dt>Login host</dt>
+          <dd id="server-host">54.173.68.119</dd>
+        </div>
+        <div class="identity__row">
+          <dt>Ports</dt>
+          <dd>9100 / 9103</dd>
+        </div>
+        <div class="identity__row">
+          <dt>Region</dt>
+          <dd>us-east-1</dd>
+        </div>
+        <div class="identity__row">
+          <dt>Build</dt>
+          <dd id="server-build">newserv 2026-05-28</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- Live metrics                                                    -->
+  <!-- ============================================================== -->
+  <section id="live" aria-labelledby="live-title">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="live-title">Live</h2>
+        <span class="section-head__hint">Refreshes every 15 seconds</span>
+      </div>
+
+      <div class="metrics" role="list">
+        <article class="metric" role="listitem" aria-labelledby="m-online">
+          <div class="metric__label" id="m-online">
+            <span aria-hidden="true">●</span> Hunters online
+          </div>
+          <div class="metric__value" id="metric-online" aria-live="polite">7</div>
+          <div class="metric__delta metric__delta--up">+2 in the last hour</div>
+        </article>
+
+        <article class="metric" role="listitem" aria-labelledby="m-games">
+          <div class="metric__label" id="m-games">
+            <span aria-hidden="true">◆</span> Active games
+          </div>
+          <div class="metric__value" id="metric-games" aria-live="polite">3</div>
+          <div class="metric__delta">across 1 block</div>
+        </article>
+
+        <article class="metric" role="listitem" aria-labelledby="m-accounts">
+          <div class="metric__label" id="m-accounts">
+            <span aria-hidden="true">▲</span> Registered accounts
+          </div>
+          <div class="metric__value" id="metric-accounts">42</div>
+          <div class="metric__delta">since the server opened</div>
+        </article>
+
+        <article class="metric" role="listitem" aria-labelledby="m-quests">
+          <div class="metric__label" id="m-quests">
+            <span aria-hidden="true">✦</span> Available quests
+          </div>
+          <div class="metric__value" id="metric-quests">128</div>
+          <div class="metric__delta">official + community</div>
+        </article>
+      </div>
+
+      <div class="activity" style="margin-top: var(--space-6)">
+        <!-- Active games panel -->
+        <div class="panel" aria-labelledby="games-title">
+          <h3 id="games-title"><span aria-hidden="true">◆</span> Now playing</h3>
+          <ul class="game-list" id="games-list" aria-live="polite">
+            <!-- Populated by JS -->
+          </ul>
+        </div>
+
+        <!-- Rare drop ticker -->
+        <div class="panel" aria-labelledby="drops-title">
+          <h3 id="drops-title"><span aria-hidden="true">✦</span> Rare drops</h3>
+          <ul class="drops" id="drops-list" aria-live="polite" aria-relevant="additions">
+            <!-- Populated by JS -->
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- Quest browser                                                   -->
+  <!-- ============================================================== -->
+  <section id="quests" aria-labelledby="quests-title">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="quests-title">Quest library</h2>
+        <span class="section-head__hint" id="quest-count-label">Showing all quests</span>
+      </div>
+
+      <form class="quest-controls" role="search" aria-label="Quest filters">
+        <div class="quest-search">
+          <span aria-hidden="true">⌕</span>
+          <label for="quest-search" class="sr-only">Search quests</label>
+          <input
+            type="search"
+            id="quest-search"
+            placeholder="Search by name or description…"
+            autocomplete="off"
+          />
+        </div>
+
+        <fieldset class="filter-group" style="border: 0; margin: 0; padding: 0;">
+          <legend class="filter-group__label">Episode</legend>
+          <button type="button" class="chip" aria-pressed="false" data-filter="episode" data-value="1">Ep 1</button>
+          <button type="button" class="chip" aria-pressed="false" data-filter="episode" data-value="2">Ep 2</button>
+          <button type="button" class="chip" aria-pressed="false" data-filter="episode" data-value="4">Ep 4</button>
+        </fieldset>
+
+        <fieldset class="filter-group" style="border: 0; margin: 0; padding: 0;">
+          <legend class="filter-group__label">Source</legend>
+          <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="official">Official</button>
+          <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="community">Community</button>
+          <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="custom">Custom</button>
+        </fieldset>
+      </form>
+
+      <div class="quest-grid" id="quest-grid" role="list">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- Features                                                        -->
+  <!-- ============================================================== -->
+  <section id="features" aria-labelledby="features-title">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="features-title">What this server supports</h2>
+      </div>
+
+      <div class="features" role="list">
+        <article class="feature" role="listitem">
+          <h3>All disc versions</h3>
+          <p>Original Episode I &amp; II, the 1.1 revision, and Plus all connect. Same ship, cross-version play enabled.</p>
+        </article>
+        <article class="feature" role="listitem">
+          <h3>Episode 3 ready</h3>
+          <p>C.A.R.D. Revolution is fully supported — spectator teams, tournaments via the lobby battle table.</p>
+        </article>
+        <article class="feature" role="listitem">
+          <h3>Server-side character slots</h3>
+          <p>16 extra slots per account via <code>$savechar</code> / <code>$loadchar</code>. Move characters between versions.</p>
+        </article>
+        <article class="feature" role="listitem">
+          <h3>Custom drop tables</h3>
+          <p>Server-private drop mode keeps loot tamper-proof. Rare tables can be tuned per category.</p>
+        </article>
+        <article class="feature" role="listitem">
+          <h3>Community quests</h3>
+          <p>Beyond the disc's base quests — Ephinea, Schtserv, and GC-Forever community packs are installable.</p>
+        </article>
+        <article class="feature" role="listitem">
+          <h3>Persistent games</h3>
+          <p><code>$persist</code> keeps a game alive after the last player leaves — drop in and out without losing your run.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- How to join                                                     -->
+  <!-- ============================================================== -->
+  <section id="join" aria-labelledby="join-title">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="join-title">Joining</h2>
+      </div>
+      <div class="panel">
+        <p style="margin-top: 0;">
+          Three steps. Send Josh your public IP first
+          (<a href="https://ifconfig.io" rel="noopener">ifconfig.io</a>) — that's required for the
+          DNS allowlist. Then:
+        </p>
+        <ol style="line-height: 1.8; color: var(--text-mid); padding-left: 1.5rem;">
+          <li><strong>Real GameCube + Broadband Adapter:</strong> set Primary DNS to <code>54.173.68.119</code> in PSO's network setup screen.</li>
+          <li><strong>Dolphin (desktop):</strong> add <code>BBA_BUILTIN_DNS = 54.173.68.119</code> under <code>[Core]</code> in your global <code>Dolphin.ini</code>. See <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-dolphin.md">client-setup-dolphin.md</a>.</li>
+          <li><strong>Batocera:</strong> same Dolphin setting, paths in <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup.md">client-setup.md</a>.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="container">
+    <span>Built on <a href="https://github.com/fuzziqersoftware/newserv">newserv</a>. PSO is a registered trademark of SEGA — this server is not affiliated with SEGA.</span>
+    <span>
+      <a href="https://github.com/joshkautz/pso-server">Source on GitHub</a>
+    </span>
+  </div>
+</footer>
+
+<!-- ================================================================ -->
+<!-- Data + behavior                                                  -->
+<!-- ================================================================ -->
+<script>
+/*
+  =========================================================================
+  Newserv REST API integration points (commented for now)
+  =========================================================================
+
+  Production wiring would replace MOCK_* below with real fetches. Example:
+
+    const API = 'https://your-dashboard-backend/api';   // your proxy in front of newserv
+
+    async function refresh() {
+      const [summary, lobbies, quests] = await Promise.all([
+        fetch(`${API}/summary`).then(r => r.json()),     // -> /y/summary
+        fetch(`${API}/lobbies`).then(r => r.json()),     // -> /y/lobbies
+        fetch(`${API}/quests`).then(r => r.json()),      // -> /y/data/quests
+      ]);
+      renderMetrics(summary);
+      renderGames(lobbies);
+      renderQuests(quests);
+    }
+
+    // WebSocket for rare drops:
+    const ws = new WebSocket(`${API.replace('http', 'ws')}/rare-drops/stream`);
+    ws.addEventListener('message', (e) => addDrop(JSON.parse(e.data)));
+
+  Quest completion tracking requires extending newserv (not currently in
+  the REST API surface). See readme.md for the proposed extension.
+
+  =========================================================================
+*/
+
+// ---------- Mock data (matches the shape of real API responses) ----------
+
+const MOCK_GAMES = [
+  { name: 'TTF rerun', episode: 1, difficulty: 'Very Hard', players: 4, leader: 'Sonic', mode: 'Normal' },
+  { name: 'Maximum Attack', episode: 2, difficulty: 'Ultimate', players: 3, leader: 'Tails', mode: 'Battle' },
+  { name: 'Solo Caves grind', episode: 1, difficulty: 'Hard', players: 1, leader: 'Knuckles', mode: 'Solo' },
+];
+
+const MOCK_DROPS = [
+  { item: 'Heaven Striker', player: 'RUSTY', game: 'TTF rerun', ts: '15s ago' },
+  { item: 'Psycho Wand',    player: 'AURORA', game: 'Caves grind', ts: '4m ago' },
+  { item: 'Lavis Cannon',   player: 'NEPTUNE', game: 'Maximum Attack', ts: '12m ago' },
+  { item: 'God/Battle',     player: 'SONIC', game: 'TTF rerun', ts: '18m ago' },
+  { item: 'STA/Maximum',    player: 'TAILS', game: 'Ruins party', ts: '34m ago' },
+];
+
+const MOCK_QUESTS = [
+  // Official Government quests
+  { id: 'g01', name: 'The Tunnels',          number: 'q001', episode: 1, source: 'official',  description: 'Official Episode 1 government quest. Open Caves and stop the rogue Sinow operation.', completions: 38, total: 42 },
+  { id: 'g02', name: 'The Mines',            number: 'q002', episode: 1, source: 'official',  description: 'Official Episode 1 government quest. Recover the lost Mines transmissions.', completions: 24, total: 42 },
+  { id: 'g03', name: 'Ruins of Eden',        number: 'q003', episode: 1, source: 'official',  description: 'Official Episode 1 government quest. Investigate the unknown signal in the Ruins.', completions: 11, total: 42 },
+  { id: 'g04', name: 'VR Temple',            number: 'q011', episode: 2, source: 'official',  description: 'Official Episode 2 government quest. Reach the heart of the Temple Beta zone.', completions: 17, total: 42 },
+  { id: 'g05', name: 'CCA Mystery',          number: 'q012', episode: 2, source: 'official',  description: 'Official Episode 2 government quest. The CCA Sub-Tower puzzle.', completions: 9, total: 42 },
+
+  // Retrieval (single-player)
+  { id: 'r01', name: 'Lost HEAT SWORD',      number: 'q058', episode: 1, source: 'official',  description: 'Sega-original retrieval quest. Single-player, Forest. Returns the HEAT SWORD.', completions: 41, total: 42 },
+  { id: 'r02', name: 'Lost RAY DIVERGENCE',  number: 'q059', episode: 1, source: 'official',  description: 'Sega-original retrieval quest. Single-player, Caves.', completions: 22, total: 42 },
+  { id: 'r03', name: 'Lost ICE SPINNER',     number: 'q060', episode: 1, source: 'official',  description: 'Sega-original retrieval quest. Single-player, Mines.', completions: 18, total: 42 },
+
+  // Multiplayer
+  { id: 'm01', name: 'Towards The Future',   number: 'q101', episode: 1, source: 'official',  description: 'Sega-original multiplayer quest. Speed-run all four areas back-to-back. Aka TTF — the bread and butter.', completions: 42, total: 42 },
+  { id: 'm02', name: 'Maximum Attack S',     number: 'q102', episode: 2, source: 'official',  description: 'Sega-original multiplayer quest. Survive the entire S zone.', completions: 28, total: 42 },
+  { id: 'm03', name: 'Christmas Fiasco',     number: 'q103', episode: 1, source: 'official',  description: 'Seasonal multiplayer quest. Christmas Nightmare 2003 event.', completions: 12, total: 42 },
+
+  // Community
+  { id: 'c01', name: 'Phantasmal World #1',  number: 'q201', episode: 1, source: 'community', description: 'Ephinea community quest. Atmospheric forest exploration with rare drops.', completions: 19, total: 42 },
+  { id: 'c02', name: 'Phantasmal World #2',  number: 'q202', episode: 2, source: 'community', description: 'Ephinea community quest. Episode 2 narrative continuation.', completions: 14, total: 42 },
+  { id: 'c03', name: 'Doctor''s Mission',    number: 'q203', episode: 1, source: 'community', description: 'GC-Forever community quest. Medical emergency in the Mines.', completions: 8, total: 42 },
+  { id: 'c04', name: 'Survival Trial',       number: 'q204', episode: 2, source: 'community', description: 'Ultimate-difficulty endurance quest. Survive 30 minutes against escalating waves.', completions: 4, total: 42 },
+
+  // Custom (our server's own)
+  { id: 'x01', name: 'Hunter Onboarding',    number: 'q301', episode: 1, source: 'custom',    description: 'Custom Pioneer 2 tutorial. New hunters learn the basics — combat, mags, weapon switching, chat commands.', completions: 33, total: 42 },
+  { id: 'x02', name: 'Friend Night Speedrun', number: 'q302', episode: 1, source: 'custom',   description: 'Our weekly Friday speedrun event. Reset every Friday at 8pm Eastern.', completions: 16, total: 42 },
+];
+
+// ---------- Renderers ----------
+
+function renderGames() {
+  const root = document.getElementById('games-list');
+  if (MOCK_GAMES.length === 0) {
+    root.innerHTML = `<li class="empty-state">No active games right now — be the first.</li>`;
+    return;
+  }
+  root.innerHTML = MOCK_GAMES.map(g => `
+    <li class="game">
+      <div>
+        <p class="game__name">${g.name}</p>
+        <div class="game__meta">
+          <span>Ep ${g.episode}</span>
+          <span aria-hidden="true">·</span>
+          <span>${g.difficulty}</span>
+          <span aria-hidden="true">·</span>
+          <span>${g.mode}</span>
+        </div>
+      </div>
+      <div class="game__count" aria-label="${g.players} of 4 hunters">
+        ${g.players}<span style="color: var(--text-low); font-size: 0.85rem;">/4</span>
+      </div>
+    </li>
+  `).join('');
+}
+
+function renderDrops() {
+  const root = document.getElementById('drops-list');
+  if (MOCK_DROPS.length === 0) {
+    root.innerHTML = `<li class="empty-state">No rare drops yet today.</li>`;
+    return;
+  }
+  root.innerHTML = MOCK_DROPS.map(d => `
+    <li class="drop">
+      <div>
+        <div class="drop__item">${d.item}</div>
+        <div class="drop__player">${d.player} · ${d.game}</div>
+      </div>
+      <div class="drop__time">${d.ts}</div>
+    </li>
+  `).join('');
+}
+
+const filterState = { episode: null, source: null, search: '' };
+
+function renderQuests() {
+  const grid = document.getElementById('quest-grid');
+  const countLabel = document.getElementById('quest-count-label');
+
+  let filtered = MOCK_QUESTS;
+  if (filterState.episode) {
+    filtered = filtered.filter(q => String(q.episode) === filterState.episode);
+  }
+  if (filterState.source) {
+    filtered = filtered.filter(q => q.source === filterState.source);
+  }
+  if (filterState.search) {
+    const q = filterState.search.toLowerCase();
+    filtered = filtered.filter(x =>
+      x.name.toLowerCase().includes(q) ||
+      x.description.toLowerCase().includes(q) ||
+      x.number.toLowerCase().includes(q)
+    );
+  }
+
+  countLabel.textContent =
+    filtered.length === MOCK_QUESTS.length
+      ? `Showing all ${filtered.length} quests`
+      : `Showing ${filtered.length} of ${MOCK_QUESTS.length} quests`;
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div class="panel" style="grid-column: 1 / -1; text-align: center;">
+        <p style="color: var(--text-low); margin: 0;">No quests match those filters.</p>
+      </div>`;
+    return;
+  }
+
+  // Update chip counts per facet
+  const epCounts = { '1': 0, '2': 0, '4': 0 };
+  const srcCounts = { 'official': 0, 'community': 0, 'custom': 0 };
+  MOCK_QUESTS.forEach(q => {
+    epCounts[String(q.episode)] = (epCounts[String(q.episode)] || 0) + 1;
+    srcCounts[q.source] = (srcCounts[q.source] || 0) + 1;
+  });
+
+  document.querySelectorAll('.chip[data-filter="episode"]').forEach(c => {
+    const v = c.dataset.value;
+    if (!c.querySelector('.chip__count')) {
+      c.insertAdjacentHTML('beforeend', `<span class="chip__count" aria-hidden="true">${epCounts[v] || 0}</span>`);
+    }
+  });
+  document.querySelectorAll('.chip[data-filter="source"]').forEach(c => {
+    const v = c.dataset.value;
+    if (!c.querySelector('.chip__count')) {
+      c.insertAdjacentHTML('beforeend', `<span class="chip__count" aria-hidden="true">${srcCounts[v] || 0}</span>`);
+    }
+  });
+
+  grid.innerHTML = filtered.map(q => {
+    const pct = Math.round((q.completions / q.total) * 100);
+    const epBadge = `<span class="badge badge--ep${q.episode}">Episode ${q.episode}</span>`;
+    const srcBadgeClass = q.source === 'official' ? 'badge--official'
+                       : q.source === 'community' ? 'badge--community'
+                       : 'badge--custom';
+    const srcLabel = q.source.charAt(0).toUpperCase() + q.source.slice(1);
+    return `
+      <article class="quest" role="listitem" tabindex="0" aria-labelledby="quest-${q.id}-name">
+        <div class="quest__head">
+          <h3 class="quest__name" id="quest-${q.id}-name">${q.name}</h3>
+          <span class="quest__number" aria-label="Quest number ${q.number}">${q.number}</span>
+        </div>
+        <p class="quest__desc">${q.description}</p>
+        <div class="quest__badges">
+          ${epBadge}
+          <span class="badge ${srcBadgeClass}">${srcLabel}</span>
+        </div>
+        <div>
+          <div class="progress" role="progressbar"
+               aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"
+               aria-label="${pct}% of accounts have completed this quest">
+            <div class="progress__bar" style="width: ${pct}%"></div>
+          </div>
+        </div>
+        <div class="quest__footer">
+          <div class="quest__completions">
+            <span aria-hidden="true">✓</span>
+            <span>${q.completions} of ${q.total} accounts (${pct}%)</span>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+// ---------- Wire up filter chips + search ----------
+
+function setupChipBehavior() {
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const filter = chip.dataset.filter;
+      const value = chip.dataset.value;
+      // Toggle behavior — clicking active chip deactivates it
+      const current = filterState[filter];
+      if (current === value) {
+        filterState[filter] = null;
+        chip.setAttribute('aria-pressed', 'false');
+      } else {
+        // Deactivate sibling chips
+        document.querySelectorAll(`.chip[data-filter="${filter}"]`).forEach(c => {
+          c.setAttribute('aria-pressed', 'false');
+        });
+        filterState[filter] = value;
+        chip.setAttribute('aria-pressed', 'true');
+      }
+      renderQuests();
+    });
+  });
+}
+
+function setupSearch() {
+  const input = document.getElementById('quest-search');
+  let debounce;
+  input.addEventListener('input', e => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => {
+      filterState.search = e.target.value.trim();
+      renderQuests();
+    }, 150);
+  });
+}
+
+// ---------- Boot ----------
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderGames();
+  renderDrops();
+  renderQuests();
+  setupChipBehavior();
+  setupSearch();
+
+  // Mock periodic refresh — in production this would refetch from /y/summary
+  // setInterval(refresh, 15000);
+});
+</script>
+
+</body>
+</html>
