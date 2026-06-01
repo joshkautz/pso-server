@@ -335,6 +335,14 @@ function stripCharacters(rawCharacters, rawAccounts, levelTables) {
       EXP:             isLikelyBB === true ? (typeof c.EXP === 'number' ? c.EXP : null) : null,
       EXPToNextLevel:  isLikelyBB === true ? expToNext : null,
       PlayTimeSeconds: isLikelyBB === true ? (typeof c.PlayTimeSeconds === 'number' ? c.PlayTimeSeconds : null) : null,
+      // Inventory passthrough — already sanitized server-side:
+      // newserv's /y/characters resolves names via describe_item and
+      // returns just {Name, Kind, Equipped} per entry. No raw item
+      // bytes / IDs reach the dashboard. Inventory is more useful than
+      // EXP for disc versions because gear changes are infrequent
+      // enough that "as of last lobby return" is still good UI — we
+      // pass it through for every version, BB or not.
+      Inventory:       Array.isArray(c.Inventory) ? c.Inventory : [],
     });
   }
   return out;

@@ -1003,6 +1003,49 @@
     font-size: 0.7rem;
   }
 
+  /* -----------------------------------------------------------------
+     Player inventory
+     -----------------------------------------------------------------
+     Two stacked sections in the player-modal body — Equipped and
+     Inventory — built from resolved-name data the dashboard backend
+     supplies in /api/characters. Each row is a kind-badge plus the
+     describe_item() string (already legible: grinder count, %atts,
+     mag stats, etc.). The list wraps on narrow viewports. */
+  .inventory-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .inventory-item {
+    display: grid;
+    grid-template-columns: 4.5rem 1fr;
+    gap: var(--space-3);
+    align-items: baseline;
+    padding: var(--space-1) 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+  }
+  .inventory-item:last-child { border-bottom: 0; }
+  .inventory-item__kind {
+    color: var(--text-low);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .inventory-item__name { color: var(--text-mid); word-break: break-word; }
+  /* Inventory freshness disclaimer — small, low-key note above the list
+     for disc-version characters where the snapshot can lag real state. */
+  .inventory-staleness {
+    font-size: 0.75rem;
+    color: var(--text-low);
+    margin: 0 0 var(--space-2) 0;
+    font-style: italic;
+  }
+
   /* =================================================================
      Features list
      ================================================================= */
@@ -2749,12 +2792,77 @@ function renderPlayerModalCharacter(c, titleEl, subEl, bodyEl) {
       </dl>
     </section>
 
-    <p class="quest-modal__placeholder">
-      Equipped items and inventory aren't surfaced yet — they live in the same
-      saved-character payload but need an item-name lookup against the
-      version's parameter table to render legibly. Coming in a future pass.
-    </p>
+    ${renderInventorySections(c)}
   `;
+}
+
+// Item rendering order: weapons → armor → shield → units → mags → tools →
+// meseta → unknown. Matches the PSO inventory UI's natural top-to-bottom
+// grouping so the equipment loadout reads at-a-glance.
+const INVENTORY_KIND_ORDER = ['weapon', 'armor', 'shield', 'unit', 'mag', 'tool', 'meseta', 'guard', 'unknown'];
+
+function inventoryKindRank(kind) {
+  const i = INVENTORY_KIND_ORDER.indexOf(kind);
+  return i < 0 ? INVENTORY_KIND_ORDER.length : i;
+}
+
+function renderInventoryItem(item) {
+  return `
+    <li class="inventory-item">
+      <span class="inventory-item__kind">${escapeHtml(item.Kind || 'item')}</span>
+      <span class="inventory-item__name">${escapeHtml(item.Name || 'Unknown')}</span>
+    </li>
+  `;
+}
+
+function renderInventorySections(c) {
+  const inventory = Array.isArray(c.Inventory) ? c.Inventory : [];
+  if (inventory.length === 0) {
+    return `
+      <section class="quest-modal__section" aria-label="Inventory">
+        <h3>Inventory</h3>
+        <p class="quest-modal__placeholder">Empty inventory — no items in any of the 30 slots.</p>
+      </section>
+    `;
+  }
+
+  // Split equipped vs not. Sort each list by kind, then by name within
+  // kind so identical items group together (useful when an inventory
+  // has e.g. multiple Monomates — they appear next to each other).
+  const sortByKindThenName = (a, b) =>
+    inventoryKindRank(a.Kind) - inventoryKindRank(b.Kind) ||
+    String(a.Name || '').localeCompare(String(b.Name || ''), undefined, { sensitivity: 'base' });
+  const equipped = inventory.filter((i) => i.Equipped).sort(sortByKindThenName);
+  const other    = inventory.filter((i) => !i.Equipped).sort(sortByKindThenName);
+
+  // For non-BB characters the inventory snapshot lags real state by
+  // however long it's been since the player returned to the lobby (the
+  // server only learns about inventory mid-session via 6x item
+  // subcommands, but commits to disp only at 61/98 boundaries). Show a
+  // small italic note so the reader understands why an item they just
+  // picked up isn't here.
+  const stalenessNote = c.IsLikelyBB === false
+    ? `<p class="inventory-staleness">As of last lobby return — disc versions only refresh inventory between quests.</p>`
+    : '';
+
+  const equippedBlock = `
+    <section class="quest-modal__section" aria-label="Equipped items">
+      <h3>Equipped <span style="color: var(--text-low); font-weight: normal; font-size: 0.85em;">(${equipped.length})</span></h3>
+      ${stalenessNote}
+      ${equipped.length > 0
+        ? `<ul class="inventory-list">${equipped.map(renderInventoryItem).join('')}</ul>`
+        : `<p class="quest-modal__placeholder">Nothing equipped.</p>`}
+    </section>
+  `;
+
+  const otherBlock = other.length > 0 ? `
+    <section class="quest-modal__section" aria-label="Inventory items">
+      <h3>Inventory <span style="color: var(--text-low); font-weight: normal; font-size: 0.85em;">(${other.length} of ${30 - equipped.length} free)</span></h3>
+      <ul class="inventory-list">${other.map(renderInventoryItem).join('')}</ul>
+    </section>
+  ` : '';
+
+  return equippedBlock + otherBlock;
 }
 
 function renderPlayerModalAccount(p, titleEl, subEl, bodyEl) {
