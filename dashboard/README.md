@@ -98,7 +98,7 @@ the row renders as `newserv —`.
 - **Hero** — countdown to a configured target date (currently July 20, 2026)
   in the eyebrow slot. Live ticker via `setInterval`, paused on `visibilitychange`
   so background tabs don't waste cycles.
-- **Server identity card** — Login host, ports, `newserv <sha> (up to date)`.
+- **Server identity card** — Host (the static IP players point DNS at), Platforms list, `newserv <sha> (up to date)` build indicator.
 - **Live metrics** — Hunters online, Active games, Uptime, Available quests.
   Sourced from `/api/summary` + `/api/quests`. Uses newserv's PascalCase
   field names (`Server.ClientCount`, `Server.GameCount`, `Server.UptimeUsecs`,
@@ -114,7 +114,9 @@ the row renders as `newserv —`.
   platform newserv supports — DC, PC, GC, XB, BB — so non-GC players
   can still join games and play any quest where their version's variant
   also exists. With newserv's current bundle the GC-playable subset is
-  ~142 of 260 quests. Cards are classified by Episode (1/2/4) and Source
+  ~142 of 260 quests. Cards are classified by Episode (1/2 — no GC
+  quests exist for Episode 4, so the Ep 4 filter chip is intentionally
+  absent) and Source
   (Original Sega / Custom community), paginated at 9 per page. Each
   card is a button — `cursor: pointer`, `role="button"`,
   `aria-haspopup="dialog"`, click + Enter + Space — opening a native

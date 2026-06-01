@@ -335,9 +335,35 @@ Apply. The instance is *recreated* (not resized in place) — you'll lose any da
 ### Server is unreachable
 
 1. Try SSH: `ssh -i ~/.ssh/pso-server-deploy ubuntu@<ip>`. If it works, you're probably OK — check `docker logs newserv` for crash loops.
-2. Lightsail console → Instances → `pso-server`. Status should be "Running". If not, click the instance → Stop → Start.
-3. If SSH times out but Lightsail says "Running", the network rules might have changed. Check `infra/main.tf`'s `port_info` blocks. Verify your laptop's IP is still in `allowed_admin_cidr` (defaults to `0.0.0.0/0` so this is unlikely).
-4. Worst case: take a snapshot from Lightsail console → create a new instance from it → reattach the static IP. ~5 minutes.
+
+2. **If SSH hangs with "Connection timed out during banner exchange" but `nc -z <ip> 22` says the port accepts**: the host is reachable at the TCP layer but sshd isn't responding — the instance is in a degraded state. Reboot it via the AWS CLI (no console needed):
+
+   ```bash
+   AWS_PROFILE=pso-server aws lightsail reboot-instance --instance-name pso-server
+   # ~3 minutes to come back. Poll SSH banner:
+   for i in {1..30}; do
+     timeout 4 ssh -i ~/.ssh/pso-server-deploy -o ConnectTimeout=3 ubuntu@<ip> 'uptime' && break
+     echo "[$i] still down"; sleep 6
+   done
+   ```
+
+   The `pso-server` AWS profile is wired to 1Password — credentials come from the "AWS josh" item on `my.1password.com` via `/Users/josh/.aws/op-aws-personal`. If the profile is missing, see the bottom of `~/.aws/config` for the template.
+
+3. **If reboot doesn't bring containers back to healthy**, the docker pull may not have happened or compose didn't re-up:
+
+   ```bash
+   ssh ubuntu@<ip>
+   cd /home/ubuntu/pso-server
+   sudo docker compose up -d --remove-orphans
+   ```
+
+4. **If unreachability happened right after a deploy that touched ports**: the most likely cause is too many published ports overloading docker's iptables. The `10000-12001` wide range in compose creates 2002 NAT rules and pushed a 2 GB instance into the banner-timeout state once before — see commit `4ac7d31` for the postmortem. Don't widen the compose port publishing without reason; the Lightsail firewall can stay wide cheaply, but docker compose port ranges directly create kernel iptables rules.
+
+5. Lightsail console → Instances → `pso-server`. Status should be "Running". If not, click the instance → Stop → Start (or use `aws lightsail start-instance` similarly).
+
+6. If SSH times out and `nc -z` says port 22 is filtered/closed, the network rules changed. Check `infra/main.tf`'s `port_info` blocks. Verify your laptop's IP is still in `allowed_admin_cidr` (defaults to `0.0.0.0/0` so this is unlikely).
+
+7. Worst case: take a snapshot from Lightsail console → create a new instance from it → reattach the static IP. ~5 minutes.
 
 ### State drift / Terraform stuck
 

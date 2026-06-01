@@ -1232,12 +1232,12 @@
 
       <dl class="identity" aria-label="Server identity">
         <div class="identity__row">
-          <dt>Login host</dt>
+          <dt>Host</dt>
           <dd id="server-host">54.173.68.119</dd>
         </div>
         <div class="identity__row">
-          <dt>Ports</dt>
-          <dd>9100 / 9103</dd>
+          <dt>Platforms</dt>
+          <dd>DC · GC · PC · Xbox · BB</dd>
         </div>
         <div class="identity__row">
           <dt>Build</dt>
@@ -1390,7 +1390,6 @@
           <legend class="filter-group__label">Episode</legend>
           <button type="button" class="chip" aria-pressed="false" data-filter="episode" data-value="1">Ep 1</button>
           <button type="button" class="chip" aria-pressed="false" data-filter="episode" data-value="2">Ep 2</button>
-          <button type="button" class="chip" aria-pressed="false" data-filter="episode" data-value="4">Ep 4</button>
         </fieldset>
 
         <fieldset class="filter-group" style="border: 0; margin: 0; padding: 0;">
@@ -2314,7 +2313,7 @@ function updateChipCounts() {
   // fills in asynchronously (and stay correct when filters narrow the
   // catalog — the chip count is always the TOTAL available, not the
   // filtered subset, so users can see what each chip would surface).
-  const epCounts  = { '1': 0, '2': 0, '4': 0 };
+  const epCounts  = { '1': 0, '2': 0 };
   const srcCounts = { original: 0, custom: 0 };
   for (const q of quests) {
     epCounts[String(q.episode)]  = (epCounts[String(q.episode)]  || 0) + 1;

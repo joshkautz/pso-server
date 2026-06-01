@@ -20,13 +20,28 @@ public internet ──────│                                           
                       │                    │                        │
                       │                    │ /api/* (allowlist)     │
                       │                    ▼                        │
-PSO GC client ────────│   newserv (master image from upstream)      │
+PSO client (any) ─────│   newserv (joshkautz/newserv fork)          │
   via DNS+game ports  │     ├ DNS  :53/udp                          │
-                      │     ├ game :9000-9204/tcp                   │
+                      │     ├ GC   :9000-9204/tcp                   │
+                      │     ├ PC   :9300/tcp                        │
+                      │     ├ Xbox :9500/tcp                        │
+                      │     ├ BB   :10000, 11000, 11100-11101,      │
+                      │     │      :11200, 12000-12001 /tcp         │
                       │     └ REST :8081 (internal-only)            │
                       │                                            │
                       └────────── Lightsail (small_3_0) ────────────┘
 ```
+
+Every PSO version newserv supports — DC v1, DC v2, PC, GameCube
+(v1.0/v1.1/Plus/Trial), Xbox, Blue Burst — can connect. The primary
+client base is GameCube (Dolphin + real-GC hardware); BB/PC/Xbox
+listeners are open so anyone with a compatible client can join.
+
+The dashboard quest library filters to quests that have a GameCube
+variant (`isPlayableHere()` in `dashboard/index.html`), which trims
+260 → 142 quests. Non-GC players can still play any of those 142
+quests in the same game as a GC player — newserv routes each client
+its version's variant.
 
 ## Repository layout
 
@@ -128,6 +143,43 @@ rules in `~/.claude/CLAUDE.md`.
   same command.
 - Never skip pre-commit hooks (`--no-verify`).
 - Prefer small focused commits over large ones.
+
+## Operational gotchas worth remembering
+
+A few specific things that have bitten us. Future sessions: read these
+before changing infrastructure or compose port publishing.
+
+### `aws_lightsail_instance_public_ports` is destroy+create on change
+
+The Lightsail Terraform resource replaces wholesale when port_info
+blocks change. Apply briefly removes ALL firewall rules before the new
+set lands. Don't change firewall and deploy in the same push — the
+deploy's SSH step can run during the brief unhealthy window. Stage:
+firewall change → wait → verify → deploy.
+
+### Docker port publishing creates one iptables NAT entry per port
+
+`"10000-12001:10000-12001/tcp"` told Docker to publish 2,002 ports,
+which made 2,002 NAT rules. That was enough to push the 2 GB Lightsail
+instance into a sshd-banner-timeout state for ~hours. The fix:
+publish only the specific ports newserv actually listens on (currently
+seven for BB: 10000, 11000, 11100-11101, 11200, 12000-12001). The
+Lightsail firewall can stay wide cheaply — its allow rules are cheap.
+
+### AWS access via 1Password (personal account)
+
+The personal AWS account hosting this server is in the `pso-server`
+AWS profile, wired through `/Users/josh/.aws/op-aws-personal` which
+calls the `op` CLI against `my.1password.com` for the "AWS josh"
+item. Use it like any other profile:
+
+```bash
+AWS_PROFILE=pso-server aws lightsail reboot-instance --instance-name pso-server
+AWS_PROFILE=pso-server aws lightsail get-instance --instance-name pso-server
+```
+
+This pattern is separate from the work `aws-vault-1password` binary
+(hardcoded to `craftcodery.1password.com`).
 
 ## Build + deploy pipeline
 
