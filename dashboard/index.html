@@ -1068,6 +1068,17 @@
     border: 1px solid var(--line-soft);
     border-radius: var(--radius-lg);
     min-width: 0;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+  .player:hover {
+    transform: translateY(-2px);
+    border-color: var(--line-strong);
+  }
+  .player:focus-visible {
+    outline: 2px solid var(--cyan-bright);
+    outline-offset: 2px;
+    border-color: var(--line-strong);
   }
   .player__avatar {
     flex-shrink: 0;
@@ -1345,12 +1356,10 @@
       </nav>
 
       <p class="players-note">
-        Currently showing the last character name each account used.
-        Full per-character data — class, race, section ID, level,
-        ATP/DFP/MST/ATA/EVP/LCK stats, and equipped items, with all four
-        character slots per account — will appear here once the
-        corresponding newserv-side endpoint ships
-        (tracked as task&nbsp;#70 + #61 in the repo).
+        Showing the last character name each account used. Characters
+        with full data — class, race, section ID, level, stats — appear
+        here automatically once anyone runs <code>$savechar &lt;slot&gt;</code> in
+        the lobby (one save per character slot, 0&ndash;3).
       </p>
     </div>
   </section>
@@ -1361,7 +1370,7 @@
   <section id="quests" aria-labelledby="quests-title">
     <div class="container">
       <div class="section-head">
-        <h2 id="quests-title">Quest library</h2>
+        <h2 id="quests-title">Quests</h2>
         <span class="section-head__hint" id="quest-count-label">Showing all quests</span>
       </div>
 
@@ -1398,7 +1407,7 @@
              opens the quest details modal at the end of body. -->
       </div>
 
-      <nav class="pagination" id="quest-pagination" aria-label="Quest library pagination" hidden>
+      <nav class="pagination" id="quest-pagination" aria-label="Quest pagination" hidden>
         <button type="button" class="pagination__btn" data-page-step="prev" aria-label="Previous page">
           <span aria-hidden="true">‹</span> Prev
         </button>
@@ -1419,7 +1428,7 @@
   <section id="features" aria-labelledby="features-title">
     <div class="container">
       <div class="section-head">
-        <h2 id="features-title">What this server supports</h2>
+        <h2 id="features-title">Features</h2>
       </div>
 
       <div class="features" role="list">
@@ -1457,7 +1466,7 @@
   <section id="join" aria-labelledby="join-title">
     <div class="container">
       <div class="section-head">
-        <h2 id="join-title">Joining</h2>
+        <h2 id="join-title">Join</h2>
         <span class="section-head__hint">Pick your client</span>
       </div>
 
@@ -1587,6 +1596,31 @@
     </div>
   </section>
 </main>
+
+<!-- ================================================================ -->
+<!-- Player details modal                                             -->
+<!-- ================================================================ -->
+<!-- Reuses the .quest-modal CSS class — same visual pattern, just a
+     different content slot. Native <dialog>, focus trap, ESC + backdrop
+     + close-button close, return-focus to the originating card. -->
+<dialog id="player-modal" class="quest-modal" aria-labelledby="player-modal-title">
+  <div class="quest-modal__inner">
+    <header class="quest-modal__head">
+      <div>
+        <p class="quest-modal__number" id="player-modal-subtitle" aria-hidden="true">—</p>
+        <h2 class="quest-modal__title" id="player-modal-title">Player</h2>
+      </div>
+      <button type="button" class="quest-modal__close"
+              aria-label="Close player details"
+              data-action="close-player-modal">
+        <span aria-hidden="true">×</span>
+      </button>
+    </header>
+    <div class="quest-modal__body" id="player-modal-body">
+      <!-- Populated by openPlayerModal() -->
+    </div>
+  </div>
+</dialog>
 
 <!-- ================================================================ -->
 <!-- Quest details modal                                              -->
@@ -1996,9 +2030,35 @@ function avatarLetter(name) {
   return [...trimmed][0].toUpperCase();
 }
 
+// Class string → role / race / gender mapping. newserv sends only the
+// class name (HUmar, HUcast, etc.) since that already encodes all three,
+// but the user-facing UI is clearer when they're split out.
+const CLASS_DETAILS = {
+  HUmar:     { role: 'Hunter', race: 'Human',   gender: 'Male' },
+  HUnewearl: { role: 'Hunter', race: 'Newman',  gender: 'Female' },
+  HUcast:    { role: 'Hunter', race: 'Android', gender: 'Male' },
+  HUcaseal:  { role: 'Hunter', race: 'Android', gender: 'Female' },
+  RAmar:     { role: 'Ranger', race: 'Human',   gender: 'Male' },
+  RAmarl:    { role: 'Ranger', race: 'Human',   gender: 'Female' },
+  RAcast:    { role: 'Ranger', race: 'Android', gender: 'Male' },
+  RAcaseal:  { role: 'Ranger', race: 'Android', gender: 'Female' },
+  FOmar:     { role: 'Force',  race: 'Human',   gender: 'Male' },
+  FOmarl:    { role: 'Force',  race: 'Human',   gender: 'Female' },
+  FOnewm:    { role: 'Force',  race: 'Newman',  gender: 'Male' },
+  FOnewearl: { role: 'Force',  race: 'Newman',  gender: 'Female' },
+};
+
 function renderCharacterCard(c) {
+  // role=button + aria-haspopup=dialog + tabindex=0 makes the card
+  // announce as a clickable item that opens the player modal. Same
+  // pattern as quest cards (see renderQuests).
+  const key = `char:${c.AccountID}:${c.SlotIndex}`;
   return `
-    <article class="player">
+    <article class="player"
+             role="button" tabindex="0"
+             aria-haspopup="dialog"
+             aria-label="Open details for ${escapeHtml(c.Name)}"
+             data-player-key="${escapeHtml(key)}">
       <div class="player__avatar" aria-hidden="true">${escapeHtml(avatarLetter(c.Name))}</div>
       <div class="player__body">
         <h3 class="player__name" title="${escapeHtml(c.Name)}">${escapeHtml(c.Name)}</h3>
@@ -2017,8 +2077,13 @@ function renderAccountCard(p) {
   const platformBadges = (p.platforms || [])
     .map((plat) => `<span class="badge">${escapeHtml(plat)}</span>`)
     .join('');
+  const key = `acct:${p.name}`;
   return `
-    <article class="player">
+    <article class="player"
+             role="button" tabindex="0"
+             aria-haspopup="dialog"
+             aria-label="Open details for ${escapeHtml(p.name)}"
+             data-player-key="${escapeHtml(key)}">
       <div class="player__avatar" aria-hidden="true">${escapeHtml(avatarLetter(p.name))}</div>
       <div class="player__body">
         <h3 class="player__name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</h3>
@@ -2107,7 +2172,7 @@ function renderDrops() {
 }
 
 const filterState = { episode: null, source: null, search: '' };
-const QUEST_PAGE_SIZE = 24;
+const QUEST_PAGE_SIZE = 9;
 let questPage = 1;
 
 // One canonical filter pass so renderQuests() and the pagination click
@@ -2534,6 +2599,165 @@ function setupQuestCardClicks() {
   });
 }
 
+// ---------- Player modal ----------
+
+let playerModalReturnFocus = null;
+
+function findPlayerByKey(key) {
+  if (!key) return null;
+  if (key.startsWith('char:')) {
+    const [, accountId, slotIndex] = key.split(':');
+    return characters.find((c) =>
+      String(c.AccountID) === accountId &&
+      String(c.SlotIndex) === slotIndex,
+    ) || null;
+  }
+  if (key.startsWith('acct:')) {
+    const name = key.slice(5);
+    return players.find((p) => p.name === name) || null;
+  }
+  return null;
+}
+
+function openPlayerModal(key) {
+  const item = findPlayerByKey(key);
+  const modal     = document.getElementById('player-modal');
+  const titleEl   = document.getElementById('player-modal-title');
+  const subEl     = document.getElementById('player-modal-subtitle');
+  const bodyEl    = document.getElementById('player-modal-body');
+  if (!item || !modal || !titleEl || !bodyEl) return;
+
+  playerModalReturnFocus = document.activeElement;
+
+  // Two shapes: character (from /api/characters) vs account (from
+  // /api/accounts). Pick which renderer to use.
+  if ('Name' in item) {
+    renderPlayerModalCharacter(item, titleEl, subEl, bodyEl);
+  } else {
+    renderPlayerModalAccount(item, titleEl, subEl, bodyEl);
+  }
+
+  modal.showModal();
+  modal.querySelector('[data-action="close-player-modal"]')?.focus();
+}
+
+function renderPlayerModalCharacter(c, titleEl, subEl, bodyEl) {
+  titleEl.textContent = c.Name;
+  if (subEl) subEl.textContent = `Slot ${c.SlotIndex} · Account #${c.AccountID}`;
+
+  const cls    = CLASS_DETAILS[c.Class] || { role: '—', race: '—', gender: '—' };
+  const stats  = c.Stats || {};
+  const fmt    = (n) => (Number.isFinite(n) ? n.toLocaleString() : '—');
+  const playT  = formatPlayTime(c.PlayTimeSeconds);
+
+  bodyEl.innerHTML = `
+    <dl class="quest-modal__meta">
+      <dt>Class</dt><dd>${escapeHtml(c.Class)} <span style="color: var(--text-low);">(${escapeHtml(cls.role)})</span></dd>
+      <dt>Race</dt><dd>${escapeHtml(cls.race)}</dd>
+      <dt>Gender</dt><dd>${escapeHtml(cls.gender)}</dd>
+      <dt>Section ID</dt><dd>${escapeHtml(c.SectionID)}</dd>
+      <dt>Level</dt><dd>${escapeHtml(String(c.Level))}</dd>
+      <dt>EXP</dt><dd>${escapeHtml(fmt(c.EXP))}</dd>
+      <dt>Meseta</dt><dd>${escapeHtml(fmt(c.Meseta))}</dd>
+      ${playT ? `<dt>Play time</dt><dd>${escapeHtml(playT)}</dd>` : ''}
+    </dl>
+
+    <section class="quest-modal__section" aria-label="Base stats">
+      <h3>Base stats</h3>
+      <dl class="quest-modal__meta">
+        <dt>ATP (attack power)</dt><dd>${escapeHtml(fmt(stats.ATP))}</dd>
+        <dt>DFP (defense)</dt><dd>${escapeHtml(fmt(stats.DFP))}</dd>
+        <dt>MST (mental strength)</dt><dd>${escapeHtml(fmt(stats.MST))}</dd>
+        <dt>ATA (accuracy)</dt><dd>${escapeHtml(fmt(stats.ATA))}</dd>
+        <dt>EVP (evasion)</dt><dd>${escapeHtml(fmt(stats.EVP))}</dd>
+        <dt>LCK (luck)</dt><dd>${escapeHtml(fmt(stats.LCK))}</dd>
+        <dt>HP</dt><dd>${escapeHtml(fmt(stats.HP))}</dd>
+      </dl>
+    </section>
+
+    <p class="quest-modal__placeholder">
+      Equipped items and inventory aren't surfaced yet — they live in the same
+      saved-character payload but need an item-name lookup against the
+      version's parameter table to render legibly. Coming in a future pass.
+    </p>
+  `;
+}
+
+function renderPlayerModalAccount(p, titleEl, subEl, bodyEl) {
+  titleEl.textContent = p.name;
+  if (subEl) subEl.textContent = 'Account snapshot';
+
+  const platforms = (p.platforms || []).map((plat) =>
+    `<span class="badge">${escapeHtml(plat)}</span>`,
+  ).join('');
+
+  bodyEl.innerHTML = `
+    <dl class="quest-modal__meta">
+      <dt>Platforms</dt><dd><div class="quest-modal__badges">${platforms || '<span class="badge">No platforms</span>'}</div></dd>
+    </dl>
+
+    <p class="quest-modal__placeholder">
+      No saved character yet for <strong>${escapeHtml(p.name)}</strong>. Full
+      details — class, race, section ID, level, stats — appear here after
+      running <code>$savechar &lt;slot&gt;</code> in the lobby. Until then the
+      dashboard only knows the account's last-used character name and which
+      platforms have logged in from it.
+    </p>
+  `;
+}
+
+function formatPlayTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  const totalMin = Math.floor(seconds / 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m}m`;
+  return `${h}h ${m}m`;
+}
+
+function setupPlayerModal() {
+  const modal = document.getElementById('player-modal');
+  if (!modal) return;
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.close();
+      return;
+    }
+    if (e.target.closest('[data-action="close-player-modal"]')) {
+      modal.close();
+    }
+  });
+
+  modal.addEventListener('close', () => {
+    if (playerModalReturnFocus?.focus) {
+      playerModalReturnFocus.focus();
+    }
+    playerModalReturnFocus = null;
+  });
+}
+
+function setupPlayerCardClicks() {
+  const grid = document.getElementById('players-grid');
+  if (!grid) return;
+
+  grid.addEventListener('click', (e) => {
+    const card = e.target.closest('.player');
+    if (!card) return;
+    const key = card.dataset.playerKey;
+    if (key) openPlayerModal(key);
+  });
+
+  grid.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const card = e.target.closest('.player');
+    if (!card) return;
+    e.preventDefault();
+    const key = card.dataset.playerKey;
+    if (key) openPlayerModal(key);
+  });
+}
+
 // ---------- Wire up filter chips + search ----------
 
 function setupChipBehavior() {
@@ -2917,6 +3141,8 @@ document.addEventListener('DOMContentLoaded', () => {
   setupQuestModal();
   setupQuestCardClicks();
   setupPlayerControls();
+  setupPlayerModal();
+  setupPlayerCardClicks();
   startCountdown();
 
   // Fetch the per-quest provenance overlay first, then start the live
