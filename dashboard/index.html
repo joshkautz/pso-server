@@ -1554,13 +1554,13 @@ async function fetchJSON(path) {
 }
 
 // ---------- Live data buffers ----------
-// Populated by refreshLive() from /api/lobbies, /api/accounts, and
-// (TODO) the rare-drops WebSocket. Empty by default so the page shows
-// an honest empty state before the first API response lands, not
-// flashes of stale fake data.
+// Populated by refreshLive() from /api/lobbies, /api/accounts, and (task
+// #60) the rare-drops WebSocket. Empty by default so the page shows an
+// honest empty state before the first API response lands, not flashes
+// of stale fake data — see commit 5346011 for the cautionary tale.
 
-const MOCK_GAMES = [];
-const MOCK_DROPS = [];
+let games   = [];
+let drops   = [];
 let players = [];
 
 // ---------- Quest catalog ----------
@@ -1709,24 +1709,25 @@ function escapeHtml(s) {
 
 function renderGames() {
   const root = document.getElementById('games-list');
-  if (MOCK_GAMES.length === 0) {
+  if (!root) return;
+  if (games.length === 0) {
     root.innerHTML = `<li class="empty-state">No active games right now — be the first.</li>`;
     return;
   }
-  root.innerHTML = MOCK_GAMES.map(g => `
+  root.innerHTML = games.map((g) => `
     <li class="game">
       <div>
-        <p class="game__name">${g.name}</p>
+        <p class="game__name">${escapeHtml(g.name)}</p>
         <div class="game__meta">
-          <span>Ep ${g.episode}</span>
+          <span>Ep ${escapeHtml(String(g.episode))}</span>
           <span aria-hidden="true">·</span>
-          <span>${g.difficulty}</span>
+          <span>${escapeHtml(String(g.difficulty))}</span>
           <span aria-hidden="true">·</span>
-          <span>${g.mode}</span>
+          <span>${escapeHtml(String(g.mode))}</span>
         </div>
       </div>
-      <div class="game__count" aria-label="${g.players} of 4 hunters">
-        ${g.players}<span style="color: var(--text-low); font-size: 0.85rem;">/4</span>
+      <div class="game__count" aria-label="${escapeHtml(String(g.players))} of 4 hunters">
+        ${escapeHtml(String(g.players))}<span style="color: var(--text-low); font-size: 0.85rem;">/4</span>
       </div>
     </li>
   `).join('');
@@ -1778,17 +1779,18 @@ function renderPlayers() {
 
 function renderDrops() {
   const root = document.getElementById('drops-list');
-  if (MOCK_DROPS.length === 0) {
+  if (!root) return;
+  if (drops.length === 0) {
     root.innerHTML = `<li class="empty-state">No rare drops yet today.</li>`;
     return;
   }
-  root.innerHTML = MOCK_DROPS.map(d => `
+  root.innerHTML = drops.map((d) => `
     <li class="drop">
       <div>
-        <div class="drop__item">${d.item}</div>
-        <div class="drop__player">${d.player} · ${d.game}</div>
+        <div class="drop__item">${escapeHtml(d.item)}</div>
+        <div class="drop__player">${escapeHtml(d.player)} · ${escapeHtml(d.game)}</div>
       </div>
-      <div class="drop__time">${d.ts}</div>
+      <div class="drop__time">${escapeHtml(d.ts)}</div>
     </li>
   `).join('');
 }
@@ -2226,7 +2228,10 @@ async function refreshLive() {
     }),
     fetchJSON('lobbies').then((lobbies) => {
       if (!Array.isArray(lobbies)) return;
-      const games = lobbies
+      // Always reassign the global — even when there are 0 games we
+      // want renderGames() to fall through to the empty state, not
+      // keep showing whatever the last refresh produced.
+      games = lobbies
         .filter((l) => l.IsGame === true)
         .map((l) => ({
           name:       l.Name       ?? `Game ${l.ID}`,
@@ -2237,9 +2242,6 @@ async function refreshLive() {
                         ? l.ClientIDs.filter((x) => x != null).length
                         : 0,
         }));
-      // Always render — even when there are 0 games, we want to show
-      // the empty state, not stale mock data.
-      MOCK_GAMES.splice(0, MOCK_GAMES.length, ...games);
       renderGames();
     }),
     fetchJSON('quests').then((data) => {

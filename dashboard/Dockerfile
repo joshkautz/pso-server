@@ -1,16 +1,19 @@
 # Dashboard container.
 # - Node 22 alpine for a small image (~50 MB).
-# - Serves static files (index.html, etc.) AND proxies a strict whitelist
-#   of safe newserv REST endpoints. No extra reverse proxy in front.
-# - Listens on port 8080 inside the container; mapped to host port 80 in
-#   docker-compose.
+# - Serves static files (index.html) AND proxies a strict allowlist of safe
+#   newserv REST endpoints under /api/* (see server.js).
+# - Listens on :8080 inside the container; reached by Caddy via the
+#   `internal` docker bridge network. No host port is published — Caddy
+#   is the only entry point on 80/443 (see ../docker-compose.yml +
+#   ../Caddyfile).
 
 FROM node:22-alpine
 
 WORKDIR /app
 
-# Install only production deps. The dashboard backend is tiny — express
-# + http-proxy + that's it.
+# Install only production deps. The backend is just express — no proxy
+# library; we call fetch() directly against newserv on the internal
+# bridge network and run the response through per-route sanitisers.
 COPY package.json package-lock.json* ./
 RUN npm install --omit=dev
 
