@@ -9,7 +9,7 @@ OIDC plumbing that lets CI assume an IAM role without long-lived credentials.
 |---|---|
 | `aws_lightsail_instance` | Ubuntu 24.04 box; runs Docker; cloud-init installs deps on first boot |
 | `aws_lightsail_static_ip` (+ attachment) | Stable public IP — players configure this as PSO's DNS server |
-| `aws_lightsail_instance_public_ports` | UDP 53 (DNS), TCP 9000-9204 (PSO GC range), TCP 22 (SSH), TCP 80 + 443 (Caddy / dashboard HTTPS) |
+| `aws_lightsail_instance_public_ports` | UDP 53 (DNS), TCP 9000-9204 (GC), TCP 9300 (PC), TCP 9500 (Xbox), TCP 10000-12001 (BB patch+game+data), TCP 22 (SSH), TCP 80 + 443 (Caddy / dashboard HTTPS) |
 | `aws_lightsail_key_pair` | SSH key pair the deploy workflow uses |
 | `aws_iam_openid_connect_provider` | GitHub OIDC, one per AWS account |
 | `aws_iam_role` (+ inline policy) | Role assumed by Actions workflows |

@@ -30,10 +30,12 @@ services:
       - "53:53/udp"
       # PSO GC game/login range
       - "9000-9204:9000-9204/tcp"
-      # Uncomment for PSO PC / Xbox / BB support:
-      # - "9300:9300/tcp"
-      # - "9500:9500/tcp"
-      # - "10000-12001:10000-12001/tcp"
+      # PSO PC
+      - "9300:9300/tcp"
+      # PSO Xbox
+      - "9500:9500/tcp"
+      # PSO Blue Burst (patch servers + game/data ports)
+      - "10000-12001:10000-12001/tcp"
 
     networks:
       - internal

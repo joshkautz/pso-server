@@ -105,25 +105,35 @@ resource "aws_lightsail_instance_public_ports" "pso" {
     cidrs     = ["0.0.0.0/0"]
   }
 
-  # PSO PC, Xbox, and BB ports are intentionally NOT opened by default.
-  # Uncomment if you ever want to support those clients:
-  #
-  # port_info {
-  #   from_port = 9300
-  #   to_port   = 9300
-  #   protocol  = "tcp"
-  #   cidrs     = [var.allowed_game_cidr]
-  # }
-  # port_info {
-  #   from_port = 9500
-  #   to_port   = 9500
-  #   protocol  = "tcp"
-  #   cidrs     = [var.allowed_game_cidr]
-  # }
-  # port_info {
-  #   from_port = 10000
-  #   to_port   = 12001
-  #   protocol  = "tcp"
-  #   cidrs     = [var.allowed_game_cidr]
-  # }
+  # PSO PC clients (Sega's PC v2 release).
+  port_info {
+    from_port = 9300
+    to_port   = 9300
+    protocol  = "tcp"
+    cidrs     = [var.allowed_game_cidr]
+  }
+
+  # PSO Xbox.
+  port_info {
+    from_port = 9500
+    to_port   = 9500
+    protocol  = "tcp"
+    cidrs     = [var.allowed_game_cidr]
+  }
+
+  # PSO Blue Burst — patch + game + data servers. Range covers:
+  #   10000      PC-style patch port (legacy PC clients)
+  #   11000      BB patch
+  #   11100      BB JP patch
+  #   11101      BB JP game
+  #   11200      BB patch (HG)
+  #   12000-12001 BB game/data
+  # See server/config.json's PortConfiguration block for the per-port
+  # role definitions newserv listens with.
+  port_info {
+    from_port = 10000
+    to_port   = 12001
+    protocol  = "tcp"
+    cidrs     = [var.allowed_game_cidr]
+  }
 }

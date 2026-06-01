@@ -1739,6 +1739,36 @@ function questIsHidden(catId) {
   return catId === 1;
 }
 
+// This server enables every platform newserv supports (DC / PC / GC /
+// XB / BB), and the operator's philosophy is "only show quests that work
+// on every enabled platform". A quest qualifies only if its Versions
+// array carries a file for each of these five platform families — any
+// missing family means the quest can't be loaded by some clients, so
+// it's excluded from the library.
+//
+// Note: DC_NTE, PC_NTE, GC_NTE, and the Episode 3 variants (GC_EP3,
+// GC_EP3_NTE) are intentionally excluded — they're trial editions and
+// the Ep3 card game, not vanilla Ep1&2 content.
+const REQUIRED_PLATFORM_FAMILIES = ['DC', 'PC', 'GC', 'XB', 'BB'];
+
+function questPlatformFamilies(q) {
+  const families = new Set();
+  for (const v of (q?.Versions || [])) {
+    const ver = v?.Version || '';
+    if (ver === 'DC_V1' || ver === 'DC_V2') families.add('DC');
+    else if (ver === 'PC_V2')                families.add('PC');
+    else if (ver === 'GC_V3')                families.add('GC');
+    else if (ver === 'XB_V3')                families.add('XB');
+    else if (ver === 'BB_V4')                families.add('BB');
+  }
+  return families;
+}
+
+function isCrossPlatformQuest(q) {
+  const have = questPlatformFamilies(q);
+  return REQUIRED_PLATFORM_FAMILIES.every((f) => have.has(f));
+}
+
 // Strip the U+0080-009F control bytes newserv emits as text-format
 // markers (paragraph breaks etc.), collapse whitespace, and trim.
 // No HTML escaping here — renderQuest() handles that downstream.
@@ -1809,6 +1839,9 @@ function adaptQuest(q) {
   if (!version) return null;
 
   if (questIsHidden(meta.CategoryID)) return null;
+  // Drop quests that don't have a file for every enabled platform —
+  // see REQUIRED_PLATFORM_FAMILIES above for the rationale.
+  if (!isCrossPlatformQuest(q)) return null;
 
   // newserv returns "Episode 1" / "Episode 2" / "Episode 4" as strings.
   const epMatch = String(meta.Episode ?? '').match(/(\d+)/);

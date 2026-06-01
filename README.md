@@ -1,8 +1,11 @@
 # pso-server
 
 A personal [newserv](https://github.com/fuzziqersoftware/newserv) deployment
-on AWS Lightsail — Phantasy Star Online Episode I & II Plus multiplayer for
-friends running Batocera + Dolphin, real GameCube + BBA, or desktop Dolphin.
+on AWS Lightsail — Phantasy Star Online private server supporting every
+disc/client version newserv handles: Dreamcast (v1, v2), PC, GameCube
+(v1.0, v1.1, Plus, Trial), Xbox, and Blue Burst. Primary friend group
+runs Batocera + Dolphin or real GameCube + BBA; the other platforms are
+available for anyone who has a compatible client.
 
 A public status dashboard lives at <https://pso.joshkautz.com> showing server
 stats, the quest catalog, and registered players.
@@ -35,13 +38,20 @@ This repo is everything needed to stand up, deploy, and operate it.
 ## Architecture
 
 ```
-Friend's Batocera + Dolphin          Browser
-  └── PSO GC Plus (Rev 2)              └── https://pso.joshkautz.com
-       └── DNS: STATIC_IP                   │
-            │                               ▼
-            ▼                          Caddy 2 (TLS, HSTS, redirects)
-       UDP 53 (newserv DNS)            ─┐         │
-       TCP 9000-9204 (newserv game)    ─┼─┬───────┘ docker bridge network "internal"
+Friend's PSO client                   Browser
+  ├── GC (Dolphin / real BBA)            └── https://pso.joshkautz.com
+  ├── Blue Burst (PC)                         │
+  ├── PC (Sega original)                      ▼
+  ├── Xbox                                Caddy 2 (TLS, HSTS, redirects)
+  └── Dreamcast (DC v1, v2)                   │
+       └── DNS: STATIC_IP                     │
+            │                                 │
+            ▼                                 │
+       UDP 53 (newserv DNS)               ─┐  │
+       TCP 9000-9204 (GC)                 ─┤  │
+       TCP 9300       (PC)                ─┤  │
+       TCP 9500       (Xbox)              ─┤  │
+       TCP 10000-12001 (BB patch+game+data)┼─┬┘ docker bridge network "internal"
                                          │            │
                                          ▼            ▼
                               Lightsail Instance (ubuntu_24_04)
