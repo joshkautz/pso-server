@@ -1000,6 +1000,72 @@
   }
 
   /* =================================================================
+     Players grid
+     ================================================================= */
+  .players-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--space-3);
+  }
+  .player {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    background: var(--bg-surface);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-lg);
+    min-width: 0;
+  }
+  .player__avatar {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--cyan-soft);
+    border: 1px solid var(--line-strong);
+    color: var(--cyan-primary);
+    display: grid;
+    place-items: center;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+  }
+  .player__body { flex: 1; min-width: 0; }
+  .player__name {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 var(--space-2);
+    color: var(--text-high);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .player__platforms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin: 0;
+  }
+  .player__platforms .badge {
+    background: rgba(0, 212, 255, 0.08);
+    border-color: rgba(0, 212, 255, 0.25);
+    color: var(--cyan-bright);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.04em;
+    text-transform: none;
+  }
+  .players-note {
+    margin-top: var(--space-5);
+    color: var(--text-low);
+    font-size: 0.85rem;
+    max-width: 60ch;
+  }
+
+  /* =================================================================
      Footer
      ================================================================= */
   footer {
@@ -1047,6 +1113,7 @@
 
     <nav class="nav" aria-label="Primary">
       <a href="#live" aria-current="page">Live</a>
+      <a href="#players">Players</a>
       <a href="#quests">Quests</a>
       <a href="#features">Features</a>
       <a href="#join">Join</a>
@@ -1158,6 +1225,34 @@
           </ul>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- Players                                                         -->
+  <!-- ============================================================== -->
+  <!-- Sourced from /api/accounts via the strict stripAccountIdentities
+       sanitiser — every record is reduced to {name, platforms[]} with
+       any banned account dropped. License contents (PSO serial numbers,
+       passwords) and account IDs never leave the dashboard backend. -->
+  <section id="players" aria-labelledby="players-title">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="players-title">Players</h2>
+        <span class="section-head__hint" id="players-count-label">Registered hunters</span>
+      </div>
+
+      <div class="players-grid" id="players-grid">
+        <!-- Populated by JS from /api/accounts. Empty-state markup is
+             rendered into the grid until the first fetch lands. -->
+      </div>
+
+      <p class="players-note">
+        Showing the last character name each account used.
+        Per-character data — level, class, equipment, quest completions —
+        will appear here once the corresponding newserv endpoint lands
+        (tracked as task&nbsp;#61 in the repo).
+      </p>
     </div>
   </section>
 
@@ -1459,12 +1554,14 @@ async function fetchJSON(path) {
 }
 
 // ---------- Live data buffers ----------
-// Populated by refreshLive() from /api/lobbies and (TODO) the rare-drops
-// WebSocket. Empty by default so the page shows an honest empty state
-// before the first API response lands, not flashes of stale fake data.
+// Populated by refreshLive() from /api/lobbies, /api/accounts, and
+// (TODO) the rare-drops WebSocket. Empty by default so the page shows
+// an honest empty state before the first API response lands, not
+// flashes of stale fake data.
 
 const MOCK_GAMES = [];
 const MOCK_DROPS = [];
+let players = [];
 
 // ---------- Quest catalog ----------
 // Populated from /api/quests on first refreshLive(). Empty until then so
@@ -1633,6 +1730,50 @@ function renderGames() {
       </div>
     </li>
   `).join('');
+}
+
+function renderPlayers() {
+  const grid       = document.getElementById('players-grid');
+  const countLabel = document.getElementById('players-count-label');
+  if (!grid) return;
+
+  if (countLabel) {
+    countLabel.textContent = players.length === 0
+      ? 'Registered hunters'
+      : `${players.length} registered hunter${players.length === 1 ? '' : 's'}`;
+  }
+
+  if (players.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column: 1 / -1;">
+        No one's registered yet. Be the first.
+      </div>`;
+    return;
+  }
+
+  // First-grapheme avatar letter. PSO names are usually ASCII but the
+  // unicode-iterator spread handles surrogate pairs cleanly when they
+  // do appear (Japanese players, accented latin, etc.).
+  const avatarLetter = (name) => {
+    const trimmed = String(name ?? '').trim();
+    if (!trimmed) return '?';
+    return [...trimmed][0].toUpperCase();
+  };
+
+  grid.innerHTML = players.map((p) => {
+    const platformBadges = (p.platforms || [])
+      .map((plat) => `<span class="badge">${escapeHtml(plat)}</span>`)
+      .join('');
+    return `
+      <article class="player">
+        <div class="player__avatar" aria-hidden="true">${escapeHtml(avatarLetter(p.name))}</div>
+        <div class="player__body">
+          <h3 class="player__name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</h3>
+          <p class="player__platforms">${platformBadges || '<span class="badge">No platforms</span>'}</p>
+        </div>
+      </article>
+    `;
+  }).join('');
 }
 
 function renderDrops() {
@@ -2112,6 +2253,15 @@ async function refreshLive() {
       if (el) el.textContent = String(quests.length);
       renderQuests();
     }),
+    fetchJSON('accounts').then((data) => {
+      // /api/accounts is server-side-sanitised — each entry is just
+      // {name, platforms[]}. Sort by name for stable order across
+      // refreshes; the API doesn't guarantee any particular order.
+      players = Array.isArray(data) ? [...data].sort((a, b) =>
+        String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' }),
+      ) : [];
+      renderPlayers();
+    }),
   ]);
 }
 
@@ -2260,6 +2410,7 @@ document.addEventListener('visibilitychange', () => {
 document.addEventListener('DOMContentLoaded', () => {
   renderGames();
   renderDrops();
+  renderPlayers();
   renderQuests();
   setupChipBehavior();
   setupSearch();

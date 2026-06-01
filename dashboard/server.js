@@ -52,6 +52,7 @@ const ALLOWLIST = new Map([
   ['lobbies',  { path: '/y/lobbies',      strip: stripPlayerIdentities }],
   ['server',   { path: '/y/server',       strip: passthrough }],
   ['quests',   { path: '/y/data/quests',  strip: passthrough }],
+  ['accounts', { path: '/y/accounts',     strip: stripAccountIdentities }],
 ]);
 
 // =========================================================================
@@ -96,6 +97,45 @@ function stripPlayerIdentities(data) {
     }));
   }
   return data;
+}
+
+// /y/accounts returns full Account records — license details (with PSO
+// serial numbers / passwords), ban end-times, auto-reply messages,
+// per-platform login dicts, internal account_id, BBTeamID, ep3 meseta
+// totals, auto-patch flags. Most of that is PII or server-internal
+// state. We keep only the bare minimum for a "who has played here" list:
+// the most-recent character name and a list of platforms the account
+// has registered logins for. Banned accounts are filtered out entirely.
+function stripAccountIdentities(data) {
+  if (!Array.isArray(data)) return [];
+  const out = [];
+  for (const a of data) {
+    if (!a || typeof a !== 'object') continue;
+
+    // Skip currently-banned accounts — BanEndTime is a Unix timestamp in
+    // seconds, 0 (or negative) means "not banned".
+    if (typeof a.BanEndTime === 'number' && a.BanEndTime > Math.floor(Date.now() / 1000)) {
+      continue;
+    }
+    const name = typeof a.LastPlayerName === 'string' && a.LastPlayerName.trim()
+      ? a.LastPlayerName.trim()
+      : null;
+    if (!name) continue;
+
+    // Derive platforms from the per-version license arrays. The arrays
+    // themselves contain serial-numbers / passwords / etc. so they're
+    // dropped wholesale — we only keep the count + the friendly label.
+    const platforms = [];
+    if (Array.isArray(a.GCLicenses)    && a.GCLicenses.length)    platforms.push('GameCube');
+    if (Array.isArray(a.BBLicenses)    && a.BBLicenses.length)    platforms.push('Blue Burst');
+    if (Array.isArray(a.PCLicenses)    && a.PCLicenses.length)    platforms.push('PC');
+    if (Array.isArray(a.XBLicenses)    && a.XBLicenses.length)    platforms.push('Xbox');
+    if (Array.isArray(a.DCLicenses)    && a.DCLicenses.length)    platforms.push('Dreamcast');
+    if (Array.isArray(a.DCNTELicenses) && a.DCNTELicenses.length) platforms.push('DC NTE');
+
+    out.push({ name, platforms });
+  }
+  return out;
 }
 
 // =========================================================================
