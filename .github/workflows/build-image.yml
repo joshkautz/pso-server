@@ -11,20 +11,27 @@ on:
       - ".github/workflows/build-image.yml"
   workflow_dispatch:
     inputs:
+      newserv_repo:
+        description: "newserv source repo (owner/name)"
+        required: false
+        default: "joshkautz/newserv"
       newserv_ref:
         description: "newserv git ref to build (commit SHA, tag, or branch)"
         required: false
-        default: "master"
+        default: "dashboard-character-endpoints"
 
 permissions:
   contents: read
   packages: write
 
 env:
-  # Pin to a known-good upstream commit. Bump intentionally to update.
-  # `master` is also fine for "always latest"; pinning gets you
-  # reproducibility.
-  NEWSERV_REF: ${{ inputs.newserv_ref || 'master' }}
+  # Source repository + ref for the newserv build. Defaults to the
+  # joshkautz/newserv fork's `dashboard-character-endpoints` branch while
+  # we maintain the /y/characters + /y/data/quest/:num/completions
+  # endpoints there pending upstream PR merge. Point back at
+  # fuzziqersoftware/newserv@master once those land upstream.
+  NEWSERV_REPO: ${{ inputs.newserv_repo || 'joshkautz/newserv' }}
+  NEWSERV_REF:  ${{ inputs.newserv_ref  || 'dashboard-character-endpoints' }}
   IMAGE_NAME: ghcr.io/${{ github.repository }}
   # Opt every JavaScript action into Node 24 even if it advertises Node 20.
   # GitHub forces this default starting June 2026.
@@ -37,7 +44,7 @@ jobs:
       - name: checkout upstream newserv
         uses: actions/checkout@v5
         with:
-          repository: fuzziqersoftware/newserv
+          repository: ${{ env.NEWSERV_REPO }}
           ref: ${{ env.NEWSERV_REF }}
           path: newserv
 
