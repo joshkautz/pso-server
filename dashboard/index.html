@@ -1673,15 +1673,15 @@ async function fetchJSON(path) {
 
 // ---------- Live data buffers ----------
 // Populated by refreshLive() from /api/lobbies, /api/accounts,
-// /api/characters, and (task #60) the rare-drops WebSocket. Empty by
-// default so the page shows an honest empty state before the first API
-// response lands, not flashes of stale fake data — see commit 5346011
-// for the cautionary tale.
+// /api/characters, and the rare-drops WebSocket. Empty by default so the
+// page shows an honest empty state before the first API response lands,
+// not flashes of stale fake data — see commit 5346011 for the cautionary
+// tale.
 
 let games      = [];
 let drops      = [];
-let players    = []; // from /api/accounts — fallback when no characters exist
-let characters = []; // from /api/characters — preferred when populated
+let players    = []; // from /api/accounts — name + platforms only, shown until /api/characters lands
+let characters = []; // from /api/characters — preferred when populated (auto-snapshot fills this)
 
 // ---------- Quest catalog ----------
 // Populated from /api/quests on first refreshLive(). Empty until then so
@@ -1895,9 +1895,10 @@ function adaptQuest(q) {
     // quest so we always have them.
     maxPlayers:       Number.isInteger(meta.MaxPlayers) ? meta.MaxPlayers : null,
     joinable:         typeof meta.Joinable === 'boolean' ? meta.Joinable : null,
-    // Per-quest completion totals come from a future newserv endpoint
-    // (task #61); until then we leave these null and the card hides
-    // the progress bar / replaces the completion row with the category.
+    // Per-quest completion totals aren't on the bulk /api/quests payload —
+    // newserv exposes them per quest at /api/quest/:num/completions, which
+    // the modal fetches on open. Leave these null in the card view so the
+    // progress bar stays hidden and the footer shows the category instead.
     completions:      null,
     total:            null,
   };
@@ -1951,7 +1952,8 @@ const playerFilter = { search: '' };
 // Two display modes: characters (rich data from /api/characters — name,
 // class, section, level, stats) and accounts (just name + platforms,
 // from /api/accounts). Characters are preferred when present; accounts
-// are the fallback for when no one has $savechar'd yet.
+// are the fallback while waiting for the first auto-snapshot to land
+// (auto-snapshot fires on login, every 60s during play, and on disconnect).
 function isCharacterMode() {
   return characters.length > 0;
 }
@@ -2369,9 +2371,11 @@ function renderQuests() {
     const srcBadgeClass = q.source === 'original' ? 'badge--official' : 'badge--community';
     const srcLabel = SOURCE_LABELS[q.source] || q.source;
 
-    // Until quest-completion data is exposed by newserv (task #61), we
-    // hide the progress bar and put the category name in the footer
-    // where the completion summary will go.
+    // The card view hides the progress bar because per-quest aggregate
+    // totals aren't on the bulk /api/quests payload — those would need a
+    // separate fan-out across /api/quest/:num/completions. For now the
+    // footer shows the category name instead of the completion summary;
+    // the modal still fetches per-quest completion data on open.
     const hasCompletions = Number.isInteger(q.completions)
                         && Number.isInteger(q.total)
                         && q.total > 0;
@@ -2741,11 +2745,10 @@ function renderPlayerModalAccount(p, titleEl, subEl, bodyEl) {
     </dl>
 
     <p class="quest-modal__placeholder">
-      No saved character yet for <strong>${escapeHtml(p.name)}</strong>. Full
-      details — class, race, section ID, level, stats — appear here after
-      running <code>$savechar &lt;slot&gt;</code> in the lobby. Until then the
-      dashboard only knows the account's last-used character name and which
-      platforms have logged in from it.
+      No character details for <strong>${escapeHtml(p.name)}</strong> yet. The
+      server snapshots character data the first time you join a lobby and
+      refreshes it every minute during play — class, race, section ID, level,
+      and stats will appear here within a minute of next logging in.
     </p>
   `;
 }
@@ -2927,11 +2930,13 @@ async function refreshLive() {
       renderPlayers();
     }),
     fetchJSON('characters').then((data) => {
-      // /api/characters comes from newserv's walk of system/players/
-      // backup_player_*.psochar files (created by $savechar). Each
-      // entry already sanitized server-side: {AccountID, SlotIndex,
-      // Name, Class, SectionID, Level, EXP, Meseta, PlayTimeSeconds,
-      // Stats}. Stable sort: account then slot then name.
+      // /api/characters comes from newserv's walk of system/players/ —
+      // both backup_player_*.psochar (legacy manual $savechar) and
+      // auto_player_*.psochar (auto-snapshot on login + every 60s +
+      // on disconnect), deduped per (account, slot) with auto-snapshot
+      // winning. Each entry already sanitized server-side: {AccountID,
+      // SlotIndex, Name, Class, SectionID, Level, EXP, Meseta,
+      // PlayTimeSeconds, Stats}. Stable sort: account then slot then name.
       characters = Array.isArray(data) ? [...data].sort((a, b) =>
         (a.AccountID - b.AccountID) ||
         (a.SlotIndex - b.SlotIndex) ||
