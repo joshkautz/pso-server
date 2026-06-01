@@ -39,3 +39,9 @@ Thumbs.db
 !.env.example
 secrets/
 scratch/
+
+# Node — dashboard / future Node apps
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
