@@ -2077,7 +2077,12 @@ function renderCharacterCard(c) {
   // role=button + aria-haspopup=dialog + tabindex=0 makes the card
   // announce as a clickable item that opens the player modal. Same
   // pattern as quest cards (see renderQuests).
-  const key = `char:${c.AccountID}:${c.SlotIndex}`;
+  //
+  // AccountToken is the HMAC of the real AccountID — the dashboard
+  // backend hashes it before sending so the raw value (== player's PSO
+  // serial number for disc versions) never reaches the browser. Used
+  // here purely as a stable Map key for the player modal's open/lookup.
+  const key = `char:${c.AccountToken}:${c.SlotIndex}`;
   return `
     <article class="player"
              role="button" tabindex="0"
@@ -2654,9 +2659,10 @@ let playerModalReturnFocus = null;
 function findPlayerByKey(key) {
   if (!key) return null;
   if (key.startsWith('char:')) {
-    const [, accountId, slotIndex] = key.split(':');
+    // Key format matches renderCharacterCard: "char:<AccountToken>:<SlotIndex>"
+    const [, accountToken, slotIndex] = key.split(':');
     return characters.find((c) =>
-      String(c.AccountID) === accountId &&
+      String(c.AccountToken) === accountToken &&
       String(c.SlotIndex) === slotIndex,
     ) || null;
   }
@@ -2691,12 +2697,31 @@ function openPlayerModal(key) {
 
 function renderPlayerModalCharacter(c, titleEl, subEl, bodyEl) {
   titleEl.textContent = c.Name;
-  if (subEl) subEl.textContent = `Slot ${c.SlotIndex} · Account #${c.AccountID}`;
+  // Subtitle is just the slot — we used to include "Account #<id>" here
+  // but that surfaced the raw account_id (== PSO serial number for disc
+  // versions), which is part of the login credential and shouldn't be
+  // publicly visible. Slot index alone is enough disambiguation between
+  // a player's multiple characters.
+  if (subEl) subEl.textContent = `Slot ${c.SlotIndex}`;
 
   const cls    = CLASS_DETAILS[c.Class] || { role: '—', race: '—', gender: '—' };
   const stats  = c.Stats || {};
   const fmt    = (n) => (Number.isFinite(n) ? n.toLocaleString() : '—');
-  const playT  = formatPlayTime(c.PlayTimeSeconds);
+
+  // EXP / play-time trust gate. The backend nulls these out for disc
+  // versions because the server doesn't track them live there — the
+  // values that arrive at the dashboard are stale until the client's
+  // next 61/98 upload (lobby/quest transition). For BB they're
+  // server-authoritative and trustworthy.
+  const showLiveFields = c.IsLikelyBB === true;
+  const totalExpHtml   = showLiveFields ? escapeHtml(fmt(c.EXP)) : '<span title="Disc versions don\'t track EXP server-side — refreshes on lobby return.">—</span>';
+  const toNextHtml     = showLiveFields && Number.isFinite(c.EXPToNextLevel)
+    ? escapeHtml(fmt(c.EXPToNextLevel))
+    : '<span title="Computed from the BB level table; only meaningful when EXP is live.">—</span>';
+  const playTimeStr    = showLiveFields ? formatPlayTime(c.PlayTimeSeconds) : null;
+  const playTimeHtml   = playTimeStr
+    ? escapeHtml(playTimeStr)
+    : '<span title="Play time isn\'t in the disc-version network protocol — only Blue Burst tracks it server-side.">—</span>';
 
   bodyEl.innerHTML = `
     <dl class="quest-modal__meta">
@@ -2705,9 +2730,10 @@ function renderPlayerModalCharacter(c, titleEl, subEl, bodyEl) {
       <dt>Gender</dt><dd>${escapeHtml(cls.gender)}</dd>
       <dt>Section ID</dt><dd>${escapeHtml(c.SectionID)}</dd>
       <dt>Level</dt><dd>${escapeHtml(String(c.Level))}</dd>
-      <dt>EXP</dt><dd>${escapeHtml(fmt(c.EXP))}</dd>
+      <dt>Total EXP</dt><dd>${totalExpHtml}</dd>
+      <dt>To next level</dt><dd>${toNextHtml}</dd>
       <dt>Meseta</dt><dd>${escapeHtml(fmt(c.Meseta))}</dd>
-      ${playT ? `<dt>Play time</dt><dd>${escapeHtml(playT)}</dd>` : ''}
+      <dt>Play time</dt><dd>${playTimeHtml}</dd>
     </dl>
 
     <section class="quest-modal__section" aria-label="Base stats">
@@ -2934,11 +2960,16 @@ async function refreshLive() {
       // both backup_player_*.psochar (legacy manual $savechar) and
       // auto_player_*.psochar (auto-snapshot on login + every 60s +
       // on disconnect), deduped per (account, slot) with auto-snapshot
-      // winning. Each entry already sanitized server-side: {AccountID,
-      // SlotIndex, Name, Class, SectionID, Level, EXP, Meseta,
-      // PlayTimeSeconds, Stats}. Stable sort: account then slot then name.
+      // winning. Each entry shape: {AccountToken (HMAC of account_id —
+      // backend never reveals the raw id), SlotIndex, Name, Class,
+      // SectionID, Level, Meseta, Stats, IsLikelyBB, EXP, EXPToNextLevel,
+      // PlayTimeSeconds}. EXP/PlayTime are null for non-BB characters
+      // (server doesn't track them live there).
+      //
+      // Stable sort: account then slot then name. AccountToken is a hex
+      // string, so localeCompare for the primary key.
       characters = Array.isArray(data) ? [...data].sort((a, b) =>
-        (a.AccountID - b.AccountID) ||
+        String(a.AccountToken).localeCompare(String(b.AccountToken)) ||
         (a.SlotIndex - b.SlotIndex) ||
         String(a.Name).localeCompare(String(b.Name), undefined, { sensitivity: 'base' }),
       ) : [];

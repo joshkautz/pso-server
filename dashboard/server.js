@@ -14,6 +14,7 @@ import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import http from 'node:http';
+import crypto from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -45,6 +46,40 @@ const NEWSERV_UPSTREAM_BRANCH = 'master';
 // ~2 calls/hr — comfortably under budget even with sporadic restarts.
 const BUILD_INFO_TTL_MS = 60 * 60 * 1000;
 
+// Level tables are static once newserv has loaded them at boot — there's
+// no reason to re-fetch every few seconds. An hour TTL keeps us off the
+// hot path for the lifetime of a typical container instance.
+const LEVEL_TABLES_TTL_MS = 60 * 60 * 1000;
+
+// HMAC secret used to derive AccountToken from AccountID before any data
+// leaves the backend. Generated per-process so a token from one container
+// can't be replayed against another, and so the raw account_id (which
+// equals the player's PSO serial number for disc versions) is never
+// recoverable from the public response. The frontend uses the token as
+// a stable Map key for the lifetime of a page load; it doesn't need to
+// persist across restarts.
+const ACCOUNT_TOKEN_SECRET = crypto.randomBytes(32);
+
+// =========================================================================
+// PSO class-name → index map. Mirrors name_for_char_class() in newserv's
+// StaticGameData.cc — needed to look up rows in the level-table arrays,
+// which are indexed by enum value (not class name).
+// =========================================================================
+const CLASS_NAME_TO_INDEX = Object.freeze({
+  HUmar:     0,
+  HUnewearl: 1,
+  HUcast:    2,
+  RAmar:     3,
+  RAcast:    4,
+  RAcaseal:  5,
+  FOmarl:    6,
+  FOnewm:    7,
+  FOnewearl: 8,
+  HUcaseal:  9,
+  FOmar:     10,
+  RAmarl:    11,
+});
+
 // =========================================================================
 // Safe-endpoint allowlist
 //
@@ -59,13 +94,11 @@ const ALLOWLIST = new Map([
   ['server',     { path: '/y/server',      strip: passthrough }],
   ['quests',     { path: '/y/data/quests', strip: passthrough }],
   ['accounts',   { path: '/y/accounts',    strip: stripAccountIdentities }],
-  // /y/characters is already sanitized server-side (see HTTPServer.cc's
-  // /y/characters handler — drops PSO serials, passwords, ban times, raw
-  // inventory hex, bank contents, guild card data, auto-reply text,
-  // info-board text, choice-search config). AccountID is intentionally
-  // kept so the frontend can group characters by account (each PSO
-  // account has up to 4 character slots).
-  ['characters', { path: '/y/characters',  strip: passthrough }],
+  // /api/characters has its own dedicated route below — it has to
+  // cross-reference /y/accounts and /y/data/level-tables to derive
+  // AccountToken (HMAC of account_id), IsLikelyBB (which decides whether
+  // EXP / PlayTime are trustworthy), and EXPToNextLevel. The generic
+  // allowlist passthrough pattern only handles single-source fetches.
 ]);
 
 // =========================================================================
@@ -152,15 +185,193 @@ function stripAccountIdentities(data) {
 }
 
 // =========================================================================
+// AccountToken derivation
+//
+// For disc-version players (DC/GC/PC/Xbox), `account_id` happens to equal
+// the PSO serial number printed on the player's HUNTER's License — i.e.
+// half their login credential. Even leaking just the serial gives an
+// attacker who already knows or guesses the access key the ability to
+// impersonate. We never want to surface the raw value publicly.
+//
+// AccountToken is a deterministic HMAC of the account_id keyed by a
+// per-process secret. It preserves the property the frontend needs
+// (stable identifier for grouping characters by account, keying Map
+// lookups, matching modal selections) without exposing the original.
+// Reverse-mapping is computationally infeasible without the secret;
+// brute-forcing requires generating tokens for every plausible 10-digit
+// PSO serial and comparing — which would still only narrow to "this is
+// account #N on the server," not yield the credential.
+// =========================================================================
+
+function accountToken(accountId) {
+  // Numeric account_ids come through as JS numbers; stringify so the
+  // HMAC input is deterministic regardless of upstream type.
+  return crypto
+    .createHmac('sha256', ACCOUNT_TOKEN_SECRET)
+    .update(String(accountId))
+    .digest('hex')
+    .slice(0, 16);
+}
+
+// =========================================================================
+// Character sanitiser
+//
+// Takes the raw /y/characters response, plus side-data from /y/accounts
+// (for BB-likelihood inference) and /y/data/level-tables (for EXP-to-next
+// computation), and produces the dashboard-safe shape:
+//
+//   {
+//     AccountToken:    "deadbeef12345678",  // 16-hex HMAC of account_id
+//     SlotIndex:       0,
+//     Name:            "Sonic",
+//     Class:           "HUmar",
+//     SectionID:       "Pinkal",
+//     Level:           42,
+//     Meseta:          99999,
+//     Stats:           {...},
+//     // EXP-related fields. Only trustworthy for BB (server-authoritative);
+//     // for disc versions they reflect whatever the client last uploaded
+//     // at a 61/98 boundary, which lags behind real progression. We pass
+//     // IsLikelyBB so the frontend can decide whether to render literals
+//     // or "—" with a tooltip.
+//     IsLikelyBB:      true | false | null,
+//     EXP:             123456 | null,         // cumulative since L1
+//     EXPToNextLevel:  4321   | null,
+//     PlayTimeSeconds: 720000 | null,
+//   }
+//
+// IsLikelyBB resolution:
+//   - account has BBLicenses AND no other licenses → true (snapshot is BB)
+//   - account has non-BB licenses AND no BBLicenses → false (snapshot is disc)
+//   - account has both kinds, or lookup fails       → null (can't tell)
+//
+// "null" means "we don't trust EXP/PlayTime for this character"; the
+// frontend hides those fields rather than guessing.
+// =========================================================================
+
+function buildAccountBBIndex(rawAccounts) {
+  // /y/accounts comes from inside the docker network — it returns full
+  // account records including license arrays. We only read here, never
+  // surface; the public /api/accounts goes through stripAccountIdentities.
+  const out = new Map();
+  if (!Array.isArray(rawAccounts)) return out;
+  for (const a of rawAccounts) {
+    if (!a || typeof a.AccountID !== 'number') continue;
+    const hasBB =
+      Array.isArray(a.BBLicenses)    && a.BBLicenses.length    > 0;
+    const hasOther =
+      (Array.isArray(a.GCLicenses)    && a.GCLicenses.length    > 0) ||
+      (Array.isArray(a.PCLicenses)    && a.PCLicenses.length    > 0) ||
+      (Array.isArray(a.XBLicenses)    && a.XBLicenses.length    > 0) ||
+      (Array.isArray(a.DCLicenses)    && a.DCLicenses.length    > 0) ||
+      (Array.isArray(a.DCNTELicenses) && a.DCNTELicenses.length > 0);
+    let isLikelyBB;
+    if (hasBB && !hasOther) isLikelyBB = true;
+    else if (!hasBB && hasOther) isLikelyBB = false;
+    else isLikelyBB = null;  // both or neither — can't infer
+    out.set(a.AccountID, isLikelyBB);
+  }
+  return out;
+}
+
+function computeExpToNextLevel(charClass, currentLevel, currentExp, levelTables, isLikelyBB) {
+  // We don't know which version's curve was used to produce the snapshot.
+  // For BB we use v4; for disc versions we default to v3 (the only disc
+  // family in active use here is GC). For "unknown" / mixed accounts we
+  // skip the computation rather than guess — the EXP value itself is
+  // already untrustworthy in that case.
+  if (isLikelyBB === null) return null;
+  if (!levelTables || typeof levelTables !== 'object') return null;
+  const table = isLikelyBB ? levelTables.v4 : levelTables.v3;
+  if (!table || !Array.isArray(table.LevelDeltas)) return null;
+  const classIndex = CLASS_NAME_TO_INDEX[charClass];
+  if (typeof classIndex !== 'number') return null;
+  const row = table.LevelDeltas[classIndex];
+  if (!Array.isArray(row)) return null;
+  // `Level` from /y/characters is 1-based (in-game level). The level table
+  // is 0-indexed and row[k].EXP is the cumulative EXP needed to reach
+  // internal level k = in-game level k+1. To advance from in-game
+  // currentLevel to currentLevel+1, look up row[currentLevel] (since
+  // internal level = currentLevel = in-game level - 1 + 1 = currentLevel).
+  // Wait through that: in-game Lv.2 → internal level 1 → next is internal
+  // level 2 → row index 2 → which the table calls "to reach in-game Lv.3".
+  // So the index we want is `currentLevel` (1-based in-game = next
+  // internal level = next row index).
+  const nextRow = row[currentLevel];
+  if (!nextRow || typeof nextRow.EXP !== 'number') return null;
+  const remaining = nextRow.EXP - (typeof currentExp === 'number' ? currentExp : 0);
+  return remaining > 0 ? remaining : 0;
+}
+
+function stripCharacters(rawCharacters, rawAccounts, levelTables) {
+  if (!Array.isArray(rawCharacters)) return [];
+  const bbIndex = buildAccountBBIndex(rawAccounts);
+  const out = [];
+  for (const c of rawCharacters) {
+    if (!c || typeof c !== 'object') continue;
+    if (typeof c.AccountID !== 'number') continue;
+    const isLikelyBB = bbIndex.has(c.AccountID) ? bbIndex.get(c.AccountID) : null;
+    const expToNext = computeExpToNextLevel(
+      c.Class,
+      typeof c.Level === 'number' ? c.Level : 0,
+      typeof c.EXP === 'number' ? c.EXP : 0,
+      levelTables,
+      isLikelyBB,
+    );
+    out.push({
+      AccountToken:    accountToken(c.AccountID),
+      SlotIndex:       c.SlotIndex,
+      Name:            c.Name,
+      Class:           c.Class,
+      SectionID:       c.SectionID,
+      Level:           c.Level,
+      Meseta:          c.Meseta,
+      Stats:           c.Stats,
+      IsLikelyBB:      isLikelyBB,
+      // EXP / PlayTime: keep raw values for BB (trustworthy) and null
+      // for non-BB (frontend renders "—"). The dashboard never displays
+      // a misleading "0" for EXP/play-time on a level-50 disc-version
+      // character.
+      EXP:             isLikelyBB === true ? (typeof c.EXP === 'number' ? c.EXP : null) : null,
+      EXPToNextLevel:  isLikelyBB === true ? expToNext : null,
+      PlayTimeSeconds: isLikelyBB === true ? (typeof c.PlayTimeSeconds === 'number' ? c.PlayTimeSeconds : null) : null,
+    });
+  }
+  return out;
+}
+
+// Quest-completion lists also include raw AccountID (so the frontend can
+// match a completion entry to a character row by account). Same security
+// concern, same fix.
+function stripQuestCompletions(rawCompletions) {
+  if (!Array.isArray(rawCompletions)) return [];
+  const out = [];
+  for (const entry of rawCompletions) {
+    if (!entry || typeof entry !== 'object') continue;
+    if (typeof entry.AccountID !== 'number') continue;
+    out.push({
+      AccountToken: accountToken(entry.AccountID),
+      SlotIndex:    entry.SlotIndex,
+      Name:         entry.Name,
+    });
+  }
+  return out;
+}
+
+// =========================================================================
 // Small TTL cache to avoid hammering newserv on every dashboard refresh
 // =========================================================================
 
 const cache = new Map();
 
 async function fetchCached(key, url) {
+  return fetchCachedLongTTL(key, url, CACHE_TTL_MS);
+}
+
+async function fetchCachedLongTTL(key, url, ttlMs) {
   const now = Date.now();
   const cached = cache.get(key);
-  if (cached && now - cached.at < CACHE_TTL_MS) {
+  if (cached && now - cached.at < ttlMs) {
     return cached.data;
   }
 
@@ -203,10 +414,44 @@ app.get('/api/quest/:num/completions', async (req, res) => {
       `quest-completions:${num}`,
       `${NEWSERV_API}/y/data/quest/${num}/completions`,
     );
-    res.json(data);
+    // newserv's response includes raw AccountID — strip it through the
+    // same HMAC path the /api/characters route uses so the frontend can
+    // still match completions against character rows without ever seeing
+    // the underlying serial.
+    res.json(stripQuestCompletions(data));
   } catch (err) {
     console.error(`[api/quest/${num}/completions] ${err.message}`);
     res.status(502).json({ error: 'upstream unavailable' });
+  }
+});
+
+// =========================================================================
+// /api/characters
+//
+// Dedicated route because it joins three upstream sources:
+//   - /y/characters     — the raw character snapshots
+//   - /y/accounts       — to infer IsLikelyBB per account
+//   - /y/data/level-tables — to compute EXP-to-next-level
+//
+// The strict allowlist passthrough pattern handles single-source fetches
+// only; characters needs all three sources cross-referenced before the
+// dashboard-safe shape can be produced. See stripCharacters for the
+// sanitisation contract.
+// =========================================================================
+
+app.get('/api/characters', async (req, res) => {
+  try {
+    const [rawCharacters, rawAccounts, levelTables] = await Promise.all([
+      fetchCached('characters', `${NEWSERV_API}/y/characters`),
+      fetchCached('accounts-internal', `${NEWSERV_API}/y/accounts`),
+      // level tables are static — long TTL keyed separately so the
+      // hot-path cache (10s) doesn't accidentally evict them.
+      fetchCachedLongTTL('level-tables', `${NEWSERV_API}/y/data/level-tables`, LEVEL_TABLES_TTL_MS),
+    ]);
+    res.json(stripCharacters(rawCharacters, rawAccounts, levelTables));
+  } catch (err) {
+    console.error(`[api/characters] ${err.message}`);
+    res.status(502).json({ error: 'upstream unavailable', resource: 'characters' });
   }
 });
 
