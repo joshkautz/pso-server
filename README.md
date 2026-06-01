@@ -145,6 +145,7 @@ your player count.
 | [`docs/client-setup.md`](docs/client-setup.md) | Each player on Batocera + Dolphin (handhelds, HTPCs) |
 | [`docs/client-setup-dolphin.md`](docs/client-setup-dolphin.md) | Each player on desktop Dolphin (macOS / Windows / Linux) |
 | [`docs/community-quests.md`](docs/community-quests.md) | Operator. How to install fan-made quest packs on top of the 260 quests newserv ships with |
+| [`docs/community-quest-sources.md`](docs/community-quest-sources.md) | Operator. Procurement guide — where to register, what to grab, who to look up |
 | [`dashboard/README.md`](dashboard/README.md) | Anyone touching the public dashboard — architecture, allowlist, sanitisers, build pipeline |
 | [`infra/README.md`](infra/README.md) | Anyone bootstrapping this from scratch (e.g. forking) |
 | [`server/README.md`](server/README.md) | Understanding what runs on the instance and how |
