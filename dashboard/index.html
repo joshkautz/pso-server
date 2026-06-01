@@ -1395,9 +1395,8 @@
 
         <fieldset class="filter-group" style="border: 0; margin: 0; padding: 0;">
           <legend class="filter-group__label">Source</legend>
-          <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="official">Original game</button>
-          <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="community">Fan-made</button>
-          <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="custom">Custom</button>
+          <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="original">Original (Sega)</button>
+          <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="custom">Custom (community)</button>
         </fieldset>
       </form>
 
@@ -1736,10 +1735,8 @@ const QUEST_CATEGORY_NAMES = [
   'Download',                    // 21
 ];
 
-function questSourceForCategoryId(catId) {
-  if (catId === 1)  return null;          // hidden — exclude from library
-  if (catId === 21) return 'community';   // download bucket
-  return 'official';
+function questIsHidden(catId) {
+  return catId === 1;
 }
 
 // Strip the U+0080-009F control bytes newserv emits as text-format
@@ -1760,26 +1757,23 @@ function pickEnglishVersion(versions) {
   return versions.find((v) => v?.Language === 'English') || versions[0];
 }
 
-// Source labels — internal source keys stay as 'official'/'community'/
-// 'custom' for css class names + data-value selectors; the user-facing
-// labels reflect what the underlying research actually shows. Most of
-// CategoryID 21 ("Download") in newserv's bundled content is Sega-
-// original-distributed-via-download, not fan-made — see the
-// quest-provenance.json overrides for the 9 reclassifications.
+// Binary source classification. Per user research/preference: there are
+// fundamentally only two kinds of quests — original Sega-authored content
+// and community-authored quests (anyone not Sega). The third "custom
+// server-specific" bucket was never populated and is folded into custom.
 const SOURCE_LABELS = {
-  official:  'Original game',
-  community: 'Fan-made',
-  custom:    'Custom',
+  original: 'Original (Sega)',
+  custom:   'Custom (community)',
 };
 
-// Default origin label by classified source. Quests with a per-quest
-// override in dashboard/quest-provenance.json get a more specific label
-// (e.g. "Sega DC download — Soul of a Blacksmith (2001)") + an external
-// link to the canonical source.
-const QUEST_PROVENANCE_DEFAULT_LABEL = {
-  official:  'Original PSO game (Sega)',
-  community: 'Fan-made (community pack)',
-  custom:    "This server's own quest",
+// Human-friendly labels for the distribution channel field.
+const DISTRIBUTION_LABELS = {
+  'disc-included':     'Pressed on the original disc',
+  'disc-bundled-plus': 'Preloaded on the PSO Plus disc',
+  'download':          'Sega online quest download',
+  'event':             'Sega limited-time event',
+  'community-archive': 'Community archive / forum release',
+  'newserv-bundled':   'Bundled with newserv (utility quest)',
 };
 
 // Filled in by fetchProvenance() on page load. Keys are decimal quest
@@ -1814,8 +1808,7 @@ function adaptQuest(q) {
   const version = pickEnglishVersion(q.Versions);
   if (!version) return null;
 
-  let source = questSourceForCategoryId(meta.CategoryID);
-  if (!source) return null; // hidden
+  if (questIsHidden(meta.CategoryID)) return null;
 
   // newserv returns "Episode 1" / "Episode 2" / "Episode 4" as strings.
   const epMatch = String(meta.Episode ?? '').match(/(\d+)/);
@@ -1823,7 +1816,18 @@ function adaptQuest(q) {
   if (episode !== 1 && episode !== 2 && episode !== 4) return null;
 
   const num  = meta.QuestNumber ?? 0;
-  const name = version.Name || `Quest ${num}`;
+  const override = questProvenance[String(num)] || null;
+
+  // Classify: every quest in the bundle has a provenance entry that
+  // sets classify to 'original' or 'custom'. Without an override, fall
+  // back to 'original' — most uncatalogued quests will be Sega
+  // additions and that's the safer default.
+  const source = override?.classify === 'custom' ? 'custom' : 'original';
+
+  // Prefer the curated name from provenance (it's the canonical
+  // English name); fall back to whatever newserv ships in the version
+  // payload.
+  const name = override?.name || version.Name || `Quest ${num}`;
 
   // ShortDescription is usually a clean one-liner; fall back to
   // LongDescription if it's missing or stub-thin.
@@ -1843,19 +1847,17 @@ function adaptQuest(q) {
 
   const category = QUEST_CATEGORY_NAMES[meta.CategoryID] || 'Other';
 
-  // Per-quest provenance overlay. When present, can override the
-  // source classification (the most common case: the 9 Sega-DC-download
-  // quests in CategoryID 21 reclassify to 'official').
-  const override = questProvenance[String(num)] || null;
-  if (override?.classify === 'original')  source = 'official';
-  if (override?.classify === 'community') source = 'community';
-  if (override?.classify === 'custom')    source = 'custom';
-
+  // Provenance is now a richer object — everything the modal renders.
+  // Author defaults: 'Sega' for original quests with no specific override,
+  // null for custom quests with no override (we want the field blank
+  // rather than a generic "Unknown community member" placeholder).
   const provenance = {
-    label:     override?.originLabel || QUEST_PROVENANCE_DEFAULT_LABEL[source] || 'Unknown',
-    sourceUrl: override?.sourceUrl   || null,
-    author:    override?.author      || null,
-    year:      Number.isFinite(override?.year) ? override.year : null,
+    author:       override?.author       || (source === 'original' ? 'Sega' : null),
+    year:         Number.isFinite(override?.year) ? override.year : null,
+    platform:     override?.platform     || null,
+    distribution: override?.distribution || null,
+    sourceUrl:    override?.sourceUrl    || null,
+    notes:        override?.notes        || null,
   };
 
   return {
@@ -2278,7 +2280,7 @@ function updateChipCounts() {
   // catalog — the chip count is always the TOTAL available, not the
   // filtered subset, so users can see what each chip would surface).
   const epCounts  = { '1': 0, '2': 0, '4': 0 };
-  const srcCounts = { official: 0, community: 0, custom: 0 };
+  const srcCounts = { original: 0, custom: 0 };
   for (const q of quests) {
     epCounts[String(q.episode)]  = (epCounts[String(q.episode)]  || 0) + 1;
     srcCounts[q.source]          = (srcCounts[q.source]          || 0) + 1;
@@ -2343,9 +2345,7 @@ function renderQuests() {
 
   grid.innerHTML = visible.map((q) => {
     const epBadge = `<span class="badge badge--ep${q.episode}">Episode ${q.episode}</span>`;
-    const srcBadgeClass = q.source === 'official'  ? 'badge--official'
-                       : q.source === 'community' ? 'badge--community'
-                       :                            'badge--custom';
+    const srcBadgeClass = q.source === 'original' ? 'badge--official' : 'badge--community';
     const srcLabel = SOURCE_LABELS[q.source] || q.source;
 
     // Until quest-completion data is exposed by newserv (task #61), we
@@ -2423,23 +2423,34 @@ function openQuestModal(questId) {
                      :                            'badge--custom';
   const srcLabel = q.source.charAt(0).toUpperCase() + q.source.slice(1);
 
-  // Build the Origin <dd>. With a sourceUrl, render as a link out to the
-  // canonical source (Ephinea wiki article, PSO-World guide, attribution
-  // page, GitHub commit). Without, just the label string. Either way the
-  // dt label is plain text.
-  const originDd = q.provenance.sourceUrl
-    ? `<a href="${escapeHtml(q.provenance.sourceUrl)}" target="_blank" rel="noopener">${escapeHtml(q.provenance.label)}</a>`
-    : escapeHtml(q.provenance.label);
-
+  // Build the modal's metadata dl. The new schema gives us a richer set
+  // of provenance fields per quest — surface each as its own row when
+  // present so the modal reads like a small reference page.
   const meta = [];
-  meta.push(`<dt>Category</dt><dd>${escapeHtml(q.category)}</dd>`);
+  meta.push(`<dt>Source</dt><dd>${escapeHtml(SOURCE_LABELS[q.source] || q.source)}</dd>`);
   meta.push(`<dt>Episode</dt><dd>${q.episode}</dd>`);
-  meta.push(`<dt>Origin</dt><dd>${originDd}</dd>`);
+  meta.push(`<dt>Category</dt><dd>${escapeHtml(q.category)}</dd>`);
   if (q.provenance.author) {
     meta.push(`<dt>Author</dt><dd>${escapeHtml(q.provenance.author)}</dd>`);
   }
   if (q.provenance.year) {
-    meta.push(`<dt>Year</dt><dd>${q.provenance.year}</dd>`);
+    meta.push(`<dt>Year released</dt><dd>${q.provenance.year}</dd>`);
+  }
+  if (q.provenance.platform) {
+    meta.push(`<dt>Original platform</dt><dd>${escapeHtml(q.provenance.platform)}</dd>`);
+  }
+  if (q.provenance.distribution) {
+    const distLabel = DISTRIBUTION_LABELS[q.provenance.distribution] || q.provenance.distribution;
+    meta.push(`<dt>Distribution</dt><dd>${escapeHtml(distLabel)}</dd>`);
+  }
+  if (q.provenance.sourceUrl) {
+    let host;
+    try {
+      host = new URL(q.provenance.sourceUrl).hostname.replace(/^www\./, '');
+    } catch {
+      host = q.provenance.sourceUrl;
+    }
+    meta.push(`<dt>Reference</dt><dd><a href="${escapeHtml(q.provenance.sourceUrl)}" target="_blank" rel="noopener">${escapeHtml(host)} ↗</a></dd>`);
   }
   if (q.maxPlayers != null) {
     meta.push(`<dt>Max players</dt><dd>${q.maxPlayers}</dd>`);
@@ -2447,6 +2458,16 @@ function openQuestModal(questId) {
   if (q.joinable != null) {
     meta.push(`<dt>Joinable mid-game</dt><dd>${q.joinable ? 'yes' : 'no'}</dd>`);
   }
+
+  // Free-form historical notes — shown as its own section below the
+  // briefing if present. Useful for context like "Famitsu magazine
+  // event sponsor" or "Co-authored by FaNaTiC".
+  const notesBlock = q.provenance.notes ? `
+    <section class="quest-modal__section" aria-label="Historical notes">
+      <h3>Notes</h3>
+      <p class="quest-modal__desc">${escapeHtml(q.provenance.notes)}</p>
+    </section>
+  ` : '';
 
   const hasFullBriefing = q.fullDescription && q.fullDescription !== q.description;
 
@@ -2484,6 +2505,8 @@ function openQuestModal(questId) {
       <h3>Briefing</h3>
       <p class="quest-modal__desc">${escapeHtml(q.fullDescription)}</p>
     </section>` : ''}
+
+    ${notesBlock}
 
     ${completionsBlock}
   `;

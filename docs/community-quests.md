@@ -1,9 +1,26 @@
 # Installing community quest packs
 
-newserv ships with 260 quests in its base `system/quests/` directory. About
-245 of those are Sega's original content and 11 are community-distributed
-quests under `download/` (CategoryID 21, surfaced as **Community** on the
-dashboard). This document covers how to add more community packs.
+newserv ships with 260 quests in its base `system/quests/` directory. A
+deep audit (see `dashboard/quest-provenance.json` for the per-quest
+catalog) confirmed the binary classification: **258 are Sega-authored
+("original"), 2 are community-authored ("custom")**. The 2 custom
+entries are:
+
+- `q000` "Tower Mop Up 3/11/06" by soulja224466 (GameCube modding scene,
+  2006) — preserved in fuzziqersoftware's pso1212 archive.
+- `q253` "Story Flag Fixer" by Matt Swift (2024) — newserv-bundled
+  utility quest to unstick offline story progression.
+
+The other 9 entries in the `download/` directory that *appear* community
+on first glance are actually Sega's DC-era online download quests
+(2000-2003), preloaded on the PSO Plus disc in 2003 and bundled with
+newserv since.
+
+If you're looking for *more* community quests beyond those 2, this
+document covers the install path. **Honest caveat up front**: the major
+community archives (Schtserv, PSO Palace / Aleron Ives) gate their pack
+attachments behind forum registration, so installing them is a
+manual-action workflow rather than a one-line `curl`.
 
 ## Where quest files live
 
@@ -18,18 +35,31 @@ server/quests/<category>/qNNN-<version>.dat
 - Inside the container that path is `/newserv/system/quests/<category>/`.
 - newserv picks up new files on `reload quest-index` (no restart needed).
 
-The `<category>` directory determines how the quest is classified:
+The `<category>` directory determines the in-game quest-menu category
+(see `system/config.example.json`'s `QuestCategories` list). It does
+**not** determine the dashboard's Original-vs-Custom classification —
+that's per-quest data from `dashboard/quest-provenance.json`.
 
-| Directory | CategoryID | Dashboard "Source" |
+| Directory | CategoryID | In-game menu label |
 |---|---|---|
-| `download/` | 21 | **Community** (matches the community-pack convention) |
-| `government-ep1/`, `government-ep2/`, `government-ep4/` | 18, 19, 20 | Official |
-| `extermination/`, `retrieval/`, `events/`, `vr/`, `tower/`, `solo-story/`, `solo-extra/`, `team/`, `shops/` | 2-17 (per `config.example.json`) | Official |
-| `hidden/` | 1 | (excluded from the public library) |
+| `government-ep1/`, `government-ep2/`, `government-ep4/` | 18, 19, 20 | "Hero in Red" / "The Military's Hero" / "The Meteor Impact Incident" |
+| `extermination/` | 5 | Extermination |
+| `retrieval/` | 4 | Retrieval |
+| `events/` | 6 | Events |
+| `vr/`, `tower/` | 8, 9 | Virtual Reality / Control Tower |
+| `solo-story/`, `solo-extra/` | 16, 17 | Story / Solo |
+| `team/`, `shops/` | 10, 7 | Team / Shops |
+| `challenge-*/`, `battle/` | 11-15 | Challenge / Solo Challenge / Battle |
+| `download/` | 21 | Download |
+| `hidden/` | 1 | (excluded from menus) |
 
-For brand-new packs from the wider community, **`download/` is the right
-home** — that's the bucket the dashboard expects and what other server
-operators use for community-distributed content.
+For brand-new community packs, **`download/` is the right home** —
+that's where Sega's online quest distribution went historically and
+where private servers have continued to pile community packs since.
+
+To make sure the dashboard surfaces the quest with the correct origin,
+add a matching entry to `dashboard/quest-provenance.json` keyed by the
+decimal quest number — see the schema docs at the top of that file.
 
 ## File naming convention
 
@@ -57,89 +87,115 @@ q205-gc.dat     Shared DAT for quest 205, GameCube
 
 ## Recommended packs to install
 
-### 1. Schtserv 42-quest pack (easiest)
+### Quest-number ranges to use
+
+newserv's bundled quests already occupy a sparse set of decimal numbers
+spread between 0 and 88533. To avoid collisions when adding new packs,
+use these free ranges:
+
+| Range | Notes |
+|---|---|
+| **300–399** | Cleanest first-install block. Plenty of room. |
+| **500–599** | Second-best. Use after exhausting 300s. |
+| **600–699** | Save for a specific author's pack (e.g. Aleron Ives). |
+
+Avoid: 0, 1-29, 30-37, 50-82, 101-103, 142-179, 187-227, 253, 401-468,
+701-712, 8811-8825, 88001+, 88101+, 88201+, 88530+.
+
+### 1. Schtserv community quest archive
 
 - **Source**: <https://schtserv.com/forums/viewtopic.php?t=1284>
-  (forum login may be required to grab the attachment)
-- **Format**: Already `.bin`/`.dat` — drop-in, no decode step
-- **Count**: 42 GC-targeted quests
-- **Examples**: "Below the Waves", "Buried Relics",
-  "Schtserv Spring Cleaning"
+- **Format**: Forum attachments, mixed `.qst` (use `newserv decode-qst`)
+- **Login required**: yes — Schtserv historically gates attachments
+  behind a registered, post-count-verified account. Register at
+  schtserv.com, browse to the thread, download the attachment.
+- **Count**: variable per thread; the historical "42-pack" number may
+  not be the current attachment size — verify after download.
 
 Install:
 
 ```bash
-# On your laptop, after downloading and unzipping the pack:
-mkdir -p server/quests/download
-cp path/to/schtserv-pack/*.bin server/quests/download/
-cp path/to/schtserv-pack/*.dat server/quests/download/
+# After downloading the attachment via Schtserv forum:
+mkdir -p /tmp/schtserv-quests
+cd /tmp/schtserv-quests
+unzip ~/Downloads/<attachment>.zip
 
-# Verify nothing collides with existing quest numbers:
-ls server/quests/download/ | sort
+# Decode .qst to .bin/.dat (one per quest)
+for f in *.qst; do
+  /path/to/newserv-build/newserv decode-qst "$f"
+done
 
-git add server/quests/download/
-git commit -m "quests: install Schtserv 42-quest pack"
+# Rename to newserv convention. Inspect each quest's intended number
+# via the .bin filename or the in-quest metadata, then renumber into
+# the 300-399 range:
+#   mv qXXX-gc-e.bin q3NN-gc-e.bin
+#   mv qXXX-gc.dat   q3NN-gc.dat
+
+# Drop into the server overlay
+cp q3*-gc*.bin q3*-gc*.dat \
+   /path/to/pso-server/server/quests/download/
+
+# Add provenance metadata for each new quest in
+# dashboard/quest-provenance.json (one entry per number, see schema)
+
+git add server/quests/download/ dashboard/quest-provenance.json
+git commit -m "quests: install Schtserv pack (N quests)"
 git push
 ```
 
-Deploy runs, the pack lands at
-`/home/ubuntu/pso-server/system/quests/download/`, newserv restarts, the
-dashboard's Community filter chip count jumps by 42.
+### 2. PSO Palace (Aleron Ives + others)
 
-### 2. b0n3zx PSOquest (32 quests, requires decode)
+- **Source**: <https://www.pso-palace.com/> (forum) and
+  <https://psopalace.sylverant.net/downloads_gamecube.html> (patches)
+- **Format**: Per-quest threads with `.qst` attachments
+- **Login required**: typically yes
+- **Quality**: high (Aleron Ives is a long-time quest creator)
+- **Count**: distributed one-quest-per-thread; not packaged as a single
+  archive — enumerate manually
+
+Recommended approach: register at PSO Palace, filter the Quests
+subforum by Aleron Ives's posts, download each `.qst` you want, decode
+with `newserv decode-qst`, renumber into the **600–699** range.
+
+### 3. b0n3zx PSOquest GitHub repo
 
 - **Source**: <https://github.com/b0n3zx/PSOquest> — folder
   `Quests/psogc_quests/`
 - **Format**: `.gci` (GameCube memory card download-quest dumps)
-- **Count**: 32 quests, `8P-GPOE-PSO______006.gci` through `037.gci`
-- **Note**: Some overlap with Sega's bundled download quests; some are
-  item-creator / cheat quests — review before install.
-
-The `.gci` format is GameCube memory card images. newserv ships with a
-`decode-gci` subcommand that extracts the `.bin`/`.dat` pair. Run it
-once per file:
+- **Login required**: no — public GitHub repo
+- **Count**: 32 files
+- **Important caveat**: most of these are *Sega-original DC download
+  quests* (the same q050-q082 series already bundled with newserv), not
+  fan-made content. Plus a few item-creator / cheat quests. Filter
+  carefully before install.
 
 ```bash
-# On your laptop with newserv built locally — see fuzziqersoftware/newserv
-# README for build instructions. Alternatively run inside the deployed
-# container:
-ssh ubuntu@$(terraform -chdir=infra output -raw instance_public_ip)
-docker exec -it newserv sh
+git clone --depth=1 https://github.com/b0n3zx/PSOquest.git
+cd PSOquest/Quests/psogc_quests
 
-cd /tmp
-git clone --depth=1 https://github.com/b0n3zx/PSOquest.git pack
-mkdir converted
-
-for f in pack/Quests/psogc_quests/*.gci; do
-  /newserv/newserv decode-gci "$f"
+# Decode all
+for f in *.gci; do
+  /path/to/newserv-build/newserv decode-gci "$f"
 done
-mv pack/Quests/psogc_quests/*.bin pack/Quests/psogc_quests/*.dat converted/
 
-# Inspect — drop cheat/item-creator entries if you don't want them.
-# Then renumber to avoid quest-number collisions before copying into
-# the live quests dir:
-#   for f in converted/*.bin; do mv "$f" "$(...)"; done
-
-cp converted/*.bin converted/*.dat /home/ubuntu/pso-server/system/quests/download/
-docker exec newserv newserv reload quest-index
+# Inspect the resulting .bin files for quest names. Drop anything that
+# duplicates the existing bundle (most of them will), keep genuinely
+# new entries. Renumber survivors into 300-399.
 ```
 
-For a cleaner workflow, do the decode + rename steps on your laptop and
-commit the final `.bin`/`.dat` pairs to `server/quests/download/` so they
-flow through the standard rsync deploy path.
+### Why this is more manual than ideal
 
-### 3. PSO Palace (Aleron Ives, scattered)
+Earlier versions of this doc promised one-line installs. The honest
+reality after research: **community quest distribution is fragmented
+across forum attachments** (Schtserv, PSO Palace) **that gate downloads
+behind registered accounts**. There is no curated CC-licensed
+GitHub-hosted "PSO community quest collection" you can `curl` in a
+script.
 
-- **Source**: <https://psopalace.sylverant.net/downloads_gamecube.html>
-  (patches only — quest threads are at <https://psopalace.forumotion.com/>)
-- **Format**: Mostly `.qst` (use `newserv decode-qst` to get
-  `.bin`/`.dat`)
-- **Count**: Dozens of quests authored / modified by Aleron Ives over
-  ~15 years; distributed one-per-forum-thread.
-
-PSO Palace is worth a second pass once the easy wins are in. The
-per-quest manual download makes it tedious as a first install but the
-quality is high.
+That's a community-norms thing, not a tooling problem — pack authors
+preserve credit by hosting their work on the forums where they're
+known. The install path requires a one-time forum registration per
+source.
 
 ## Decoding non-native formats
 
