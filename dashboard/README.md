@@ -202,29 +202,33 @@ filter chip with an Ephinea wiki / PSO-World article link in the modal.
 When community packs land (via task #53's documented install flow),
 add their entries here mapping quest numbers to attribution.
 
-## What's still v2
+## newserv fork
 
-- **#70 Full character data** — newserv exposes `/y/accounts` with a
-  single LastPlayerName per account, but doesn't expose per-character
-  data. Goal: add `GET /y/characters` walking `system/players/` and
-  returning sanitized per-character records (name, class, race,
-  section_id, level, ATP/DFP/MST/ATA/EVP/LCK stats, HP/TP) for all 4
-  slots per account. Requires re-forking `fuzziqersoftware/newserv`,
-  finding the character file parser (struct lives in
-  `src/PlayerSubordinates.hh` or similar), writing a walker + sanitiser
-  in `src/HTTPServer.cc`, and PR-ing upstream. Once shipped, dashboard
-  backend gets a new allowlist entry + sanitiser, frontend Players
-  cards expand from name-only to full character data with all 4 slots
-  visible per account.
-- **#61 Quest completion tracking** — per-quest "who completed this" +
-  per-player "what have I completed" both need character `FlagsArray<0x400>`
-  at offset `0x460` of the character file. Pair with #70 since both
-  touch the same walker. New endpoint: `GET /y/data/quest/:num/completions`
-  returning the character-name list with that quest's bit set. Modal's
-  "Completed by" placeholder section will populate from this.
-- **#60 Rare-drops WebSocket** — newserv exposes `WS /y/rare-drops/stream`;
-  dashboard backend needs a WS-proxy hop and the frontend ticker needs to
-  consume the stream.
+The dashboard depends on two read endpoints that don't ship in upstream
+`fuzziqersoftware/newserv` — `/y/characters` (sanitized walk of saved
+character files) and `/y/data/quest/:num/completions` (which characters
+have completed quest N). Those live on `joshkautz/newserv@master`, a
+fork we maintain. The intent is to **stay forked**, not PR upstream;
+the features are dashboard-specific and the upstream project hasn't
+asked for them.
+
+`build-image.yml` defaults `NEWSERV_REPO`/`NEWSERV_REF` to
+`joshkautz/newserv`/`master`. To pick up upstream fixes:
+
+```bash
+cd /path/to/joshkautz/newserv-checkout
+git remote add upstream https://github.com/fuzziqersoftware/newserv.git
+git fetch upstream master
+git merge upstream/master
+git push origin master   # CI sees the new master, rebuilds the image
+```
+
+## Pending
+
+- **#60 Rare-drops WebSocket** — `WS /y/rare-drops/stream` exists on
+  newserv. The dashboard backend needs a WebSocket proxy hop on
+  `/api/drops/stream` and the frontend ticker needs to consume the
+  stream + prepend events with a capped buffer.
 - **#53 Community quest packs** — operational; install pack files under
   `server/quests/download/` per the procedure in
   [`docs/community-quests.md`](../docs/community-quests.md) and they show up

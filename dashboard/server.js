@@ -13,9 +13,15 @@
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import http from 'node:http';
+import { WebSocketServer, WebSocket } from 'ws';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
+// Explicit http.Server so we can attach an `upgrade` handler for the
+// WebSocket route — Express's app.listen() doesn't expose the underlying
+// server in a clean way.
+const server = http.createServer(app);
 
 // =========================================================================
 // Configuration
@@ -315,8 +321,139 @@ app.use(express.static(__dirname, { extensions: ['html'] }));
 // Start
 // =========================================================================
 
-app.listen(PORT, () => {
+// =========================================================================
+// WebSocket proxy: /api/drops/stream
+//
+// Maintains exactly one outbound WebSocket connection to newserv's
+// `WS /y/rare-drops/stream` endpoint and fans the messages out to every
+// browser subscribed on `/api/drops/stream`. Browsers never reach newserv
+// directly — same security model as the HTTP allowlist.
+//
+// On the wire newserv emits one JSON object per rare drop with these
+// fields (see ReceiveSubcommands.cc:2300+):
+//   PlayerAccountID, PlayerName, PlayerVersion, GameName, GameDropMode,
+//   ItemData (raw hex), ItemDescription, NotifyGame, NotifyServer
+//
+// We sanitize:
+//   - drop PlayerAccountID (server-internal ID, no need to leak it)
+//   - drop ItemData (raw bytes, not useful for the ticker)
+//   - drop NotifyGame (game-internal flag)
+//   - drop messages with NotifyServer=false (they're game-local, not
+//     intended for the public ticker)
+//   - the first message on connect is a server-hello (NewservVersion
+//     field), not a drop event — skip those
+//
+// Per-client messages are wrapped as {type, ...} so future event kinds
+// (server status, etc.) can ride the same stream.
+// =========================================================================
+
+const wss = new WebSocketServer({ noServer: true });
+const dropSubscribers = new Set();
+let newservDropsWs = null;
+let newservReconnectTimer = null;
+
+function sanitizeDropMessage(msg) {
+  if (!msg || typeof msg !== 'object') return null;
+  return {
+    type: 'drop',
+    player:  typeof msg.PlayerName       === 'string' ? msg.PlayerName       : '?',
+    version: typeof msg.PlayerVersion    === 'string' ? msg.PlayerVersion    : null,
+    game:    typeof msg.GameName         === 'string' ? msg.GameName         : '',
+    item:    typeof msg.ItemDescription  === 'string' ? msg.ItemDescription  : 'Unknown',
+    // Stamp at receipt — newserv doesn't put a timestamp in the message
+    // and the ticker only needs relative "X seconds ago" anyway.
+    ts: Date.now(),
+  };
+}
+
+function connectToNewservDropsStream() {
+  if (newservDropsWs) return;
+  clearTimeout(newservReconnectTimer);
+
+  const url = `${NEWSERV_API.replace(/^http/, 'ws')}/y/rare-drops/stream`;
+  console.log(`[drops] connecting to ${url}`);
+  let ws;
+  try {
+    ws = new WebSocket(url);
+  } catch (err) {
+    console.warn(`[drops] WS construct failed: ${err.message}`);
+    newservReconnectTimer = setTimeout(connectToNewservDropsStream, 5000);
+    return;
+  }
+
+  ws.on('open', () => {
+    console.log('[drops] connected to newserv');
+    newservDropsWs = ws;
+  });
+
+  ws.on('message', (data) => {
+    let msg;
+    try {
+      msg = JSON.parse(data.toString());
+    } catch (err) {
+      console.warn(`[drops] non-JSON from newserv: ${err.message}`);
+      return;
+    }
+    // The server-version hello fires on every connect — discard it.
+    if (msg && typeof msg.NewservVersion === 'string') return;
+    // Only forward drops flagged as global notifications.
+    if (msg && msg.NotifyServer === false) return;
+
+    const out = sanitizeDropMessage(msg);
+    if (!out) return;
+    const payload = JSON.stringify(out);
+    for (const sub of dropSubscribers) {
+      if (sub.readyState === WebSocket.OPEN) {
+        sub.send(payload);
+      }
+    }
+  });
+
+  ws.on('close', () => {
+    console.log('[drops] disconnected from newserv, retrying in 5s');
+    newservDropsWs = null;
+    newservReconnectTimer = setTimeout(connectToNewservDropsStream, 5000);
+  });
+
+  ws.on('error', (err) => {
+    console.warn(`[drops] newserv ws error: ${err.message}`);
+    // 'close' will fire after 'error'; reconnect there.
+  });
+}
+
+server.on('upgrade', (req, socket, head) => {
+  const path = new URL(req.url, 'http://localhost').pathname;
+  if (path === '/api/drops/stream') {
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit('connection', ws, req);
+    });
+  } else {
+    // Unknown upgrade target — reject the handshake cleanly so the client
+    // doesn't sit blocked waiting for a response.
+    socket.destroy();
+  }
+});
+
+wss.on('connection', (ws) => {
+  dropSubscribers.add(ws);
+  console.log(`[drops] subscriber connected (${dropSubscribers.size} total)`);
+  // Send a one-shot hello so the client knows whether we have a working
+  // upstream connection. The browser can decide whether to show "live" UI.
+  ws.send(JSON.stringify({
+    type: 'hello',
+    upstreamConnected: !!newservDropsWs,
+  }));
+  ws.on('close', () => {
+    dropSubscribers.delete(ws);
+  });
+  ws.on('error', () => {/* close fires too */});
+});
+
+connectToNewservDropsStream();
+
+server.listen(PORT, () => {
   console.log(`[dashboard] listening on :${PORT}`);
   console.log(`[dashboard] proxying ${ALLOWLIST.size} routes to ${NEWSERV_API}`);
   console.log(`[dashboard] newserv revision: ${NEWSERV_REV}`);
+  console.log(`[dashboard] WebSocket /api/drops/stream → ${NEWSERV_API.replace(/^http/, 'ws')}/y/rare-drops/stream`);
 });

@@ -2085,18 +2085,25 @@ function renderDrops() {
   const root = document.getElementById('drops-list');
   if (!root) return;
   if (drops.length === 0) {
-    root.innerHTML = `<li class="empty-state">No rare drops yet today.</li>`;
+    root.innerHTML = `<li class="empty-state">No rare drops yet.</li>`;
     return;
   }
-  root.innerHTML = drops.map((d) => `
-    <li class="drop">
-      <div>
-        <div class="drop__item">${escapeHtml(d.item)}</div>
-        <div class="drop__player">${escapeHtml(d.player)} · ${escapeHtml(d.game)}</div>
-      </div>
-      <div class="drop__time">${escapeHtml(d.ts)}</div>
-    </li>
-  `).join('');
+  root.innerHTML = drops.map((d) => {
+    // d.ts is a millisecond epoch stamped by the dashboard backend at
+    // receipt. formatDropAge renders it relative to "now" each time
+    // — see the 15s tick in startRareDropsStream.
+    const ts = formatDropAge(typeof d.ts === 'number' ? d.ts : Date.parse(d.ts));
+    const playerGame = d.game ? `${d.player} · ${d.game}` : d.player;
+    return `
+      <li class="drop">
+        <div>
+          <div class="drop__item">${escapeHtml(d.item)}</div>
+          <div class="drop__player">${escapeHtml(playerGame)}</div>
+        </div>
+        <div class="drop__time">${escapeHtml(ts)}</div>
+      </li>
+    `;
+  }).join('');
 }
 
 const filterState = { episode: null, source: null, search: '' };
@@ -2667,11 +2674,101 @@ async function refreshLive() {
   ]);
 }
 
+// ---------- Rare-drops WebSocket ----------
+//
+// Connects to /api/drops/stream — the dashboard backend proxies the
+// raw WS /y/rare-drops/stream from newserv, sanitizing each message
+// down to {type, player, version, game, item, ts}. Drops with
+// NotifyServer=false are filtered out server-side already.
+//
+// Buffer is capped at DROPS_BUFFER_MAX so a long session doesn't grow
+// unbounded. Time labels are recomputed on each render so "10s ago"
+// becomes "1m ago" without a fresh event — see renderDrops.
+//
+// Reconnect uses exponential backoff capped at 30s. The hello message
+// upstream-connected flag is logged but doesn't drive UI yet.
+
+const DROPS_BUFFER_MAX = 50;
+
+function formatDropAge(stampMs) {
+  if (!Number.isFinite(stampMs)) return '';
+  const ageSec = Math.max(0, Math.floor((Date.now() - stampMs) / 1000));
+  if (ageSec < 5)     return 'just now';
+  if (ageSec < 60)    return `${ageSec}s ago`;
+  if (ageSec < 3600)  return `${Math.floor(ageSec / 60)}m ago`;
+  if (ageSec < 86400) return `${Math.floor(ageSec / 3600)}h ago`;
+  return `${Math.floor(ageSec / 86400)}d ago`;
+}
+
 function startRareDropsStream() {
-  // newserv's WebSocket lives at WS /y/rare-drops/stream. For v1 we
-  // skip it (it requires a tiny WS-proxy hop in server.js). Re-enable
-  // when that lands.
-  return;
+  let ws = null;
+  let reconnectTimer = null;
+  let reconnectDelay = 1000;
+
+  function connect() {
+    if (ws) return;
+    clearTimeout(reconnectTimer);
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = `${protocol}//${location.host}/api/drops/stream`;
+    try {
+      ws = new WebSocket(url);
+    } catch (err) {
+      console.warn('[drops] WS construct failed:', err.message);
+      scheduleReconnect();
+      return;
+    }
+
+    ws.addEventListener('open', () => {
+      console.log('[drops] connected');
+      reconnectDelay = 1000;
+    });
+
+    ws.addEventListener('message', (event) => {
+      let msg;
+      try {
+        msg = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (!msg || typeof msg !== 'object') return;
+
+      if (msg.type === 'drop') {
+        drops.unshift({
+          item: msg.item || 'Unknown',
+          player: msg.player || '?',
+          game: msg.game || '',
+          ts: msg.ts || Date.now(),
+        });
+        if (drops.length > DROPS_BUFFER_MAX) drops.length = DROPS_BUFFER_MAX;
+        renderDrops();
+      }
+      // 'hello' messages and unknown types are silently ignored
+    });
+
+    ws.addEventListener('close', () => {
+      ws = null;
+      scheduleReconnect();
+    });
+
+    ws.addEventListener('error', () => {
+      // 'close' fires after; reconnect handled there.
+    });
+  }
+
+  function scheduleReconnect() {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connect, reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+  }
+
+  // Reformat ticker time labels every 15s so "5s ago" updates to
+  // "20s ago" without needing new events. Cheap — drops array maxes
+  // at 50 and renderDrops is just innerHTML assembly.
+  setInterval(() => {
+    if (drops.length > 0) renderDrops();
+  }, 15000);
+
+  connect();
 }
 
 // ---------- Build info ----------

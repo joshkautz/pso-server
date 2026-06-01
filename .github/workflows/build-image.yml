@@ -18,20 +18,24 @@ on:
       newserv_ref:
         description: "newserv git ref to build (commit SHA, tag, or branch)"
         required: false
-        default: "dashboard-character-endpoints"
+        default: "master"
 
 permissions:
   contents: read
   packages: write
 
 env:
-  # Source repository + ref for the newserv build. Defaults to the
-  # joshkautz/newserv fork's `dashboard-character-endpoints` branch while
-  # we maintain the /y/characters + /y/data/quest/:num/completions
-  # endpoints there pending upstream PR merge. Point back at
-  # fuzziqersoftware/newserv@master once those land upstream.
+  # Source repository + ref for the newserv build. We maintain a fork
+  # (joshkautz/newserv) with our own additions — currently the
+  # /y/characters and /y/data/quest/:num/completions endpoints the
+  # dashboard depends on. Fork's master tracks our deployed state.
+  # Re-merge from upstream master periodically with:
+  #     git remote add upstream https://github.com/fuzziqersoftware/newserv.git
+  #     git fetch upstream master
+  #     git merge upstream/master
+  #     git push origin master
   NEWSERV_REPO: ${{ inputs.newserv_repo || 'joshkautz/newserv' }}
-  NEWSERV_REF:  ${{ inputs.newserv_ref  || 'dashboard-character-endpoints' }}
+  NEWSERV_REF:  ${{ inputs.newserv_ref  || 'master' }}
   IMAGE_NAME: ghcr.io/${{ github.repository }}
   # Opt every JavaScript action into Node 24 even if it advertises Node 20.
   # GitHub forces this default starting June 2026.

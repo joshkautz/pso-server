@@ -179,25 +179,34 @@ flow:
 If any step breaks, the identity card shows `newserv —` — never a misleading
 value.
 
-## What's deferred to upstream changes
+## newserv fork
 
-Tracked as separate tasks; mention if relevant during planning.
+We maintain `joshkautz/newserv` as a fork of `fuzziqersoftware/newserv` to
+host the small handful of endpoints the dashboard needs that upstream
+doesn't ship. **Intent is to stay forked**, not to PR upstream — the
+features are dashboard-specific (sanitized character + quest-completion
+read endpoints) and the upstream project hasn't asked for them.
 
-- **#70 Full character data** — newserv's `/y/accounts` returns `LastPlayerName`
-  per account but no per-character data. Add `GET /y/characters` walking
-  `system/players/` and returning sanitized records (name, class, race,
-  section_id, level, ATP/DFP/MST/ATA/EVP/LCK stats, HP/TP) for all 4 slots
-  per account. Requires re-forking `fuzziqersoftware/newserv` and writing
-  ~100-200 lines of C++ in `src/HTTPServer.cc` + a walker helper. PR upstream.
-- **#61 Per-quest + per-player completion tracking** — pair with #70 since
-  both touch the same character-file walker. Adds
-  `GET /y/data/quest/:num/completions` reading `FlagsArray<0x400>` at offset
-  `0x460` in each character file, returning the character-name list with
-  that quest's bit set. Dashboard modal's "Completed by" placeholder is
-  already in place and just needs the data.
+Currently on the fork beyond upstream:
+- `GET /y/characters` — sanitized per-character walk of
+  `system/players/backup_player_*.psochar`. Used by the dashboard's
+  Players section when characters are present.
+- `GET /y/data/quest/:num/completions` — list of characters that have
+  the quest's bit set in `FlagsArray<0x400>` on any difficulty. Powers
+  the modal's "Completed by" section.
+
+`build-image.yml` pulls from `joshkautz/newserv@master`. The fork's
+master is periodically rebased / merged on top of upstream master to
+pick up new features and bug fixes.
+
+## What's still pending
+
 - **#60 Rare-drops WebSocket bridge** — newserv exposes
-  `WS /y/rare-drops/stream`; dashboard needs WS proxy support in `server.js`
-  (the existing HTTP allowlist doesn't cover WebSockets).
+  `WS /y/rare-drops/stream`. Dashboard backend needs to accept WS
+  upgrade requests on `/api/drops/stream`, maintain a single connection
+  to newserv, and broadcast events to all connected clients. Frontend
+  prepends each event to the rare-drops ticker (currently empty, no
+  proxy hop yet).
 
 ## Quest provenance — important context
 
