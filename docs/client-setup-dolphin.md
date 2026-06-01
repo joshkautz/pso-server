@@ -4,7 +4,10 @@ Step-by-step guide for getting **PSO Episode I & II Plus (USA Rev 2)**
 connected to the server from a desktop Dolphin install. Tested on
 Dolphin 2603a on macOS (Apple Silicon, Metal renderer, HLE BBA). The
 same INI snippets work on Windows and Linux Dolphin — only the file
-paths differ.
+paths differ. v1.0 and v1.1 use the same setup; newserv treats every
+retail GC disc as the same `Version::GC_V3` client revision and the
+`BBA_BUILTIN_DNS` setting is global (not per-game), so the only
+revision-specific work is the per-game INI file name (one per disc-ID).
 
 Plan for ~15 minutes per player, ~one minute of that on the server
 side (Josh adds your IP to the allowlist).

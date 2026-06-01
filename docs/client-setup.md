@@ -2,9 +2,13 @@
 
 Step-by-step guide for getting PSO Episode I & II — **any GameCube US
 version (v1.0, v1.1, or Plus)** — connected to the server from Batocera
-Linux running Dolphin. Tested on Batocera v41+ (Mar 2026 build, Dolphin
-master) against PSO Episode I & II Plus (USA Rev 2), and validated against
-the original Episode I & II disc.
+Linux running Dolphin. Empirically tested on Batocera v41+ (Mar 2026
+build, Dolphin master) against PSO Episode I & II Plus (USA Rev 2). The
+v1.0 and v1.1 paths are confirmed by code review of newserv master:
+every retail GC disc maps to the same `Version::GC_V3` enum
+(`src/Version.hh:10-26`) and goes through identical plain-TCP login on
+ports 9100 → 9103. newserv contains no SSL/TLS code anywhere, so no
+"License server" / SSL handshake is involved for any GC revision.
 
 You'll do this once per player machine. Plan for ~15 minutes.
 
