@@ -975,6 +975,34 @@
     color: var(--cyan-bright);
   }
 
+  /* Completion list — one chip per character that's completed the quest
+     on any difficulty. Wraps gracefully and supports x{N} suffixes when
+     a single player has multiple saves of the same character. */
+  .completion-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .completion-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-3);
+    background: var(--cyan-soft);
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    color: var(--cyan-bright);
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
+  }
+  .completion-chip__count {
+    color: var(--text-low);
+    font-size: 0.7rem;
+  }
+
   /* =================================================================
      Features list
      ================================================================= */
@@ -1072,6 +1100,26 @@
     flex-wrap: wrap;
     gap: var(--space-1);
     margin: 0;
+  }
+  .player__detail {
+    margin: 0 0 var(--space-1);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-mid);
+  }
+  .player__level {
+    color: var(--cyan-bright);
+    font-weight: 600;
+  }
+  .player__class {
+    color: var(--text-high);
+  }
+  .player__section {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--text-low);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
   }
   .player__platforms .badge {
     background: rgba(0, 212, 255, 0.08);
@@ -1605,14 +1653,16 @@ async function fetchJSON(path) {
 }
 
 // ---------- Live data buffers ----------
-// Populated by refreshLive() from /api/lobbies, /api/accounts, and (task
-// #60) the rare-drops WebSocket. Empty by default so the page shows an
-// honest empty state before the first API response lands, not flashes
-// of stale fake data — see commit 5346011 for the cautionary tale.
+// Populated by refreshLive() from /api/lobbies, /api/accounts,
+// /api/characters, and (task #60) the rare-drops WebSocket. Empty by
+// default so the page shows an honest empty state before the first API
+// response lands, not flashes of stale fake data — see commit 5346011
+// for the cautionary tale.
 
-let games   = [];
-let drops   = [];
-let players = [];
+let games      = [];
+let drops      = [];
+let players    = []; // from /api/accounts — fallback when no characters exist
+let characters = []; // from /api/characters — preferred when populated
 
 // ---------- Quest catalog ----------
 // Populated from /api/quests on first refreshLive(). Empty until then so
@@ -1841,12 +1891,24 @@ const PLAYER_PAGE_SIZE = 24;
 let playerPage = 1;
 const playerFilter = { search: '' };
 
+// Two display modes: characters (rich data from /api/characters — name,
+// class, section, level, stats) and accounts (just name + platforms,
+// from /api/accounts). Characters are preferred when present; accounts
+// are the fallback for when no one has $savechar'd yet.
+function isCharacterMode() {
+  return characters.length > 0;
+}
+
+function displayItemName(item) {
+  return isCharacterMode() ? String(item.Name ?? '') : String(item.name ?? '');
+}
+
 function getFilteredPlayers() {
-  let result = players;
+  let result = isCharacterMode() ? characters : players;
   if (playerFilter.search) {
     const needle = playerFilter.search.toLowerCase();
-    result = result.filter((p) =>
-      String(p.name || '').toLowerCase().includes(needle),
+    result = result.filter((item) =>
+      displayItemName(item).toLowerCase().includes(needle),
     );
   }
   return result;
@@ -1925,12 +1987,55 @@ function setupPlayerControls() {
   }
 }
 
+// First-grapheme avatar letter. PSO names are usually ASCII but the
+// unicode-iterator spread handles surrogate pairs cleanly when they
+// do appear (Japanese players, accented latin, etc.).
+function avatarLetter(name) {
+  const trimmed = String(name ?? '').trim();
+  if (!trimmed) return '?';
+  return [...trimmed][0].toUpperCase();
+}
+
+function renderCharacterCard(c) {
+  return `
+    <article class="player">
+      <div class="player__avatar" aria-hidden="true">${escapeHtml(avatarLetter(c.Name))}</div>
+      <div class="player__body">
+        <h3 class="player__name" title="${escapeHtml(c.Name)}">${escapeHtml(c.Name)}</h3>
+        <p class="player__detail">
+          Lvl <span class="player__level">${escapeHtml(String(c.Level))}</span>
+          <span aria-hidden="true">·</span>
+          <span class="player__class">${escapeHtml(c.Class)}</span>
+        </p>
+        <p class="player__section">${escapeHtml(c.SectionID)}</p>
+      </div>
+    </article>
+  `;
+}
+
+function renderAccountCard(p) {
+  const platformBadges = (p.platforms || [])
+    .map((plat) => `<span class="badge">${escapeHtml(plat)}</span>`)
+    .join('');
+  return `
+    <article class="player">
+      <div class="player__avatar" aria-hidden="true">${escapeHtml(avatarLetter(p.name))}</div>
+      <div class="player__body">
+        <h3 class="player__name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</h3>
+        <p class="player__platforms">${platformBadges || '<span class="badge">No platforms</span>'}</p>
+      </div>
+    </article>
+  `;
+}
+
 function renderPlayers() {
   const grid       = document.getElementById('players-grid');
   const countLabel = document.getElementById('players-count-label');
   if (!grid) return;
 
   const filtered = getFilteredPlayers();
+  const source   = isCharacterMode() ? characters : players;
+  const noun     = isCharacterMode() ? 'character' : 'hunter';
 
   // Clamp page in case the filter shrank the list under our feet.
   const totalPages = Math.max(1, Math.ceil(filtered.length / PLAYER_PAGE_SIZE));
@@ -1941,18 +2046,18 @@ function renderPlayers() {
 
   if (countLabel) {
     let label;
-    if (players.length === 0) {
-      label = 'Registered hunters';
-    } else if (filtered.length === players.length) {
-      label = `${players.length} registered hunter${players.length === 1 ? '' : 's'}`;
+    if (source.length === 0) {
+      label = isCharacterMode() ? 'Saved characters' : 'Registered hunters';
+    } else if (filtered.length === source.length) {
+      label = `${source.length} ${noun}${source.length === 1 ? '' : 's'}`;
     } else {
-      label = `${filtered.length} of ${players.length} hunters`;
+      label = `${filtered.length} of ${source.length} ${noun}s`;
     }
     if (totalPages > 1) label += ` · page ${playerPage} of ${totalPages}`;
     countLabel.textContent = label;
   }
 
-  if (players.length === 0) {
+  if (source.length === 0) {
     grid.innerHTML = `
       <div class="empty-state" style="grid-column: 1 / -1;">
         No one's registered yet. Be the first.
@@ -1963,35 +2068,15 @@ function renderPlayers() {
   if (filtered.length === 0) {
     grid.innerHTML = `
       <div class="empty-state" style="grid-column: 1 / -1;">
-        No players match those filters.
+        No ${noun}s match those filters.
       </div>`;
     renderPlayerPagination(0);
     return;
   }
 
-  // First-grapheme avatar letter. PSO names are usually ASCII but the
-  // unicode-iterator spread handles surrogate pairs cleanly when they
-  // do appear (Japanese players, accented latin, etc.).
-  const avatarLetter = (name) => {
-    const trimmed = String(name ?? '').trim();
-    if (!trimmed) return '?';
-    return [...trimmed][0].toUpperCase();
-  };
-
-  grid.innerHTML = visible.map((p) => {
-    const platformBadges = (p.platforms || [])
-      .map((plat) => `<span class="badge">${escapeHtml(plat)}</span>`)
-      .join('');
-    return `
-      <article class="player">
-        <div class="player__avatar" aria-hidden="true">${escapeHtml(avatarLetter(p.name))}</div>
-        <div class="player__body">
-          <h3 class="player__name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</h3>
-          <p class="player__platforms">${platformBadges || '<span class="badge">No platforms</span>'}</p>
-        </div>
-      </article>
-    `;
-  }).join('');
+  grid.innerHTML = visible.map((item) =>
+    isCharacterMode() ? renderCharacterCard(item) : renderAccountCard(item),
+  ).join('');
 
   renderPlayerPagination(filtered.length);
 }
@@ -2293,20 +2378,17 @@ function openQuestModal(questId) {
 
   const hasFullBriefing = q.fullDescription && q.fullDescription !== q.description;
 
-  // Per-quest completion data isn't exposed by any current newserv
-  // endpoint — task #61 will add /y/data/quest/:num/completions reading
-  // the FlagsArray<0x400> at offset 0x460 of each character file. Until
-  // that ships we render an honest placeholder pointing at the task so
-  // people don't expect data that isn't there.
+  // Per-quest completion data is fetched async after the modal opens
+  // (one network call per modal open is fine; the dashboard backend
+  // caches /api/quest/:num/completions for 10s). The "Completed by"
+  // section starts as a loading placeholder and is filled in by
+  // fetchQuestCompletions() — see below.
   const completionsBlock = `
     <section class="quest-modal__section" aria-label="Per-character completion status">
       <h3>Completed by</h3>
-      <p class="quest-modal__placeholder">
-        Per-character completion data isn't available yet — it requires
-        reading the quest-flags array stored in each saved character
-        file. Tracked as task <a href="https://github.com/joshkautz/pso-server/blob/main/CLAUDE.md#whats-deferred-to-upstream-changes" target="_blank" rel="noopener">#61</a>;
-        will populate here once that endpoint lands on newserv.
-      </p>
+      <div id="quest-modal-completions" data-quest-number="${escapeHtml(String(q.number).replace(/^q0*/, '') || '0')}">
+        <p class="quest-modal__placeholder">Checking who's completed it…</p>
+      </div>
     </section>
   `;
 
@@ -2340,6 +2422,59 @@ function openQuestModal(questId) {
   // Focus the close button by default so keyboard users have a known
   // first stop and Tab cycles through the dialog content from there.
   modal.querySelector('[data-action="close-quest-modal"]')?.focus();
+
+  // Async-fetch the completion list. The quest's id is `q${num}`, so
+  // stripping the leading 'q' gives us the raw integer. The backend
+  // caches the completion result for 10s so reopen-thrash is cheap.
+  const questNum = parseInt(q.id.substring(1), 10);
+  if (Number.isInteger(questNum)) {
+    fetchQuestCompletions(questNum).catch((err) => {
+      console.warn('[quest-modal] completions fetch failed:', err.message);
+      renderQuestCompletions(questNum, null, err.message);
+    });
+  }
+}
+
+async function fetchQuestCompletions(questNum) {
+  const data = await fetchJSON(`quest/${questNum}/completions`);
+  // Could already be navigated away — guard with the data-attribute so
+  // we don't write stale data into a modal showing a different quest.
+  renderQuestCompletions(questNum, Array.isArray(data) ? data : []);
+}
+
+function renderQuestCompletions(questNum, list, error) {
+  const container = document.getElementById('quest-modal-completions');
+  if (!container) return;
+  // The data-quest-number attribute was set with the quest number the
+  // modal was opened for. If the user navigated to a different quest
+  // before the fetch settled, drop the result silently.
+  if (container.dataset.questNumber !== String(questNum)) return;
+
+  if (error) {
+    container.innerHTML = `<p class="quest-modal__placeholder">Couldn't load completion data: ${escapeHtml(error)}</p>`;
+    return;
+  }
+  if (!Array.isArray(list) || list.length === 0) {
+    container.innerHTML = `<p class="quest-modal__placeholder">No one's completed it yet.</p>`;
+    return;
+  }
+
+  // Render as a wrapping list of character names. Dedupe by name so a
+  // single player with multiple saved characters that all completed it
+  // doesn't appear 4× — show each unique name once with a slot count.
+  const counts = new Map();
+  for (const entry of list) {
+    const name = String(entry.Name ?? '').trim() || '?';
+    counts.set(name, (counts.get(name) || 0) + 1);
+  }
+  const chips = [...counts.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: 'base' }))
+    .map(([name, count]) => `<li class="completion-chip">${escapeHtml(name)}${count > 1 ? ` <span class="completion-chip__count">×${count}</span>` : ''}</li>`)
+    .join('');
+
+  container.innerHTML = `
+    <ul class="completion-list" aria-label="Characters that have completed this quest">${chips}</ul>
+  `;
 }
 
 function setupQuestModal() {
@@ -2513,6 +2648,19 @@ async function refreshLive() {
       // refreshes; the API doesn't guarantee any particular order.
       players = Array.isArray(data) ? [...data].sort((a, b) =>
         String(a.name).localeCompare(String(b.name), undefined, { sensitivity: 'base' }),
+      ) : [];
+      renderPlayers();
+    }),
+    fetchJSON('characters').then((data) => {
+      // /api/characters comes from newserv's walk of system/players/
+      // backup_player_*.psochar files (created by $savechar). Each
+      // entry already sanitized server-side: {AccountID, SlotIndex,
+      // Name, Class, SectionID, Level, EXP, Meseta, PlayTimeSeconds,
+      // Stats}. Stable sort: account then slot then name.
+      characters = Array.isArray(data) ? [...data].sort((a, b) =>
+        (a.AccountID - b.AccountID) ||
+        (a.SlotIndex - b.SlotIndex) ||
+        String(a.Name).localeCompare(String(b.Name), undefined, { sensitivity: 'base' }),
       ) : [];
       renderPlayers();
     }),

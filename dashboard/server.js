@@ -48,11 +48,18 @@ const BUILD_INFO_TTL_MS = 60 * 60 * 1000;
 // =========================================================================
 
 const ALLOWLIST = new Map([
-  ['summary',  { path: '/y/summary',      strip: stripSensitive }],
-  ['lobbies',  { path: '/y/lobbies',      strip: stripPlayerIdentities }],
-  ['server',   { path: '/y/server',       strip: passthrough }],
-  ['quests',   { path: '/y/data/quests',  strip: passthrough }],
-  ['accounts', { path: '/y/accounts',     strip: stripAccountIdentities }],
+  ['summary',    { path: '/y/summary',     strip: stripSensitive }],
+  ['lobbies',    { path: '/y/lobbies',     strip: stripPlayerIdentities }],
+  ['server',     { path: '/y/server',      strip: passthrough }],
+  ['quests',     { path: '/y/data/quests', strip: passthrough }],
+  ['accounts',   { path: '/y/accounts',    strip: stripAccountIdentities }],
+  // /y/characters is already sanitized server-side (see HTTPServer.cc's
+  // /y/characters handler — drops PSO serials, passwords, ban times, raw
+  // inventory hex, bank contents, guild card data, auto-reply text,
+  // info-board text, choice-search config). AccountID is intentionally
+  // kept so the frontend can group characters by account (each PSO
+  // account has up to 4 character slots).
+  ['characters', { path: '/y/characters',  strip: passthrough }],
 ]);
 
 // =========================================================================
@@ -169,6 +176,33 @@ async function fetchCached(key, url) {
 // =========================================================================
 // Routes
 // =========================================================================
+
+// =========================================================================
+// /api/quest/:num/completions
+//
+// Per-quest "who has completed this" — proxies newserv's parameterized
+// /y/data/quest/:num/completions endpoint. Quest number must be a
+// non-negative integer; anything else returns 400 without touching
+// newserv. The response is already sanitized server-side (each entry
+// is just {AccountID, SlotIndex, Name}).
+// =========================================================================
+
+app.get('/api/quest/:num/completions', async (req, res) => {
+  const num = Number.parseInt(req.params.num, 10);
+  if (!Number.isInteger(num) || num < 0 || String(num) !== req.params.num) {
+    return res.status(400).json({ error: 'quest number must be a non-negative integer' });
+  }
+  try {
+    const data = await fetchCached(
+      `quest-completions:${num}`,
+      `${NEWSERV_API}/y/data/quest/${num}/completions`,
+    );
+    res.json(data);
+  } catch (err) {
+    console.error(`[api/quest/${num}/completions] ${err.message}`);
+    res.status(502).json({ error: 'upstream unavailable' });
+  }
+});
 
 app.get('/api/:resource', async (req, res, next) => {
   // Reserved sub-resources are handled by dedicated routes registered
