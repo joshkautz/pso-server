@@ -108,15 +108,13 @@ the row renders as `newserv —`.
 - **Players** — registered hunters from `/api/accounts`. Shows last character
   name + platform badges. Levels / classes / quest completions aren't exposed
   by any current newserv endpoint (task #61).
-- **Quest library** — cards from `/api/quests`, **strictly filtered to
-  quests that work on every enabled platform** (DC, PC, GC, XB, BB).
-  The server supports cross-version play, so showing a quest the BB
-  player can run but the GC player can't would be misleading — the
-  library only surfaces the universal-compatibility subset. With
-  newserv's current bundle that's 38 quests (all Episode 1 — the core
-  Sega releases that shipped with every disc version: Lost weapon
-  retrievals, Mop-up Operations, Towards The Future, Battle / Challenge
-  Ep1 rule sets). Cards are classified by Episode (1/2/4) and Source
+- **Quest library** — cards from `/api/quests`, filtered to quests that
+  have a **GameCube variant** (the operator's primary client base is
+  Dolphin + real-GameCube hardware). The server enables every PSO
+  platform newserv supports — DC, PC, GC, XB, BB — so non-GC players
+  can still join games and play any quest where their version's variant
+  also exists. With newserv's current bundle the GC-playable subset is
+  ~142 of 260 quests. Cards are classified by Episode (1/2/4) and Source
   (Original Sega / Custom community), paginated at 9 per page. Each
   card is a button — `cursor: pointer`, `role="button"`,
   `aria-haspopup="dialog"`, click + Enter + Space — opening a native

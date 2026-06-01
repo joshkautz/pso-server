@@ -1739,17 +1739,19 @@ function questIsHidden(catId) {
   return catId === 1;
 }
 
-// This server enables every platform newserv supports (DC / PC / GC /
-// XB / BB), and the operator's philosophy is "only show quests that work
-// on every enabled platform". A quest qualifies only if its Versions
-// array carries a file for each of these five platform families — any
-// missing family means the quest can't be loaded by some clients, so
-// it's excluded from the library.
+// The server enables every PSO platform newserv supports (DC / PC / GC /
+// XB / BB) so anyone with a compatible client can join. The quest
+// library is curated around the GameCube experience — the friend group
+// runs Dolphin and real-GameCube hardware — so any quest with a GC
+// variant is shown. BB/PC/XB players still see it if they join (newserv
+// routes them the variant for their version when present); if a quest
+// lacks a variant for their version they just can't load it, same as
+// any private server.
 //
-// Note: DC_NTE, PC_NTE, GC_NTE, and the Episode 3 variants (GC_EP3,
-// GC_EP3_NTE) are intentionally excluded — they're trial editions and
-// the Ep3 card game, not vanilla Ep1&2 content.
-const REQUIRED_PLATFORM_FAMILIES = ['DC', 'PC', 'GC', 'XB', 'BB'];
+// GC_V3 is the canonical GameCube release (Episode I & II, Plus). Trial
+// edition (GC_NTE) and Episode 3 (GC_EP3, GC_EP3_NTE) are excluded —
+// GC_NTE is a demo, Ep3 is a different game (C.A.R.D. Revolution).
+const REQUIRED_PLATFORM_FAMILIES = ['GC'];
 
 function questPlatformFamilies(q) {
   const families = new Set();
@@ -1764,7 +1766,7 @@ function questPlatformFamilies(q) {
   return families;
 }
 
-function isCrossPlatformQuest(q) {
+function isPlayableHere(q) {
   const have = questPlatformFamilies(q);
   return REQUIRED_PLATFORM_FAMILIES.every((f) => have.has(f));
 }
@@ -1839,9 +1841,9 @@ function adaptQuest(q) {
   if (!version) return null;
 
   if (questIsHidden(meta.CategoryID)) return null;
-  // Drop quests that don't have a file for every enabled platform —
-  // see REQUIRED_PLATFORM_FAMILIES above for the rationale.
-  if (!isCrossPlatformQuest(q)) return null;
+  // Drop quests that don't have a GC variant — see
+  // REQUIRED_PLATFORM_FAMILIES above for the rationale.
+  if (!isPlayableHere(q)) return null;
 
   // newserv returns "Episode 1" / "Episode 2" / "Episode 4" as strings.
   const epMatch = String(meta.Episode ?? '').match(/(\d+)/);
