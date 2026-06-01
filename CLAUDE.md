@@ -183,15 +183,35 @@ value.
 
 Tracked as separate tasks; mention if relevant during planning.
 
-- **#60 Rare-drops WebSocket bridge** — newserv exposes `WS /y/rare-drops/stream`;
-  dashboard needs WS proxy support.
-- **#61 Per-quest + per-player completion tracking** — requires newserv-side
-  endpoints reading `FlagsArray<0x400>` at offset `0x460` in character files.
-  Path forward: re-fork newserv, add `/y/character/<account>/quest-flags` and
-  `/y/data/quests/<num>/completions`, PR upstream.
-- **#53 Community quest packs** — operational. Drop quest files under
-  `server/system/quests/download/`; the existing CategoryID 21 path classifies
-  them as "Community" automatically.
+- **#70 Full character data** — newserv's `/y/accounts` returns `LastPlayerName`
+  per account but no per-character data. Add `GET /y/characters` walking
+  `system/players/` and returning sanitized records (name, class, race,
+  section_id, level, ATP/DFP/MST/ATA/EVP/LCK stats, HP/TP) for all 4 slots
+  per account. Requires re-forking `fuzziqersoftware/newserv` and writing
+  ~100-200 lines of C++ in `src/HTTPServer.cc` + a walker helper. PR upstream.
+- **#61 Per-quest + per-player completion tracking** — pair with #70 since
+  both touch the same character-file walker. Adds
+  `GET /y/data/quest/:num/completions` reading `FlagsArray<0x400>` at offset
+  `0x460` in each character file, returning the character-name list with
+  that quest's bit set. Dashboard modal's "Completed by" placeholder is
+  already in place and just needs the data.
+- **#60 Rare-drops WebSocket bridge** — newserv exposes
+  `WS /y/rare-drops/stream`; dashboard needs WS proxy support in `server.js`
+  (the existing HTTP allowlist doesn't cover WebSockets).
+
+## Quest provenance — important context
+
+`dashboard/quest-provenance.json` overrides the default CategoryID-based
+source classification on a per-quest basis. Why this exists: web research
+turned up that 9 of the 11 quests under newserv's CategoryID 21 ("Download")
+bucket are *Sega-authored* DC/GC download quests, not fan-made. The Download
+category is about distribution channel, not authorship. The provenance file
+maps those 9 to `classify: "original"` so they appear under "Original game"
+instead of "Fan-made" on the dashboard.
+
+When community packs land via `server/quests/download/`, add their entries
+to this file mapping quest numbers to attribution. Only genuinely fan-made
+quests should get `classify: "community"`.
 
 ## Pointers
 

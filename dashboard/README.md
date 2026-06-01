@@ -183,16 +183,50 @@ Pushes that touch infra (`infra/**`) hit `infra.yml` which does
 - `index.html` — single-file frontend (HTML + CSS + JS inline).
 - `README.md` — this file.
 
+## Quest provenance
+
+`dashboard/quest-provenance.json` is a per-quest overlay the frontend fetches
+on load. Entries override the default CategoryID-based source classification
++ provide a human-readable `originLabel` and external `sourceUrl` for the
+modal "Origin" link.
+
+The current state of newserv's bundled `system/quests/download/` was
+surveyed by web research (commit `d5f0555`): of the 11 quests under
+CategoryID 21 ("Download"), only 2 are genuinely fan-made (`q000` by
+soulja224466; `q253` is Matt Swift's Story Flag Fixer utility added in
+2024). The other 9 are official Sega DC/GC download quests historically
+distributed via download channel. The provenance file reclassifies them
+with `classify: "original"` so they appear under the "Original game"
+filter chip with an Ephinea wiki / PSO-World article link in the modal.
+
+When community packs land (via task #53's documented install flow),
+add their entries here mapping quest numbers to attribution.
+
 ## What's still v2
 
+- **#70 Full character data** — newserv exposes `/y/accounts` with a
+  single LastPlayerName per account, but doesn't expose per-character
+  data. Goal: add `GET /y/characters` walking `system/players/` and
+  returning sanitized per-character records (name, class, race,
+  section_id, level, ATP/DFP/MST/ATA/EVP/LCK stats, HP/TP) for all 4
+  slots per account. Requires re-forking `fuzziqersoftware/newserv`,
+  finding the character file parser (struct lives in
+  `src/PlayerSubordinates.hh` or similar), writing a walker + sanitiser
+  in `src/HTTPServer.cc`, and PR-ing upstream. Once shipped, dashboard
+  backend gets a new allowlist entry + sanitiser, frontend Players
+  cards expand from name-only to full character data with all 4 slots
+  visible per account.
+- **#61 Quest completion tracking** — per-quest "who completed this" +
+  per-player "what have I completed" both need character `FlagsArray<0x400>`
+  at offset `0x460` of the character file. Pair with #70 since both
+  touch the same walker. New endpoint: `GET /y/data/quest/:num/completions`
+  returning the character-name list with that quest's bit set. Modal's
+  "Completed by" placeholder section will populate from this.
 - **#60 Rare-drops WebSocket** — newserv exposes `WS /y/rare-drops/stream`;
   dashboard backend needs a WS-proxy hop and the frontend ticker needs to
   consume the stream.
-- **#61 Quest completion tracking** — per-quest "who completed this" + per-
-  player "what have I completed" both require new newserv REST endpoints
-  that walk the saved character files and read `FlagsArray<0x400>` at offset
-  `0x460`. Plan: re-fork newserv, add `GET /y/character/<account>/quest-flags`
-  and `GET /y/data/quests/<num>/completions`, PR upstream.
 - **#53 Community quest packs** — operational; install pack files under
-  `server/system/quests/download/` and they show up as "Community" via the
-  existing CategoryID 21 path automatically.
+  `server/quests/download/` per the procedure in
+  [`docs/community-quests.md`](../docs/community-quests.md) and they show up
+  via the existing CategoryID 21 path automatically. Add per-pack entries
+  to `quest-provenance.json` so each new quest gets a proper Origin link.
