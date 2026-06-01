@@ -34,8 +34,24 @@ services:
       - "9300:9300/tcp"
       # PSO Xbox
       - "9500:9500/tcp"
-      # PSO Blue Burst (patch servers + game/data ports)
-      - "10000-12001:10000-12001/tcp"
+      # PC patch server
+      - "10000:10000/tcp"
+      # BB patch
+      - "11000:11000/tcp"
+      # BB JP patch + JP game (adjacent ports — newserv listens 11100/11101)
+      - "11100-11101:11100-11101/tcp"
+      # BB HG patch
+      - "11200:11200/tcp"
+      # BB data1 + data2 (adjacent ports — newserv listens 12000/12001)
+      - "12000-12001:12000-12001/tcp"
+      #
+      # NOTE: don't publish the wider 10000-12001 range — docker creates
+      # a separate iptables NAT entry per published port, and 2002 rules
+      # was enough to push the 2 GB Lightsail instance into an unhealthy
+      # state where sshd stopped responding (see commit history around
+      # 798f05d). Publish only the seven ports newserv actually listens
+      # on; the Lightsail firewall can stay wider since allow rules
+      # there are cheap.
 
     networks:
       - internal
