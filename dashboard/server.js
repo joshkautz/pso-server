@@ -213,6 +213,28 @@ function accountToken(accountId) {
     .slice(0, 16);
 }
 
+// Reverse the AccountToken HMAC for routes that need to forward an
+// account-scoped request to newserv. The HMAC isn't actually invertible —
+// we just build a token → account_id index by computing accountToken()
+// for every known account and remembering the mapping. Total account
+// count is small (10s–100s), so a fresh build per request is cheap.
+// Re-fetches /y/accounts via the same 10s TTL cache the public
+// /api/accounts route uses, so this lookup is effectively O(1) most of
+// the time.
+async function resolveAccountToken(token) {
+  if (typeof token !== 'string' || !/^[0-9a-f]{16}$/.test(token)) {
+    return null;
+  }
+  const rawAccounts = await fetchCached('accounts-internal', `${NEWSERV_API}/y/accounts`);
+  if (!Array.isArray(rawAccounts)) return null;
+  for (const a of rawAccounts) {
+    if (a && typeof a.AccountID === 'number' && accountToken(a.AccountID) === token) {
+      return a.AccountID;
+    }
+  }
+  return null;
+}
+
 // =========================================================================
 // Character sanitiser
 //
@@ -411,6 +433,42 @@ async function fetchCachedLongTTL(key, url, ttlMs) {
 // newserv. The response is already sanitized server-side (each entry
 // is just {AccountID, SlotIndex, Name}).
 // =========================================================================
+
+// =========================================================================
+// /api/character/:token/:slot/completions
+//
+// The inverse of /api/quest/:num/completions — for one character, lists
+// every quest they've cleared and on which difficulties. The frontend
+// renders this as "Completed quests" in the player modal, mirroring how
+// /api/quest/:num/completions feeds "Completed by" in the quest modal.
+//
+// :token is the AccountToken (HMAC of the real account_id); we reverse
+// it via the per-process token index before forwarding. Slot is a
+// 0–3 integer (PSO's per-account character slot range).
+// =========================================================================
+
+app.get('/api/character/:token/:slot/completions', async (req, res) => {
+  const slot = Number.parseInt(req.params.slot, 10);
+  if (!Number.isInteger(slot) || slot < 0 || slot > 3 || String(slot) !== req.params.slot) {
+    return res.status(400).json({ error: 'slot must be 0..3' });
+  }
+  const accountId = await resolveAccountToken(req.params.token);
+  if (accountId == null) {
+    return res.status(404).json({ error: 'unknown account' });
+  }
+  try {
+    const data = await fetchCached(
+      `character-completions:${accountId}:${slot}`,
+      `${NEWSERV_API}/y/character/${accountId}/${slot}/completions`,
+    );
+    // Response is pure quest data — {QuestNumber, Difficulties[]} entries,
+    // no account or character PII. Passthrough is safe.
+    res.json(Array.isArray(data) ? data : []);
+  } catch (err) {
+    console.error(`[api/character/${req.params.token}/${slot}/completions] ${err.message}`);
+    res.status(502).json({ error: 'upstream unavailable' });
+  }
+});
 
 app.get('/api/quest/:num/completions', async (req, res) => {
   const num = Number.parseInt(req.params.num, 10);

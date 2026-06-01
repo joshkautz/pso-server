@@ -1046,6 +1046,62 @@
     font-style: italic;
   }
 
+  /* -----------------------------------------------------------------
+     Character → completed quests (inverse of /api/quest/:n/completions)
+     -----------------------------------------------------------------
+     Episode group → quest rows. Each row is the quest name and a row
+     of small pills naming the difficulties the character has cleared
+     it on. Difficulty pills get a faint progression color, matching
+     PSO's own difficulty palette (green→yellow→orange→red). */
+  .char-completions-group {
+    margin-top: var(--space-3);
+  }
+  .char-completions-group:first-child { margin-top: 0; }
+  .char-completions-group h4 {
+    margin: 0 0 var(--space-1) 0;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-low);
+  }
+  .char-completions-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .char-completion-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-3);
+    align-items: baseline;
+    padding: var(--space-1) 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    font-size: 0.85rem;
+  }
+  .char-completion-row:last-child { border-bottom: 0; }
+  .char-completion-row__name { color: var(--text-mid); word-break: break-word; }
+  .char-completion-row__diffs {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+  .diff-pill {
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid;
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .diff-pill--normal   { background: rgba(95, 255, 170, 0.08);  border-color: rgba(95, 255, 170, 0.30);  color: var(--success); }
+  .diff-pill--hard     { background: rgba(255, 184, 74, 0.08);  border-color: rgba(255, 184, 74, 0.30);  color: var(--warning); }
+  .diff-pill--vhard    { background: rgba(255, 122, 24, 0.08);  border-color: rgba(255, 122, 24, 0.32);  color: #ff9a3a; }
+  .diff-pill--ultimate { background: rgba(255, 46, 133, 0.10);  border-color: rgba(255, 46, 133, 0.40);  color: var(--magenta); }
+
   /* =================================================================
      Features list
      ================================================================= */
@@ -2793,7 +2849,142 @@ function renderPlayerModalCharacter(c, titleEl, subEl, bodyEl) {
     </section>
 
     ${renderInventorySections(c)}
+
+    <section class="quest-modal__section" aria-label="Completed quests">
+      <h3>Completed quests</h3>
+      <div id="player-modal-completions"
+           data-account-token="${escapeHtml(String(c.AccountToken))}"
+           data-slot-index="${escapeHtml(String(c.SlotIndex))}">
+        <p class="quest-modal__placeholder">Checking which quests they've completed…</p>
+      </div>
+    </section>
   `;
+
+  // Lazy-fetch the completion list once the modal body is in the DOM.
+  // Mirrors the fetch pattern fetchQuestCompletions uses for the quest
+  // modal — one network call per modal open, response is small and
+  // cached server-side.
+  if (typeof c.AccountToken === 'string' && Number.isInteger(c.SlotIndex)) {
+    fetchCharacterCompletions(c.AccountToken, c.SlotIndex).catch((err) => {
+      console.warn('[player-modal] completions fetch failed:', err.message);
+      renderCharacterCompletions(c.AccountToken, c.SlotIndex, null, err.message);
+    });
+  }
+}
+
+// =========================================================================
+// Character → completed quests (lazy fetch on modal open)
+// =========================================================================
+
+// Build a lookup map: integer quest number → quest object from the
+// already-loaded /api/quests data. Rebuilt on demand because `quests`
+// is mutable and reflects whatever the last refreshLive() loaded.
+function getQuestNumberLookup() {
+  const map = new Map();
+  for (const q of quests) {
+    // q.number is the padded form like "q0014"; strip the prefix and
+    // leading zeros to get the canonical integer key.
+    const n = Number.parseInt(String(q.number).replace(/^q0*/, '') || '0', 10);
+    if (Number.isInteger(n)) map.set(n, q);
+  }
+  return map;
+}
+
+const DIFFICULTY_PILL_CLASS = {
+  Normal:   'diff-pill--normal',
+  Hard:     'diff-pill--hard',
+  VHard:    'diff-pill--vhard',
+  Ultimate: 'diff-pill--ultimate',
+};
+const DIFFICULTY_PILL_LABEL = {
+  Normal:   'N',
+  Hard:     'H',
+  VHard:    'VH',
+  Ultimate: 'U',
+};
+const DIFFICULTY_PILL_ORDER = ['Normal', 'Hard', 'VHard', 'Ultimate'];
+
+async function fetchCharacterCompletions(accountToken, slotIndex) {
+  const data = await fetchJSON(`character/${accountToken}/${slotIndex}/completions`);
+  renderCharacterCompletions(accountToken, slotIndex, Array.isArray(data) ? data : []);
+}
+
+function renderCharacterCompletions(accountToken, slotIndex, list, error) {
+  const container = document.getElementById('player-modal-completions');
+  if (!container) return;
+  // If the user has navigated to a different player while the fetch
+  // was in flight, the data-attrs no longer match — drop the result.
+  if (container.dataset.accountToken !== String(accountToken)) return;
+  if (container.dataset.slotIndex   !== String(slotIndex))   return;
+
+  if (error) {
+    container.innerHTML = `<p class="quest-modal__placeholder">Couldn't load completion data: ${escapeHtml(error)}</p>`;
+    return;
+  }
+  if (!Array.isArray(list) || list.length === 0) {
+    container.innerHTML = `<p class="quest-modal__placeholder">No quests completed yet.</p>`;
+    return;
+  }
+
+  // Resolve each entry against the loaded quest list. Entries with no
+  // matching quest (e.g. a quest pack that was uninstalled after the
+  // character cleared it) are still rendered with "Quest #N" so they
+  // don't silently disappear — but they sort to the end of their group.
+  const lookup = getQuestNumberLookup();
+  // Group by episode. Episode 0 = "Other" (unknown quests / quests
+  // without a usable episode tag). Sort entries within each group by
+  // quest number for stable display order.
+  const groups = new Map();
+  for (const entry of list) {
+    const q = lookup.get(entry.QuestNumber);
+    const episode = q && Number.isInteger(q.episode) ? q.episode : 0;
+    if (!groups.has(episode)) groups.set(episode, []);
+    groups.get(episode).push({ entry, q });
+  }
+  for (const arr of groups.values()) {
+    arr.sort((a, b) => a.entry.QuestNumber - b.entry.QuestNumber);
+  }
+
+  const episodeOrder = [...groups.keys()].sort((a, b) => {
+    // Real episodes first (1, 2, 4), then Episode 3, then "Other" (0)
+    const rank = (e) => (e === 0 ? 99 : e === 3 ? 50 : e);
+    return rank(a) - rank(b);
+  });
+
+  const episodeLabel = (e) => {
+    if (e === 0) return 'Other';
+    if (e === 3) return 'Episode 3';
+    return `Episode ${e}`;
+  };
+
+  const groupsHtml = episodeOrder.map((episode) => {
+    const rows = groups.get(episode).map(({ entry, q }) => {
+      const name = q ? q.name : `Quest #${entry.QuestNumber}`;
+      const pills = (Array.isArray(entry.Difficulties) ? entry.Difficulties : [])
+        .slice()
+        .sort((a, b) => DIFFICULTY_PILL_ORDER.indexOf(a) - DIFFICULTY_PILL_ORDER.indexOf(b))
+        .map((d) => {
+          const cls   = DIFFICULTY_PILL_CLASS[d] || '';
+          const label = DIFFICULTY_PILL_LABEL[d] || d;
+          return `<span class="diff-pill ${cls}" title="${escapeHtml(d)}">${escapeHtml(label)}</span>`;
+        })
+        .join('');
+      return `
+        <li class="char-completion-row">
+          <span class="char-completion-row__name">${escapeHtml(name)}</span>
+          <span class="char-completion-row__diffs">${pills}</span>
+        </li>
+      `;
+    }).join('');
+    return `
+      <div class="char-completions-group">
+        <h4>${escapeHtml(episodeLabel(episode))} <span style="color: var(--text-low); font-weight: normal;">(${groups.get(episode).length})</span></h4>
+        <ul class="char-completions-list">${rows}</ul>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = groupsHtml;
 }
 
 // Item rendering order: weapons → armor → shield → units → mags → tools →
