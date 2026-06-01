@@ -1232,34 +1232,125 @@ async function fetchJSON(path) {
 const MOCK_GAMES = [];
 const MOCK_DROPS = [];
 
-const MOCK_QUESTS = [
-  // Official Government quests
-  { id: 'g01', name: 'The Tunnels',          number: 'q001', episode: 1, source: 'official',  description: 'Official Episode 1 government quest. Open Caves and stop the rogue Sinow operation.', completions: 38, total: 42 },
-  { id: 'g02', name: 'The Mines',            number: 'q002', episode: 1, source: 'official',  description: 'Official Episode 1 government quest. Recover the lost Mines transmissions.', completions: 24, total: 42 },
-  { id: 'g03', name: 'Ruins of Eden',        number: 'q003', episode: 1, source: 'official',  description: 'Official Episode 1 government quest. Investigate the unknown signal in the Ruins.', completions: 11, total: 42 },
-  { id: 'g04', name: 'VR Temple',            number: 'q011', episode: 2, source: 'official',  description: 'Official Episode 2 government quest. Reach the heart of the Temple Beta zone.', completions: 17, total: 42 },
-  { id: 'g05', name: 'CCA Mystery',          number: 'q012', episode: 2, source: 'official',  description: 'Official Episode 2 government quest. The CCA Sub-Tower puzzle.', completions: 9, total: 42 },
+// ---------- Quest catalog ----------
+// Populated from /api/quests on first refreshLive(). Empty until then so
+// the initial render shows an honest "Loading…" placeholder instead of
+// flashes of fake content.
 
-  // Retrieval (single-player)
-  { id: 'r01', name: 'Lost HEAT SWORD',      number: 'q058', episode: 1, source: 'official',  description: 'Sega-original retrieval quest. Single-player, Forest. Returns the HEAT SWORD.', completions: 41, total: 42 },
-  { id: 'r02', name: 'Lost RAY DIVERGENCE',  number: 'q059', episode: 1, source: 'official',  description: 'Sega-original retrieval quest. Single-player, Caves.', completions: 22, total: 42 },
-  { id: 'r03', name: 'Lost ICE SPINNER',     number: 'q060', episode: 1, source: 'official',  description: 'Sega-original retrieval quest. Single-player, Mines.', completions: 18, total: 42 },
+let quests = [];
 
-  // Multiplayer
-  { id: 'm01', name: 'Towards The Future',   number: 'q101', episode: 1, source: 'official',  description: 'Sega-original multiplayer quest. Speed-run all four areas back-to-back. Aka TTF — the bread and butter.', completions: 42, total: 42 },
-  { id: 'm02', name: 'Maximum Attack S',     number: 'q102', episode: 2, source: 'official',  description: 'Sega-original multiplayer quest. Survive the entire S zone.', completions: 28, total: 42 },
-  { id: 'm03', name: 'Christmas Fiasco',     number: 'q103', episode: 1, source: 'official',  description: 'Seasonal multiplayer quest. Christmas Nightmare 2003 event.', completions: 12, total: 42 },
+// CategoryID is 1-indexed against newserv's ordered QuestCategories list
+// in system/config.example.json. The bulk (Cat 2-20) are Sega's original
+// content; Cat 21 ("Download") is the community-distributed pack
+// convention; Cat 1 ("Hidden") is excluded from the public library.
+// A "Custom" bucket will appear when this server adds its own pack.
 
-  // Community
-  { id: 'c01', name: 'Phantasmal World #1',  number: 'q201', episode: 1, source: 'community', description: 'Ephinea community quest. Atmospheric forest exploration with rare drops.', completions: 19, total: 42 },
-  { id: 'c02', name: 'Phantasmal World #2',  number: 'q202', episode: 2, source: 'community', description: 'Ephinea community quest. Episode 2 narrative continuation.', completions: 14, total: 42 },
-  { id: 'c03', name: "Doctor's Mission",     number: 'q203', episode: 1, source: 'community', description: 'GC-Forever community quest. Medical emergency in the Mines.', completions: 8, total: 42 },
-  { id: 'c04', name: 'Survival Trial',       number: 'q204', episode: 2, source: 'community', description: 'Ultimate-difficulty endurance quest. Survive 30 minutes against escalating waves.', completions: 4, total: 42 },
-
-  // Custom (our server's own)
-  { id: 'x01', name: 'Hunter Onboarding',    number: 'q301', episode: 1, source: 'custom',    description: 'Custom Pioneer 2 tutorial. New hunters learn the basics — combat, mags, weapon switching, chat commands.', completions: 33, total: 42 },
-  { id: 'x02', name: 'Friend Night Speedrun', number: 'q302', episode: 1, source: 'custom',   description: 'Our weekly Friday speedrun event. Reset every Friday at 8pm Eastern.', completions: 16, total: 42 },
+const QUEST_CATEGORY_NAMES = [
+  null,                          // 0 — unused (CategoryIDs are 1-indexed)
+  'Hidden',                      // 1
+  'Hero in Red',                 // 2  — government-console-ep1
+  "The Military's Hero",         // 3  — government-console-ep2
+  'Retrieval',                   // 4
+  'Extermination',               // 5
+  'Events',                      // 6
+  'Shops',                       // 7
+  'Virtual Reality',             // 8
+  'Control Tower',               // 9
+  'Team',                        // 10
+  'Battle',                      // 11
+  'Challenge (Episode 1)',       // 12
+  'Solo Challenge (Episode 1)',  // 13
+  'Challenge (Episode 2)',       // 14
+  'Solo Challenge (Episode 2)',  // 15
+  'Story',                       // 16 — solo-story
+  'Solo',                        // 17 — solo-extra
+  'Hero in Red',                 // 18 — government-ep1 (BB)
+  "The Military's Hero",         // 19 — government-ep2 (BB)
+  'The Meteor Impact Incident',  // 20 — government-ep4 (BB)
+  'Download',                    // 21
 ];
+
+function questSourceForCategoryId(catId) {
+  if (catId === 1)  return null;          // hidden — exclude from library
+  if (catId === 21) return 'community';   // download bucket
+  return 'official';
+}
+
+// Strip the U+0080-009F control bytes newserv emits as text-format
+// markers (paragraph breaks etc.), collapse whitespace, and trim.
+// No HTML escaping here — renderQuest() handles that downstream.
+function cleanQuestText(s) {
+  if (!s) return '';
+  return s
+    .replace(/[-]/g, ' ')
+    .replace(/\r/g, '')
+    .replace(/\n+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function pickEnglishVersion(versions) {
+  if (!Array.isArray(versions) || versions.length === 0) return null;
+  return versions.find((v) => v?.Language === 'English') || versions[0];
+}
+
+function adaptQuest(q) {
+  const meta = q?.Metadata;
+  if (!meta) return null;
+  const version = pickEnglishVersion(q.Versions);
+  if (!version) return null;
+
+  const source = questSourceForCategoryId(meta.CategoryID);
+  if (!source) return null; // hidden
+
+  // newserv returns "Episode 1" / "Episode 2" / "Episode 4" as strings.
+  const epMatch = String(meta.Episode ?? '').match(/(\d+)/);
+  const episode = epMatch ? parseInt(epMatch[1], 10) : null;
+  if (episode !== 1 && episode !== 2 && episode !== 4) return null;
+
+  const num  = meta.QuestNumber ?? 0;
+  const name = version.Name || `Quest ${num}`;
+
+  // ShortDescription is usually a clean one-liner; fall back to
+  // LongDescription if it's missing or stub-thin.
+  let description = cleanQuestText(version.ShortDescription);
+  if (!description || description.length < 10) {
+    description = cleanQuestText(version.LongDescription);
+  }
+  if (description.length > 200) {
+    description = description.substring(0, 197).trimEnd() + '…';
+  }
+
+  const category = QUEST_CATEGORY_NAMES[meta.CategoryID] || 'Other';
+
+  return {
+    id:          `q${num}`,
+    number:      `q${String(num).padStart(3, '0')}`,
+    name,
+    episode,
+    source,
+    category,
+    description: description || `${category} quest.`,
+    // Per-quest completion totals come from a future newserv endpoint
+    // (task #61); until then we leave these null and the card hides
+    // the progress bar / replaces the completion row with the category.
+    completions: null,
+    total:       null,
+  };
+}
+
+// Minimal HTML escape — quest names / descriptions come from newserv
+// JSON and could in principle contain '<', '&', etc. The dashboard
+// renders via template strings + innerHTML below, so escape on the way
+// in to keep XSS-by-quest-data impossible.
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // ---------- Renderers ----------
 
@@ -1307,89 +1398,118 @@ function renderDrops() {
 
 const filterState = { episode: null, source: null, search: '' };
 
-function renderQuests() {
-  const grid = document.getElementById('quest-grid');
-  const countLabel = document.getElementById('quest-count-label');
+function updateChipCounts() {
+  // Recompute every render so chip badges stay accurate as `quests`
+  // fills in asynchronously (and stay correct when filters narrow the
+  // catalog — the chip count is always the TOTAL available, not the
+  // filtered subset, so users can see what each chip would surface).
+  const epCounts  = { '1': 0, '2': 0, '4': 0 };
+  const srcCounts = { official: 0, community: 0, custom: 0 };
+  for (const q of quests) {
+    epCounts[String(q.episode)]  = (epCounts[String(q.episode)]  || 0) + 1;
+    srcCounts[q.source]          = (srcCounts[q.source]          || 0) + 1;
+  }
+  const writeBadge = (chip, count) => {
+    let badge = chip.querySelector('.chip__count');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'chip__count';
+      badge.setAttribute('aria-hidden', 'true');
+      chip.appendChild(badge);
+    }
+    badge.textContent = String(count);
+  };
+  document.querySelectorAll('.chip[data-filter="episode"]').forEach((c) => writeBadge(c, epCounts[c.dataset.value]  ?? 0));
+  document.querySelectorAll('.chip[data-filter="source"]' ).forEach((c) => writeBadge(c, srcCounts[c.dataset.value] ?? 0));
+}
 
-  let filtered = MOCK_QUESTS;
+function renderQuests() {
+  const grid       = document.getElementById('quest-grid');
+  const countLabel = document.getElementById('quest-count-label');
+  if (!grid || !countLabel) return;
+
+  updateChipCounts();
+
+  // Apply filters
+  let filtered = quests;
   if (filterState.episode) {
-    filtered = filtered.filter(q => String(q.episode) === filterState.episode);
+    filtered = filtered.filter((q) => String(q.episode) === filterState.episode);
   }
   if (filterState.source) {
-    filtered = filtered.filter(q => q.source === filterState.source);
+    filtered = filtered.filter((q) => q.source === filterState.source);
   }
   if (filterState.search) {
-    const q = filterState.search.toLowerCase();
-    filtered = filtered.filter(x =>
-      x.name.toLowerCase().includes(q) ||
-      x.description.toLowerCase().includes(q) ||
-      x.number.toLowerCase().includes(q)
+    const needle = filterState.search.toLowerCase();
+    filtered = filtered.filter((x) =>
+      x.name.toLowerCase().includes(needle) ||
+      x.description.toLowerCase().includes(needle) ||
+      x.number.toLowerCase().includes(needle) ||
+      x.category.toLowerCase().includes(needle),
     );
   }
 
-  countLabel.textContent =
-    filtered.length === MOCK_QUESTS.length
-      ? `Showing all ${filtered.length} quests`
-      : `Showing ${filtered.length} of ${MOCK_QUESTS.length} quests`;
+  // Three states for the count label: loading, all, partial.
+  if (quests.length === 0) {
+    countLabel.textContent = 'Loading quest catalog…';
+  } else if (filtered.length === quests.length) {
+    countLabel.textContent = `Showing all ${filtered.length} quests`;
+  } else {
+    countLabel.textContent = `Showing ${filtered.length} of ${quests.length} quests`;
+  }
 
   if (filtered.length === 0) {
+    const msg = quests.length === 0
+      ? 'Loading…'
+      : 'No quests match those filters.';
     grid.innerHTML = `
       <div class="panel" style="grid-column: 1 / -1; text-align: center;">
-        <p style="color: var(--text-low); margin: 0;">No quests match those filters.</p>
+        <p style="color: var(--text-low); margin: 0;">${msg}</p>
       </div>`;
     return;
   }
 
-  // Update chip counts per facet
-  const epCounts = { '1': 0, '2': 0, '4': 0 };
-  const srcCounts = { 'official': 0, 'community': 0, 'custom': 0 };
-  MOCK_QUESTS.forEach(q => {
-    epCounts[String(q.episode)] = (epCounts[String(q.episode)] || 0) + 1;
-    srcCounts[q.source] = (srcCounts[q.source] || 0) + 1;
-  });
-
-  document.querySelectorAll('.chip[data-filter="episode"]').forEach(c => {
-    const v = c.dataset.value;
-    if (!c.querySelector('.chip__count')) {
-      c.insertAdjacentHTML('beforeend', `<span class="chip__count" aria-hidden="true">${epCounts[v] || 0}</span>`);
-    }
-  });
-  document.querySelectorAll('.chip[data-filter="source"]').forEach(c => {
-    const v = c.dataset.value;
-    if (!c.querySelector('.chip__count')) {
-      c.insertAdjacentHTML('beforeend', `<span class="chip__count" aria-hidden="true">${srcCounts[v] || 0}</span>`);
-    }
-  });
-
-  grid.innerHTML = filtered.map(q => {
-    const pct = Math.round((q.completions / q.total) * 100);
+  grid.innerHTML = filtered.map((q) => {
     const epBadge = `<span class="badge badge--ep${q.episode}">Episode ${q.episode}</span>`;
-    const srcBadgeClass = q.source === 'official' ? 'badge--official'
+    const srcBadgeClass = q.source === 'official'  ? 'badge--official'
                        : q.source === 'community' ? 'badge--community'
-                       : 'badge--custom';
+                       :                            'badge--custom';
     const srcLabel = q.source.charAt(0).toUpperCase() + q.source.slice(1);
-    return `
-      <article class="quest" role="listitem" tabindex="0" aria-labelledby="quest-${q.id}-name">
-        <div class="quest__head">
-          <h3 class="quest__name" id="quest-${q.id}-name">${q.name}</h3>
-          <span class="quest__number" aria-label="Quest number ${q.number}">${q.number}</span>
-        </div>
-        <p class="quest__desc">${q.description}</p>
-        <div class="quest__badges">
-          ${epBadge}
-          <span class="badge ${srcBadgeClass}">${srcLabel}</span>
-        </div>
+
+    // Until quest-completion data is exposed by newserv (task #61), we
+    // hide the progress bar and put the category name in the footer
+    // where the completion summary will go.
+    const hasCompletions = Number.isInteger(q.completions)
+                        && Number.isInteger(q.total)
+                        && q.total > 0;
+    const pct = hasCompletions ? Math.round((q.completions / q.total) * 100) : 0;
+
+    const progressBlock = hasCompletions ? `
         <div>
           <div class="progress" role="progressbar"
                aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"
                aria-label="${pct}% of accounts have completed this quest">
             <div class="progress__bar" style="width: ${pct}%"></div>
           </div>
+        </div>` : '';
+
+    const footerInner = hasCompletions
+      ? `<span aria-hidden="true">✓</span><span>${q.completions} of ${q.total} accounts (${pct}%)</span>`
+      : `<span>${escapeHtml(q.category)}</span>`;
+
+    return `
+      <article class="quest" role="listitem" tabindex="0" aria-labelledby="quest-${escapeHtml(q.id)}-name">
+        <div class="quest__head">
+          <h3 class="quest__name" id="quest-${escapeHtml(q.id)}-name">${escapeHtml(q.name)}</h3>
+          <span class="quest__number" aria-label="Quest number ${escapeHtml(q.number)}">${escapeHtml(q.number)}</span>
         </div>
+        <p class="quest__desc">${escapeHtml(q.description)}</p>
+        <div class="quest__badges">
+          ${epBadge}
+          <span class="badge ${srcBadgeClass}">${srcLabel}</span>
+        </div>${progressBlock}
         <div class="quest__footer">
           <div class="quest__completions">
-            <span aria-hidden="true">✓</span>
-            <span>${q.completions} of ${q.total} accounts (${pct}%)</span>
+            ${footerInner}
           </div>
         </div>
       </article>
@@ -1501,13 +1621,15 @@ async function refreshLive() {
       renderGames();
     }),
     fetchJSON('quests').then((data) => {
-      // /y/data/quests shape is much richer than our quest cards need
-      // (Metadata, FloorAssignments, etc.). For v1 we surface the count
-      // only — the cards still come from MOCK_QUESTS until we wire a
-      // proper adapter + quest-completion exposure.
-      const quests = Array.isArray(data?.Quests) ? data.Quests : null;
+      const raw = Array.isArray(data?.Quests) ? data.Quests : [];
+      // Adapt newserv's rich /y/data/quests payload into card shape,
+      // dropping hidden and non-Ep1/2/4 quests. The metric reports
+      // the playable count, which matches what's in the library — so
+      // the badge and the cards always agree.
+      quests = raw.map(adaptQuest).filter(Boolean);
       const el = document.getElementById('metric-quests');
-      if (el && quests) el.textContent = quests.length;
+      if (el) el.textContent = String(quests.length);
+      renderQuests();
     }),
   ]);
 }
