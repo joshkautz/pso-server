@@ -17,8 +17,11 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install --omit=dev
 
-# Static assets and the tiny server.
+# Static assets and the tiny server. Add new static files to this list
+# rather than `COPY . .` so node_modules / Dockerfile / README don't
+# bloat the image.
 COPY index.html ./
+COPY quest-provenance.json ./
 COPY server.js ./
 
 ENV NODE_ENV=production
