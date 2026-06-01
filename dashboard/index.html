@@ -964,6 +964,16 @@
     color: var(--text-high);
     font-size: 0.95rem;
   }
+  .quest-modal__placeholder {
+    margin: 0;
+    color: var(--text-low);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    font-style: italic;
+  }
+  .quest-modal__meta a {
+    color: var(--cyan-bright);
+  }
 
   /* =================================================================
      Features list
@@ -1002,6 +1012,20 @@
   /* =================================================================
      Players grid
      ================================================================= */
+  .player-controls {
+    /* Same visual treatment as .quest-controls — kept as its own
+       selector so future player-specific filter chips can be added
+       without entangling the two sections. */
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+    margin-bottom: var(--space-5);
+    padding: var(--space-4);
+    background: var(--bg-surface);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-lg);
+  }
   .players-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -1242,16 +1266,43 @@
         <span class="section-head__hint" id="players-count-label">Registered hunters</span>
       </div>
 
+      <form class="player-controls" role="search" aria-label="Player search">
+        <div class="quest-search">
+          <span aria-hidden="true">⌕</span>
+          <label for="player-search" class="sr-only">Search players by name</label>
+          <input
+            type="search"
+            id="player-search"
+            placeholder="Search by name…"
+            autocomplete="off"
+          />
+        </div>
+      </form>
+
       <div class="players-grid" id="players-grid">
         <!-- Populated by JS from /api/accounts. Empty-state markup is
              rendered into the grid until the first fetch lands. -->
       </div>
 
+      <nav class="pagination" id="player-pagination" aria-label="Players pagination" hidden>
+        <button type="button" class="pagination__btn" data-page-step="prev" aria-label="Previous page">
+          <span aria-hidden="true">‹</span> Prev
+        </button>
+        <ol class="pagination__pages" id="player-pagination-pages">
+          <!-- Same compact-range strip as the quest pagination. -->
+        </ol>
+        <button type="button" class="pagination__btn" data-page-step="next" aria-label="Next page">
+          Next <span aria-hidden="true">›</span>
+        </button>
+      </nav>
+
       <p class="players-note">
-        Showing the last character name each account used.
-        Per-character data — level, class, equipment, quest completions —
-        will appear here once the corresponding newserv endpoint lands
-        (tracked as task&nbsp;#61 in the repo).
+        Currently showing the last character name each account used.
+        Full per-character data — class, race, section ID, level,
+        ATP/DFP/MST/ATA/EVP/LCK stats, and equipped items, with all four
+        character slots per account — will appear here once the
+        corresponding newserv-side endpoint ships
+        (tracked as task&nbsp;#70 + #61 in the repo).
       </p>
     </div>
   </section>
@@ -1287,8 +1338,8 @@
 
         <fieldset class="filter-group" style="border: 0; margin: 0; padding: 0;">
           <legend class="filter-group__label">Source</legend>
-          <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="official">Official</button>
-          <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="community">Community</button>
+          <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="official">Original game</button>
+          <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="community">Fan-made</button>
           <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="custom">Custom</button>
         </fieldset>
       </form>
@@ -1625,14 +1676,53 @@ function pickEnglishVersion(versions) {
   return versions.find((v) => v?.Language === 'English') || versions[0];
 }
 
-// Human-friendly label for the high-level quest source. The modal shows
-// this prominently so it's obvious whether a quest is part of the disc
-// or a fan-made / server-specific addition.
-const QUEST_PROVENANCE_LABEL = {
+// Source labels — internal source keys stay as 'official'/'community'/
+// 'custom' for css class names + data-value selectors; the user-facing
+// labels reflect what the underlying research actually shows. Most of
+// CategoryID 21 ("Download") in newserv's bundled content is Sega-
+// original-distributed-via-download, not fan-made — see the
+// quest-provenance.json overrides for the 9 reclassifications.
+const SOURCE_LABELS = {
+  official:  'Original game',
+  community: 'Fan-made',
+  custom:    'Custom',
+};
+
+// Default origin label by classified source. Quests with a per-quest
+// override in dashboard/quest-provenance.json get a more specific label
+// (e.g. "Sega DC download — Soul of a Blacksmith (2001)") + an external
+// link to the canonical source.
+const QUEST_PROVENANCE_DEFAULT_LABEL = {
   official:  'Original PSO game (Sega)',
   community: 'Fan-made (community pack)',
   custom:    "This server's own quest",
 };
+
+// Filled in by fetchProvenance() on page load. Keys are decimal quest
+// numbers as strings, values are { originLabel, sourceUrl?, author?,
+// year?, classify? } objects. The classify field lets entries override
+// the default CategoryID-derived source — necessary because the 9
+// Sega-DC-download quests in CategoryID 21 are Original-game content,
+// not Community, despite being in the "Download" bucket.
+let questProvenance = {};
+
+async function fetchProvenance() {
+  try {
+    const res = await fetch('/quest-provenance.json', {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    // Strip the schema/docs keys (anything starting with `_`), keep only
+    // numeric quest-number keys. Prevents the docs entries leaking into
+    // the lookup logic.
+    questProvenance = Object.fromEntries(
+      Object.entries(data).filter(([k]) => /^\d+$/.test(k)),
+    );
+  } catch (err) {
+    console.warn('[provenance] fetch failed:', err.message);
+  }
+}
 
 function adaptQuest(q) {
   const meta = q?.Metadata;
@@ -1640,7 +1730,7 @@ function adaptQuest(q) {
   const version = pickEnglishVersion(q.Versions);
   if (!version) return null;
 
-  const source = questSourceForCategoryId(meta.CategoryID);
+  let source = questSourceForCategoryId(meta.CategoryID);
   if (!source) return null; // hidden
 
   // newserv returns "Episode 1" / "Episode 2" / "Episode 4" as strings.
@@ -1667,8 +1757,22 @@ function adaptQuest(q) {
     description = description.substring(0, 197).trimEnd() + '…';
   }
 
-  const category    = QUEST_CATEGORY_NAMES[meta.CategoryID] || 'Other';
-  const provenance  = QUEST_PROVENANCE_LABEL[source] || 'Unknown';
+  const category = QUEST_CATEGORY_NAMES[meta.CategoryID] || 'Other';
+
+  // Per-quest provenance overlay. When present, can override the
+  // source classification (the most common case: the 9 Sega-DC-download
+  // quests in CategoryID 21 reclassify to 'official').
+  const override = questProvenance[String(num)] || null;
+  if (override?.classify === 'original')  source = 'official';
+  if (override?.classify === 'community') source = 'community';
+  if (override?.classify === 'custom')    source = 'custom';
+
+  const provenance = {
+    label:     override?.originLabel || QUEST_PROVENANCE_DEFAULT_LABEL[source] || 'Unknown',
+    sourceUrl: override?.sourceUrl   || null,
+    author:    override?.author      || null,
+    year:      Number.isFinite(override?.year) ? override.year : null,
+  };
 
   return {
     id:               `q${num}`,
@@ -1733,15 +1837,119 @@ function renderGames() {
   `).join('');
 }
 
+const PLAYER_PAGE_SIZE = 24;
+let playerPage = 1;
+const playerFilter = { search: '' };
+
+function getFilteredPlayers() {
+  let result = players;
+  if (playerFilter.search) {
+    const needle = playerFilter.search.toLowerCase();
+    result = result.filter((p) =>
+      String(p.name || '').toLowerCase().includes(needle),
+    );
+  }
+  return result;
+}
+
+function renderPlayerPagination(totalCount) {
+  const nav  = document.getElementById('player-pagination');
+  const list = document.getElementById('player-pagination-pages');
+  if (!nav || !list) return;
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PLAYER_PAGE_SIZE));
+  if (totalPages <= 1) {
+    nav.hidden = true;
+    return;
+  }
+  nav.hidden = false;
+
+  const prev = nav.querySelector('[data-page-step="prev"]');
+  const next = nav.querySelector('[data-page-step="next"]');
+  if (prev) prev.disabled = playerPage <= 1;
+  if (next) next.disabled = playerPage >= totalPages;
+
+  list.replaceChildren();
+  for (const item of compactPageRange(playerPage, totalPages)) {
+    const li = document.createElement('li');
+    if (item === '…') {
+      li.className = 'pagination__ellipsis';
+      li.textContent = '…';
+      li.setAttribute('aria-hidden', 'true');
+    } else {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pagination__page';
+      btn.dataset.pageNum = String(item);
+      btn.textContent = String(item);
+      btn.setAttribute('aria-label', `Page ${item} of ${totalPages}`);
+      if (item === playerPage) btn.setAttribute('aria-current', 'page');
+      li.appendChild(btn);
+    }
+    list.appendChild(li);
+  }
+}
+
+function setupPlayerControls() {
+  const input = document.getElementById('player-search');
+  if (input) {
+    let debounce;
+    input.addEventListener('input', (e) => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        playerFilter.search = e.target.value.trim();
+        playerPage = 1; // searching resets the pager
+        renderPlayers();
+      }, 150);
+    });
+  }
+
+  const nav = document.getElementById('player-pagination');
+  if (nav) {
+    nav.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn || btn.disabled) return;
+      const total = Math.max(1, Math.ceil(getFilteredPlayers().length / PLAYER_PAGE_SIZE));
+      if (btn.dataset.pageStep === 'prev' && playerPage > 1) {
+        playerPage -= 1;
+      } else if (btn.dataset.pageStep === 'next' && playerPage < total) {
+        playerPage += 1;
+      } else if (btn.dataset.pageNum) {
+        playerPage = parseInt(btn.dataset.pageNum, 10);
+      } else {
+        return;
+      }
+      renderPlayers();
+      document.getElementById('players')?.scrollIntoView({ block: 'start' });
+    });
+  }
+}
+
 function renderPlayers() {
   const grid       = document.getElementById('players-grid');
   const countLabel = document.getElementById('players-count-label');
   if (!grid) return;
 
+  const filtered = getFilteredPlayers();
+
+  // Clamp page in case the filter shrank the list under our feet.
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PLAYER_PAGE_SIZE));
+  if (playerPage > totalPages) playerPage = totalPages;
+  if (playerPage < 1)          playerPage = 1;
+  const start   = (playerPage - 1) * PLAYER_PAGE_SIZE;
+  const visible = filtered.slice(start, start + PLAYER_PAGE_SIZE);
+
   if (countLabel) {
-    countLabel.textContent = players.length === 0
-      ? 'Registered hunters'
-      : `${players.length} registered hunter${players.length === 1 ? '' : 's'}`;
+    let label;
+    if (players.length === 0) {
+      label = 'Registered hunters';
+    } else if (filtered.length === players.length) {
+      label = `${players.length} registered hunter${players.length === 1 ? '' : 's'}`;
+    } else {
+      label = `${filtered.length} of ${players.length} hunters`;
+    }
+    if (totalPages > 1) label += ` · page ${playerPage} of ${totalPages}`;
+    countLabel.textContent = label;
   }
 
   if (players.length === 0) {
@@ -1749,6 +1957,15 @@ function renderPlayers() {
       <div class="empty-state" style="grid-column: 1 / -1;">
         No one's registered yet. Be the first.
       </div>`;
+    renderPlayerPagination(0);
+    return;
+  }
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column: 1 / -1;">
+        No players match those filters.
+      </div>`;
+    renderPlayerPagination(0);
     return;
   }
 
@@ -1761,7 +1978,7 @@ function renderPlayers() {
     return [...trimmed][0].toUpperCase();
   };
 
-  grid.innerHTML = players.map((p) => {
+  grid.innerHTML = visible.map((p) => {
     const platformBadges = (p.platforms || [])
       .map((plat) => `<span class="badge">${escapeHtml(plat)}</span>`)
       .join('');
@@ -1775,6 +1992,8 @@ function renderPlayers() {
       </article>
     `;
   }).join('');
+
+  renderPlayerPagination(filtered.length);
 }
 
 function renderDrops() {
@@ -1970,7 +2189,7 @@ function renderQuests() {
     const srcBadgeClass = q.source === 'official'  ? 'badge--official'
                        : q.source === 'community' ? 'badge--community'
                        :                            'badge--custom';
-    const srcLabel = q.source.charAt(0).toUpperCase() + q.source.slice(1);
+    const srcLabel = SOURCE_LABELS[q.source] || q.source;
 
     // Until quest-completion data is exposed by newserv (task #61), we
     // hide the progress bar and put the category name in the footer
@@ -2047,10 +2266,24 @@ function openQuestModal(questId) {
                      :                            'badge--custom';
   const srcLabel = q.source.charAt(0).toUpperCase() + q.source.slice(1);
 
+  // Build the Origin <dd>. With a sourceUrl, render as a link out to the
+  // canonical source (Ephinea wiki article, PSO-World guide, attribution
+  // page, GitHub commit). Without, just the label string. Either way the
+  // dt label is plain text.
+  const originDd = q.provenance.sourceUrl
+    ? `<a href="${escapeHtml(q.provenance.sourceUrl)}" target="_blank" rel="noopener">${escapeHtml(q.provenance.label)}</a>`
+    : escapeHtml(q.provenance.label);
+
   const meta = [];
   meta.push(`<dt>Category</dt><dd>${escapeHtml(q.category)}</dd>`);
   meta.push(`<dt>Episode</dt><dd>${q.episode}</dd>`);
-  meta.push(`<dt>Origin</dt><dd>${escapeHtml(q.provenance)}</dd>`);
+  meta.push(`<dt>Origin</dt><dd>${originDd}</dd>`);
+  if (q.provenance.author) {
+    meta.push(`<dt>Author</dt><dd>${escapeHtml(q.provenance.author)}</dd>`);
+  }
+  if (q.provenance.year) {
+    meta.push(`<dt>Year</dt><dd>${q.provenance.year}</dd>`);
+  }
   if (q.maxPlayers != null) {
     meta.push(`<dt>Max players</dt><dd>${q.maxPlayers}</dd>`);
   }
@@ -2059,6 +2292,23 @@ function openQuestModal(questId) {
   }
 
   const hasFullBriefing = q.fullDescription && q.fullDescription !== q.description;
+
+  // Per-quest completion data isn't exposed by any current newserv
+  // endpoint — task #61 will add /y/data/quest/:num/completions reading
+  // the FlagsArray<0x400> at offset 0x460 of each character file. Until
+  // that ships we render an honest placeholder pointing at the task so
+  // people don't expect data that isn't there.
+  const completionsBlock = `
+    <section class="quest-modal__section" aria-label="Per-character completion status">
+      <h3>Completed by</h3>
+      <p class="quest-modal__placeholder">
+        Per-character completion data isn't available yet — it requires
+        reading the quest-flags array stored in each saved character
+        file. Tracked as task <a href="https://github.com/joshkautz/pso-server/blob/main/CLAUDE.md#whats-deferred-to-upstream-changes" target="_blank" rel="noopener">#61</a>;
+        will populate here once that endpoint lands on newserv.
+      </p>
+    </section>
+  `;
 
   bodyEl.innerHTML = `
     <div class="quest-modal__badges">
@@ -2080,6 +2330,8 @@ function openQuestModal(questId) {
       <h3>Briefing</h3>
       <p class="quest-modal__desc">${escapeHtml(q.fullDescription)}</p>
     </section>` : ''}
+
+    ${completionsBlock}
   `;
 
   // Native showModal() traps focus inside the dialog and handles ESC.
@@ -2419,12 +2671,18 @@ document.addEventListener('DOMContentLoaded', () => {
   setupPagination();
   setupQuestModal();
   setupQuestCardClicks();
+  setupPlayerControls();
   startCountdown();
 
-  // Try to refresh from the live API. If the backend isn't reachable,
-  // mock data (where any still exists) stays on screen.
-  refreshLive();
-  setInterval(refreshLive, REFRESH_INTERVAL_MS);
+  // Fetch the per-quest provenance overlay first, then start the live
+  // refresh loop. The provenance JSON is a static asset (no API call) so
+  // it lands fast — but adaptQuest reads questProvenance to set the
+  // classify-override per quest, so we want it populated before the
+  // first /api/quests fetch lands.
+  fetchProvenance().then(() => {
+    refreshLive();
+    setInterval(refreshLive, REFRESH_INTERVAL_MS);
+  });
   startRareDropsStream();
 
   // Build info changes only when a new image is deployed. Once per hour

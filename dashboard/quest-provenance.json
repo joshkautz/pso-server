@@ -1,0 +1,89 @@
+{
+  "_about": "Per-quest provenance overrides for the dashboard quest library. Keys are decimal quest numbers as strings. The frontend fetches this file on load and overlays each entry on the default CategoryID-derived classification produced by adaptQuest(). Schema documented below.",
+  "_schema": {
+    "originLabel": "Human-readable origin label shown in the modal 'Origin' field (e.g. 'Sega DC download (2001)', 'Fan-made by soulja224466').",
+    "sourceUrl":   "External URL to the canonical source (Ephinea wiki article, original pack thread, attribution page, commit) — rendered as a clickable link in the modal next to the origin label.",
+    "author":      "Optional. Author handle for genuinely fan-made quests.",
+    "year":        "Optional. Approximate release year for chronology context.",
+    "classify":    "One of 'original' | 'community' | 'custom'. Overrides the default CategoryID-based source classification. Set to 'original' for Sega-authored content that happens to live under CategoryID 21 (the 'Download' bucket) because that's the historical distribution channel."
+  },
+
+  "_notes": [
+    "Research basis: see commit attached to this file. The 9 entries below for q050/051/052/070/071/072/078/081/082 are all Sega-authored download quests from the DC/GC era — the 'Download' CategoryID is about distribution channel, not authorship.",
+    "Only q000 (soulja224466) and q253 (Matt Swift, newserv-bundled utility quest) are genuinely third-party-authored in the upstream newserv bundle.",
+    "When new community packs land via server/quests/download/, add entries here mapping quest_number → provenance so the dashboard attributes them correctly."
+  ],
+
+  "0": {
+    "originLabel": "Fan-made by soulja224466",
+    "sourceUrl":   "https://github.com/fuzziqersoftware/newserv/blob/master/system/quests/download/q000-gc-e.bin",
+    "author":      "soulja224466",
+    "year":        2006,
+    "classify":    "community"
+  },
+
+  "50": {
+    "originLabel": "Sega DC download — Soul of a Blacksmith",
+    "sourceUrl":   "https://wiki.pioneer2.net/w/Soul_of_a_Blacksmith",
+    "year":        2001,
+    "classify":    "original"
+  },
+  "51": {
+    "originLabel": "Sega DC download — Letter from Lionel",
+    "sourceUrl":   "https://wiki.pioneer2.net/w/Letter_from_Lionel",
+    "year":        2001,
+    "classify":    "original"
+  },
+  "52": {
+    "originLabel": "Sega DC download — The Retired Hunter",
+    "sourceUrl":   "https://wiki.pioneer2.net/w/The_Retired_Hunter",
+    "year":        2001,
+    "classify":    "original"
+  },
+
+  "70": {
+    "originLabel": "Sega Japan event — Famitsu Cup ver.2",
+    "sourceUrl":   "http://www.pso-world.com/sections.php?op=viewarticle&artid=1957",
+    "year":        2001,
+    "classify":    "original"
+  },
+  "71": {
+    "originLabel": "Sega Japan promo — Dawn of e-Access",
+    "sourceUrl":   "https://psoarchive.neocities.org/quests/quests",
+    "year":        2001,
+    "classify":    "original"
+  },
+  "72": {
+    "originLabel": "Sega DC download — Central Dome Fire Swirl",
+    "sourceUrl":   "https://wiki.pioneer2.net/w/Central_Dome_Fire_Swirl",
+    "year":        2001,
+    "classify":    "original"
+  },
+
+  "78": {
+    "originLabel": "Sega DC download — Soul of Steel",
+    "sourceUrl":   "https://www.pso-world.com/sections.php?op=viewarticle&artid=904",
+    "year":        2001,
+    "classify":    "original"
+  },
+  "81": {
+    "originLabel": "Sega Japan event — AOL CUP / Sunset Base",
+    "sourceUrl":   "https://wiki.pioneer2.net/w/AOL_CUP_-Sunset_Base-",
+    "year":        2002,
+    "classify":    "original"
+  },
+  "82": {
+    "originLabel": "Sega GameCube download — Gallon's Plan",
+    "sourceUrl":   "https://wiki.pioneer2.net/w/Gallon%27s_Plan",
+    "year":        2003,
+    "classify":    "original"
+  },
+
+  "253": {
+    "originLabel": "Custom newserv utility — Story Flag Fixer (Matt Swift)",
+    "sourceUrl":   "https://github.com/fuzziqersoftware/newserv/commit/7b6b8151a7b07c9f6bffa882823eb7a9585ace5d",
+    "author":      "Matt Swift",
+    "year":        2024,
+    "classify":    "community"
+  }
+}
