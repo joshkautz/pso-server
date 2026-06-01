@@ -1,33 +1,51 @@
 # Server runtime
 
-What runs on the Lightsail instance.
+The newserv-specific bits that ship to the Lightsail instance. The
+service definitions (`docker-compose.yml`) and TLS config (`Caddyfile`)
+live one level up, at the repo root — see [`../README.md`](../README.md)
+for the full stack.
 
 ## Files
 
 - **`config.json`** — the only file you'll regularly edit. Full newserv
   config, vendored from upstream `config.example.json` with our overrides
-  applied (server name, addresses, welcome message). Diffs from upstream
-  are intentionally small so future upstream changes are easy to merge.
-- **`docker-compose.yml`** — runs the prebuilt `ghcr.io/joshkautz/pso-server`
-  image with `./` bind-mounted at `/newserv/system` inside the container.
+  applied (server name, addresses, welcome message, `HTTPListen` for the
+  REST API). Diffs from upstream are intentionally small so future
+  upstream changes are easy to merge.
 - **`cloud-init.sh`** — first-boot setup (installs Docker, makes
   directories). Runs *once* per instance via Lightsail's user-data hook.
   Lightsail only accepts shell scripts for user_data, not cloud-init
   YAML, so this is plain bash even though the name suggests otherwise.
+- **`backup/`** — `pso-backup.sh` + systemd timer/service unit files.
+  Installed by `deploy.yml` under `/usr/local/bin/` and `/etc/systemd/system/`,
+  runs nightly, tarballs `/home/ubuntu/pso-server/system/` to S3.
 
 ## How a deploy works
 
 The `.github/workflows/deploy.yml` workflow, on every push to `main` that
-touches `server/**`:
+touches `server/**`, `dashboard/**`, `docker-compose.yml`, `Caddyfile`,
+or `deploy.yml` itself:
 
 1. Looks up the instance's public IP via `aws lightsail get-instance`.
-2. `rsync`s the contents of `server/` to `/home/ubuntu/pso-server/system/`
-   on the instance (so `config.json` lands at
-   `/home/ubuntu/pso-server/system/config.json`, which docker-compose
-   mounts into the container at `/newserv/system/config.json`).
-3. SSHes in and runs `docker compose pull && docker compose up -d`.
+2. `scp`s `docker-compose.yml` + `Caddyfile` (both repo-root) to
+   `/home/ubuntu/pso-server/` on the instance.
+3. `docker compose pull` to fetch the latest images (`pso-server:main`,
+   `pso-dashboard:main`, `caddy:2-alpine`).
+4. Reads `org.opencontainers.image.revision` off the newserv image with
+   `docker inspect`, writes `NEWSERV_REV=<sha>` to `.env` so the dashboard
+   can show "newserv abc1234 (up to date)" via `/api/build`.
+5. Seeds `/home/ubuntu/pso-server/system/` with the image's bundled
+   `system/` files (no-clobber, so our overrides win).
+6. Substitutes the actual public IP into `config.json` (`LocalAddress` +
+   `ExternalAddress` — `0.0.0.0` in the repo).
+7. `rsync`s `server/` to `/home/ubuntu/pso-server/system/` (overrides
+   land here).
+8. `docker compose up -d --remove-orphans` brings the stack up.
+9. Installs the backup systemd timer if not already running.
 
-That's the whole deploy. No rebuild, no instance recreation.
+No rebuild, no instance recreation. The container restart picks up
+config.json changes automatically; you can also reload without restart
+(see *Editing config.json* below).
 
 ## Adding custom quests
 

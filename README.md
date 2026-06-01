@@ -1,42 +1,60 @@
 # pso-server
 
 A personal [newserv](https://github.com/fuzziqersoftware/newserv) deployment
-on AWS Lightsail, so I can host Phantasy Star Online Episode I & II Plus
-multiplayer for friends running Batocera + Dolphin.
+on AWS Lightsail — Phantasy Star Online Episode I & II Plus multiplayer for
+friends running Batocera + Dolphin, real GameCube + BBA, or desktop Dolphin.
 
-This repo is everything needed to stand up, deploy, and operate the server.
+A public status dashboard lives at <https://pso.joshkautz.com> showing server
+stats, the quest catalog, and registered players.
+
+This repo is everything needed to stand up, deploy, and operate it.
 
 ```
-├── infra/                   Terraform — Lightsail instance, static IP,
-│                            firewall rules, GitHub OIDC role
-├── server/                  Runtime — docker-compose, newserv config.json,
-│                            cloud-init for first-boot setup
-├── scripts/bootstrap.sh     One-time bootstrap (S3 state bucket)
-├── docs/client-setup.md     How players configure Batocera + Dolphin
+├── infra/                  Terraform — Lightsail instance, static IP,
+│                           firewall rules, GitHub OIDC role, S3 backups
+├── server/                 newserv runtime — config.json, cloud-init,
+│                           backup script + systemd timer/service
+├── dashboard/              Public web dashboard — Node/Express backend +
+│                           single-file HTML/CSS/JS frontend
+├── docker-compose.yml      Services: newserv, dashboard, caddy
+├── Caddyfile               TLS + reverse proxy + security headers
+├── scripts/bootstrap.sh    One-time bootstrap (S3 state bucket)
+├── docs/
+│   ├── operations.md       Day-to-day runbook
+│   ├── client-setup.md     Players: Batocera + Dolphin
+│   └── client-setup-dolphin.md  Players: desktop Dolphin
+├── CLAUDE.md               Project context for AI-assisted dev
 └── .github/workflows/
-    ├── infra.yml            terraform plan on PR, apply on main
-    ├── build-image.yml      builds & pushes newserv image to GHCR
-    └── deploy.yml           rsync config + docker compose up on instance
+    ├── infra.yml           terraform plan on PR, apply on main
+    ├── build-image.yml     builds & pushes newserv image to GHCR
+    │                       (stamps the upstream SHA in an OCI label)
+    ├── build-dashboard.yml builds & pushes dashboard image to GHCR
+    └── deploy.yml          ssh + scp configs + docker compose up
 ```
 
 ## Architecture
 
 ```
-Friend's Batocera + Dolphin
-  └── PSO GC Plus (Rev 2)
-       └── DNS: AWS_LIGHTSAIL_STATIC_IP
-            │
-            ▼
-       UDP 53 (newserv DNS)             ─┐
-       TCP 9103 (newserv game server)   ─┼─→  Lightsail instance (ubuntu_24_04)
-                                          │     └── Docker
-                                          │          └── ghcr.io/joshkautz/pso-server:main
-                                          │               └── newserv binary
-                                          │                    └── /newserv/system/  ← bind-mounted from ./server/
-                                          │                         ├── config.json
-                                          │                         ├── accounts/    (player data, persisted on host)
-                                          │                         └── ...
-                                          └─ (snapshots → daily Lightsail backup)
+Friend's Batocera + Dolphin          Browser
+  └── PSO GC Plus (Rev 2)              └── https://pso.joshkautz.com
+       └── DNS: STATIC_IP                   │
+            │                               ▼
+            ▼                          Caddy 2 (TLS, HSTS, redirects)
+       UDP 53 (newserv DNS)            ─┐         │
+       TCP 9000-9204 (newserv game)    ─┼─┬───────┘ docker bridge network "internal"
+                                         │            │
+                                         ▼            ▼
+                              Lightsail Instance (ubuntu_24_04)
+                               └── Docker compose
+                                    ├── newserv (REST :8081 internal-only)
+                                    │     └── /newserv/system ← bind-mount from ./server/
+                                    └── dashboard (Node/Express)
+                                          ├── /          → index.html
+                                          ├── /api/*     → allowlisted, sanitised proxy → newserv
+                                          └── /api/build → upstream SHA + freshness vs master
+
+                              + daily Lightsail snapshot
+                              + nightly S3 backup of /system/
 ```
 
 **Why Lightsail Instance and not Container Service:**
@@ -123,10 +141,13 @@ your player count.
 
 | Doc | Audience |
 |---|---|
-| [`docs/operations.md`](docs/operations.md) | Day-to-day operator (you and Josh). Adding friends, editing config, viewing logs, granting in-game admin, restoring from backup, upgrading newserv, cost management, emergency recovery |
-| [`docs/client-setup.md`](docs/client-setup.md) | Each player. Configures Dolphin on Batocera + sets up PSO's in-game network |
+| [`docs/operations.md`](docs/operations.md) | Day-to-day operator. Adding friends, editing config, viewing logs, granting in-game admin, restoring from backup, upgrading newserv, cost management, emergency recovery |
+| [`docs/client-setup.md`](docs/client-setup.md) | Each player on Batocera + Dolphin (handhelds, HTPCs) |
+| [`docs/client-setup-dolphin.md`](docs/client-setup-dolphin.md) | Each player on desktop Dolphin (macOS / Windows / Linux) |
+| [`dashboard/README.md`](dashboard/README.md) | Anyone touching the public dashboard — architecture, allowlist, sanitisers, build pipeline |
 | [`infra/README.md`](infra/README.md) | Anyone bootstrapping this from scratch (e.g. forking) |
 | [`server/README.md`](server/README.md) | Understanding what runs on the instance and how |
+| [`CLAUDE.md`](CLAUDE.md) | Project context for AI-assisted development sessions |
 
 For PSO mechanics (item drops, quest format, chat commands, etc.), the
 upstream [`fuzziqersoftware/newserv`](https://github.com/fuzziqersoftware/newserv)
@@ -149,6 +170,18 @@ The infrastructure ships with reasonable defaults baked in:
 - **Image tag pinning**: `docker-compose.yml` uses `:main` (latest from
   upstream master), but every build also pushes a `:sha-XXXX` tag for
   rollback.
+- **Dashboard exposure**: the dashboard backend proxies only a strict
+  allowlist of newserv GET routes (`/y/summary`, `/y/lobbies`, `/y/server`,
+  `/y/data/quests`, `/y/accounts`) with per-route sanitisers that strip
+  account IDs, IPs, sessions, PSO serial numbers, ban times, and other
+  PII before responses leave the backend. newserv's REST API (port 8081)
+  is **never** published to the host or the public internet — it's only
+  reachable from sibling containers on the docker bridge network.
+- **TLS**: Caddy 2 sidecar (`caddy:2-alpine`) terminates HTTPS via Let's
+  Encrypt and auto-renews. HSTS, X-Frame-Options, X-Content-Type-Options,
+  Referrer-Policy, and Permissions-Policy headers are set. Caddy listens
+  on 80 + 443; 80 is required for the ACME HTTP-01 challenge plus the
+  HTTP → HTTPS redirect.
 
 Worth doing manually:
 

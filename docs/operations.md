@@ -299,7 +299,7 @@ If the new image breaks something, roll back:
 # Find the previous good SHA tag from a successful build run:
 gh run list --workflow=build-image.yml --status=success --limit 5
 
-# Edit server/docker-compose.yml: replace `:main` with the specific sha tag:
+# Edit docker-compose.yml (repo root): replace `:main` with the specific sha tag:
 #   image: ghcr.io/joshkautz/pso-server:sha-abc1234def0
 # Push — deploy pulls the older tag.
 ```
