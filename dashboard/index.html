@@ -401,6 +401,78 @@
   .identity__row dt { color: var(--text-low); }
   .identity__row dd { margin: 0; color: var(--text-high); }
 
+  /* -----------------------------------------------------------------
+     Side stack — identity card + compatibility matrix
+     -----------------------------------------------------------------
+     The right column of the hero used to hold just the identity card.
+     We now stack a second card under it (the Episode × Client
+     compatibility matrix) so both pieces of "what plays here" info
+     live together. On narrow viewports the parent grid drops to one
+     column and these still flow naturally underneath the hero text. */
+  .hero__side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  /* -----------------------------------------------------------------
+     Compatibility matrix
+     -----------------------------------------------------------------
+     Compact 5-column × 4-row grid showing which episodes each client
+     family can play. Reuses the identity card's glass/mono styling so
+     the two side cards feel like the same family. ✓ cells get the
+     success color (light green) for at-a-glance readability; — cells
+     stay muted. */
+  .compat {
+    background: var(--bg-glass);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4) var(--space-5);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    border-collapse: collapse;
+    width: 100%;
+  }
+  .compat caption {
+    text-align: left;
+    color: var(--text-low);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding-bottom: var(--space-2);
+    caption-side: top;
+  }
+  .compat th, .compat td {
+    padding: var(--space-1) var(--space-2);
+    text-align: center;
+    border-bottom: 1px solid var(--line-subtle);
+  }
+  .compat tr:last-child th, .compat tr:last-child td { border-bottom: 0; }
+  .compat thead th {
+    color: var(--text-low);
+    font-weight: normal;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .compat tbody th {
+    text-align: left;
+    color: var(--text-mid);
+    font-weight: normal;
+    white-space: nowrap;
+  }
+  .compat__yes { color: var(--success); }
+  .compat__no  { color: var(--text-low); }
+  .compat__note {
+    margin: var(--space-2) 0 0 0;
+    padding: 0 var(--space-5);
+    color: var(--text-low);
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+  }
+  .compat__note sup { color: var(--text-mid); }
+
   /* =================================================================
      Section heads
      - scroll-margin-top reserves space for the sticky header when an
@@ -1322,20 +1394,78 @@
         <a class="hero__cta-secondary" href="#quests">Browse quests</a>
       </div>
 
-      <dl class="identity" aria-label="Server identity">
-        <div class="identity__row">
-          <dt>Host</dt>
-          <dd id="server-host">54.173.68.119</dd>
+      <div class="hero__side">
+        <dl class="identity" aria-label="Server identity">
+          <div class="identity__row">
+            <dt>Host</dt>
+            <dd id="server-host">54.173.68.119</dd>
+          </div>
+          <div class="identity__row">
+            <dt>Platforms</dt>
+            <dd>DC · GC · PC · Xbox · BB</dd>
+          </div>
+          <div class="identity__row">
+            <dt>Build</dt>
+            <dd id="server-build">newserv —</dd>
+          </div>
+        </dl>
+
+        <div>
+          <table class="compat" aria-label="Episode compatibility by client">
+            <caption>Episodes × Clients</caption>
+            <thead>
+              <tr>
+                <th scope="col">Episode</th>
+                <th scope="col">DC</th>
+                <th scope="col">PC</th>
+                <th scope="col">GC</th>
+                <th scope="col">Xbox</th>
+                <th scope="col">BB</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Episode → client compatibility. Sourced from the protocol-version
+                   table each disc shipped with: DC v1/v2 and PC v2 only contain Ep 1
+                   maps; the V3 generation (GC + Xbox Episode I & II) added Ep 2; the
+                   separate GameCube Episode III: C.A.R.D. Revolution disc is the
+                   only Ep 3 client; Blue Burst is the only client with Ep 4 content. -->
+              <tr>
+                <th scope="row">Episode 1</th>
+                <td class="compat__yes" aria-label="supported">✓</td>
+                <td class="compat__yes" aria-label="supported">✓</td>
+                <td class="compat__yes" aria-label="supported">✓</td>
+                <td class="compat__yes" aria-label="supported">✓</td>
+                <td class="compat__yes" aria-label="supported">✓</td>
+              </tr>
+              <tr>
+                <th scope="row">Episode 2</th>
+                <td class="compat__no" aria-label="not supported">—</td>
+                <td class="compat__no" aria-label="not supported">—</td>
+                <td class="compat__yes" aria-label="supported">✓</td>
+                <td class="compat__yes" aria-label="supported">✓</td>
+                <td class="compat__yes" aria-label="supported">✓</td>
+              </tr>
+              <tr>
+                <th scope="row">Episode 3</th>
+                <td class="compat__no" aria-label="not supported">—</td>
+                <td class="compat__no" aria-label="not supported">—</td>
+                <td class="compat__yes" aria-label="supported via C.A.R.D. Revolution disc">✓<sup>*</sup></td>
+                <td class="compat__no" aria-label="not supported">—</td>
+                <td class="compat__no" aria-label="not supported">—</td>
+              </tr>
+              <tr>
+                <th scope="row">Episode 4</th>
+                <td class="compat__no" aria-label="not supported">—</td>
+                <td class="compat__no" aria-label="not supported">—</td>
+                <td class="compat__no" aria-label="not supported">—</td>
+                <td class="compat__no" aria-label="not supported">—</td>
+                <td class="compat__yes" aria-label="supported">✓</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="compat__note"><sup>*</sup> Requires the C.A.R.D. Revolution GameCube disc — a separate game from Episode I &amp; II.</p>
         </div>
-        <div class="identity__row">
-          <dt>Platforms</dt>
-          <dd>DC · GC · PC · Xbox · BB</dd>
-        </div>
-        <div class="identity__row">
-          <dt>Build</dt>
-          <dd id="server-build">newserv —</dd>
-        </div>
-      </dl>
+      </div>
     </div>
   </section>
 
