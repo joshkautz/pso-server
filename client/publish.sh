@@ -45,7 +45,9 @@ fi
 
 if [ -n "$WIN_CLIENT" ] && [ -d "$WIN_CLIENT" ]; then
   echo "==> zipping Windows client: $WIN_CLIENT"
-  ( cd "$(dirname "$WIN_CLIENT")" && zip -r -q "$WORK/PSOBB-Windows.zip" "$(basename "$WIN_CLIENT")" )
+  # Exclude *.bak (the pristine pre-repoint Psobb.exe backup) — players run
+  # Psobb.exe, and the .bak still points at 127.0.0.1.
+  ( cd "$(dirname "$WIN_CLIENT")" && zip -r -q "$WORK/PSOBB-Windows.zip" "$(basename "$WIN_CLIENT")" -x "*.bak" )
   echo "    uploading PSOBB-Windows.zip ($(du -h "$WORK/PSOBB-Windows.zip" | cut -f1))"
   aws s3 cp "$WORK/PSOBB-Windows.zip" "s3://$BUCKET/$PREFIX/PSOBB-Windows.zip" --content-type application/zip --only-show-errors
   published=$((published + 1))
