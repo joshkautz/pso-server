@@ -211,16 +211,6 @@
      so it doesn't collide with the brand. Brand + status share row 1. */
   @media (max-width: 640px) {
     .topbar__inner { row-gap: var(--space-2); }
-    .topbar__inner .nav {
-      margin-left: 0;
-      width: 100%;
-      justify-content: space-between;
-      gap: var(--space-1);
-    }
-    .topbar__inner .nav a {
-      padding: var(--space-2);
-      font-size: 0.85rem;
-    }
   }
   .brand {
     display: flex;
@@ -252,12 +242,17 @@
   }
   .nav {
     display: flex;
+    align-items: center;
+    margin-left: auto;
+    position: relative;
+  }
+  .nav__links {
+    display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-4);
-    margin-left: auto;
   }
-  .nav a {
+  .nav__links a {
     color: var(--text-mid);
     text-decoration: none;
     padding: var(--space-2) var(--space-3);
@@ -265,23 +260,75 @@
     font-weight: 500;
     font-size: 0.9rem;
   }
-  .nav a:hover { color: var(--text-high); background: var(--cyan-soft); }
-  .nav a[aria-current="page"] { color: var(--cyan-primary); }
-  /* Persistent download CTA in the nav — outlined so it reads as the primary
-     action without overpowering the status pill and cyan accents. */
-  .nav a.nav__download {
-    color: var(--cyan-primary);
+  .nav__links a:hover { color: var(--text-high); background: var(--cyan-soft); }
+  .nav__links a[aria-current="page"] { color: var(--cyan-primary); }
+
+  /* Hamburger toggle — hidden until the nav collapses at the breakpoint below. */
+  .nav__toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 38px;
+    background: transparent;
     border: 1px solid var(--line-strong);
     border-radius: var(--radius-md);
-    font-family: var(--font-display);
-    font-weight: 600;
-    font-size: 0.82rem;
-    letter-spacing: 0.04em;
+    color: var(--cyan-primary);
+    cursor: pointer;
   }
-  .nav a.nav__download:hover {
-    background: var(--cyan-primary);
-    color: var(--bg-deep);
-    border-color: var(--cyan-bright);
+  .nav__toggle:hover { border-color: var(--cyan-primary); background: var(--cyan-soft); }
+  .nav__toggle-icon,
+  .nav__toggle-icon::before,
+  .nav__toggle-icon::after {
+    content: "";
+    display: block;
+    width: 18px;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
+    transition: transform 0.25s ease, opacity 0.2s ease;
+  }
+  .nav__toggle-icon { position: relative; }
+  .nav__toggle-icon::before { position: absolute; left: 0; top: -6px; }
+  .nav__toggle-icon::after  { position: absolute; left: 0; top: 6px; }
+  .nav--open .nav__toggle-icon { background: transparent; }
+  .nav--open .nav__toggle-icon::before { transform: translateY(6px) rotate(45deg); }
+  .nav--open .nav__toggle-icon::after  { transform: translateY(-6px) rotate(-45deg); }
+
+  /* Below 768px the inline links collapse into an animated dropdown panel. */
+  @media (max-width: 768px) {
+    .nav__toggle { display: inline-flex; }
+    .nav__links {
+      position: absolute;
+      top: calc(100% + var(--space-3));
+      right: 0;
+      flex-direction: column;
+      align-items: stretch;
+      gap: var(--space-1);
+      min-width: 190px;
+      padding: var(--space-3);
+      background: var(--bg-elevated);
+      border: 1px solid var(--line-soft);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-soft);
+      z-index: 20;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-8px);
+      transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+    }
+    .nav--open .nav__links {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+    .nav__links a { padding: var(--space-3); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nav__toggle-icon,
+    .nav__toggle-icon::before,
+    .nav__toggle-icon::after,
+    .nav__links { transition: none; }
   }
 
   .status-pill {
@@ -1266,6 +1313,7 @@
     box-shadow: var(--shadow-glow);
     color: var(--bg-deep);
   }
+  .client-dl__icon { flex-shrink: 0; }
   .client-dl__size {
     font-family: var(--font-body);
     font-weight: 400;
@@ -1420,17 +1468,21 @@
   <div class="container topbar__inner">
     <span class="status-pill" data-status="online" role="status" aria-live="polite">
       <span class="status-pill__dot" aria-hidden="true"></span>
-      <span>Server online</span>
+      <span id="status-text">Online</span>
     </span>
 
     <nav class="nav" aria-label="Primary">
-      <a href="#live" aria-current="page">Live</a>
-      <a href="#players">Players</a>
-      <a href="#quests">Quests</a>
-      <a href="#features">Features</a>
-      <a href="#join">Join</a>
-      <a href="#resources">Resources</a>
-      <a class="nav__download" href="#download">Download</a>
+      <button class="nav__toggle" type="button" aria-expanded="false" aria-controls="nav-menu" aria-label="Open menu">
+        <span class="nav__toggle-icon" aria-hidden="true"></span>
+      </button>
+      <div class="nav__links" id="nav-menu">
+        <a href="#live" aria-current="page">Live</a>
+        <a href="#players">Players</a>
+        <a href="#quests">Quests</a>
+        <a href="#features">Features</a>
+        <a href="#join">Join</a>
+        <a href="#resources">Resources</a>
+      </div>
     </nav>
   </div>
 </header>
@@ -1796,11 +1848,13 @@
           <div class="client-dl" id="client-dl">
             <a class="client-dl__btn" data-platform="mac" download
                href="https://pso-server-downloads-315902154426.s3.amazonaws.com/downloads/PSOBB-macOS.zip">
-              <span aria-hidden="true">↓</span> macOS <span class="client-dl__size">Apple Silicon</span>
+              <svg class="client-dl__icon" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.54 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
+              macOS <span class="client-dl__size">Apple Silicon</span>
             </a>
             <a class="client-dl__btn" data-platform="win" download
                href="https://pso-server-downloads-315902154426.s3.amazonaws.com/downloads/PSOBB-Windows.zip">
-              <span aria-hidden="true">↓</span> Windows
+              <svg class="client-dl__icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+              Windows
             </a>
           </div>
           <p style="margin-top: var(--space-4);">
@@ -3420,7 +3474,8 @@ async function refreshLive() {
       set('metric-uptime',         formatUptime(srv.UptimeUsecs));
       set('metric-uptime-delta',   formatStartedAt(srv.StartTime));
       set('metric-games-delta',    srv.LobbyCount != null ? `across ${srv.LobbyCount} lobbies` : '');
-    }),
+      setServerStatus(true);
+    }).catch(() => setServerStatus(false)),
     fetchJSON('lobbies').then((lobbies) => {
       if (!Array.isArray(lobbies)) return;
       // Always reassign the global — even when there are 0 games we
@@ -3729,6 +3784,35 @@ function setupClientDownloads() {
   }
 }
 
+// Server status pill — driven by whether the live summary fetch succeeds.
+function setServerStatus(online) {
+  const pill = document.querySelector('.status-pill');
+  if (pill) pill.dataset.status = online ? 'online' : 'offline';
+  const label = document.getElementById('status-text');
+  if (label) label.textContent = online ? 'Online' : 'Offline';
+}
+
+// Collapsible nav (hamburger) for narrow viewports. Progressive enhancement —
+// the links work as plain anchors without JS; this only manages the toggle.
+function setupNav() {
+  const nav = document.querySelector('.nav');
+  const toggle = nav && nav.querySelector('.nav__toggle');
+  const links = nav && nav.querySelector('.nav__links');
+  if (!nav || !toggle || !links) return;
+  const setOpen = (open) => {
+    nav.classList.toggle('nav--open', open);
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  };
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setOpen(!nav.classList.contains('nav--open'));
+  });
+  links.addEventListener('click', (e) => { if (e.target.closest('a')) setOpen(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+  document.addEventListener('click', (e) => { if (!nav.contains(e.target)) setOpen(false); });
+}
+
 // ---------- Boot ----------
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -3745,6 +3829,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupPlayerModal();
   setupPlayerCardClicks();
   setupClientDownloads();
+  setupNav();
   startCountdown();
 
   // Fetch the per-quest provenance overlay first, then start the live
