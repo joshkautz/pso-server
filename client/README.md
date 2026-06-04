@@ -12,8 +12,9 @@ the two downloads produced here:
   Unzip → run `Psobb.exe` (not `online.exe`, which is the standalone patcher and
   isn't pointed at this server).
 
-Each zip also bundles the `remember-login` helper (saves your UserID so the login
-screen pre-fills it) — see [`remember-login/`](remember-login/).
+Each zip also bundles the `remember-login` helper (saves your UserID **and
+password** so the login screen pre-fills both) — see
+[`remember-login/`](remember-login/).
 
 Both are hosted on a public S3 bucket (`pso-server-downloads-<account>`) and are
 **never committed** — they embed Sega's copyrighted client. This directory holds
