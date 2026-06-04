@@ -237,6 +237,11 @@ dashboard container (8081 isn't published to the host):
 docker exec pso-dashboard wget -qO- http://newserv:8081/y/accounts
 ```
 
+Each account currently carries both a BB and a GC license (same player, either
+platform), and `JKautz` has `Flags=0x7FFFFFFF` (root). Characters are per-version;
+players move progress between platforms with `$savechar`/`$loadchar` — see
+[`docs/character-transfer.md`](docs/character-transfer.md).
+
 ## Build + deploy pipeline
 
 ```

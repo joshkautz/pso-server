@@ -215,15 +215,15 @@ Save the config to Slot A and select **CONNECT**.
 ### Plus (v1.2, USA Rev 2)
 
 Plus has an additional 3-field registration screen Sega added as an
-anti-piracy/anti-private-server measure. **PSO doesn't actually
-validate any of these values** — type literally anything that fits
-the length constraints:
+anti-piracy/anti-private-server measure. The server now requires a
+registered account, so **enter the GameCube credentials the admin
+assigned to you** — they must match exactly:
 
-| Field | Length | Example |
+| Field | Length | Source |
 |---|---|---|
-| Serial Number | 10 alphanumeric chars | `0123456789` |
-| Access Key | 12 alphanumeric chars | `0123456789AB` |
-| Password | 1–8 alphanumeric chars | `password` |
+| Serial Number | 10-digit number | from the admin |
+| Access Key | 12 characters | from the admin |
+| Password | up to 8 characters | from the admin |
 
 When Plus asks "Save Password to Memory Card?" choose **Yes** so you
 don't have to re-enter the password every session.

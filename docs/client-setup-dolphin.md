@@ -125,14 +125,12 @@ through the Sega/Sonic Team logos, EULA, and date prompt. Then:
 5. PSO will show "**In order to play PSO Episode 1 and 2 online, you
    must purchase a Hunter's License.**" — this is just informational.
    Select **Agree** to continue.
-6. **Enter a Serial Number** — exactly 10 alphanumeric characters.
-   PSO doesn't validate the value; type whatever you want. Example:
-   `0123456789`.
-7. **Enter an Access Key** — 12 alphanumeric characters. Same deal.
-   Example: `0123456789AB`.
-8. **Enter a Password** — 1 to 8 alphanumeric characters. Example:
-   `password`. **Write this one down** — if you don't save it to the
-   memcard at the next prompt, you'll re-enter it every session.
+6. **Enter the Serial Number** the admin gave you — a 10-digit number.
+   The server checks these now, so it must match your account exactly.
+7. **Enter the Access Key** the admin gave you — 12 characters.
+8. **Enter the Password** the admin gave you — up to 8 characters.
+   **Save it to the memory card** at the next prompt so you don't have to
+   re-enter it every session.
 9. **Game Certificate Confirmation** screen — verify and press Yes.
 10. **Save Password to Memory Card?** — Yes (saves you typing it next
     time).
