@@ -44,8 +44,9 @@ Grab your platform from the **PSO Blue Burst (PC)** card on
 ### Windows
 
 1. Unzip the folder anywhere (e.g. your Desktop).
-2. Run **`online.exe`** — it does a quick patch check, then launches the game.
-   (If the launcher ever misbehaves, run **`Psobb.exe`** directly instead.)
+2. Run **`Psobb.exe`** — it connects straight to the server and handles the patch
+   check itself. (Don't use `online.exe`; it's the standalone patcher and isn't
+   pointed at this server.)
 
 ## 4. Log in & play
 
