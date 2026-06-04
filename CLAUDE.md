@@ -195,6 +195,48 @@ on purpose: it belongs to client distribution, not the gated server infra, and
 infra applies do a destroy/recreate on the firewall. Don't add it to Terraform
 expecting a clean apply — `publish.sh` is the source of truth.
 
+## Accounts & access control
+
+**Access is gated by accounts, not the firewall.** `AllowUnregisteredUsers` is
+`false` in `server/config.json`, so only pre-created accounts can log in. The DNS
+allowlist (`allowed_dns_cidrs`) is open (`0.0.0.0/0`) on purpose: it only ever
+gated console clients that point their DNS at newserv — Blue Burst resolves
+`pso.joshkautz.com` via public DNS, and the game ports are world-open anyway. The
+account list is the real door.
+
+**Accounts live in `system/licenses/<AccountID-decimal>.json`** — one file each,
+runtime data (NOT in the repo; `deploy.yml`'s rsync has no `--delete`, so they
+survive deploys). Each holds per-version license arrays; the two that matter:
+- BB: `"BBLicenses": [{"UserName": "...", "Password": "..."}]` (≤16 chars each)
+- GC: `"GCLicenses": [{"SerialNumber": <10-digit int>, "AccessKey": "<12 chars>", "Password": "<≤8 chars>"}]`
+
+`AccountID` is the guild-card number; for BB, newserv derives it as
+`fnv1a32(username) & 0x7FFFFFFF`, but **login resolves by the username string**
+(`AccountIndex::by_bb_username`, case-sensitive), so any unique AccountID works.
+One account can hold multiple license types (BB + GC + …) — same player, different
+platforms.
+
+**The interactive shell is NOT reachable in this Docker deployment.** `docker exec
+-it newserv newserv` starts a *second* newserv (no ACTION arg ⇒ server mode) which
+aborts at `bind: Address already in use` — PID 1 already holds the ports, and the
+container has no TTY / `stdin_open`. So the upstream README / runbook "run
+`list-accounts` in the shell" recipe does not work here. Manage accounts by editing
+the JSON instead, modelling new files on an existing one:
+
+```
+docker compose stop newserv     # so it can't flush stale state over your edits
+# add/remove system/licenses/*.json   (and system/players/* for character data)
+docker compose start newserv    # re-indexes accounts on startup
+```
+
+`newserv [ACTION]` (CLI mode) has offline utilities (compress/encrypt/decode) but
+**no** account actions. Verify the loaded accounts via newserv's HTTP API from the
+dashboard container (8081 isn't published to the host):
+
+```
+docker exec pso-dashboard wget -qO- http://newserv:8081/y/accounts
+```
+
 ## Build + deploy pipeline
 
 ```

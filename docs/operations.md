@@ -60,9 +60,48 @@ docker kill --signal SIGUSR1 newserv     # reload config.json only
 docker kill --signal SIGUSR2 newserv     # reload config + quests + everything
 ```
 
-### Add a friend's IP to the DNS allowlist
+### Add a friend (create an account)
 
-The DNS server (UDP 53) is locked down to known IPs. To add a friend:
+`AllowUnregisteredUsers` is `false`, so a new player needs an account before they
+can log in. Accounts are one JSON file each in `system/licenses/`; the current
+ones are visible via `docker exec pso-dashboard wget -qO- http://newserv:8081/y/accounts`.
+For a Blue Burst player you only need a `BBLicenses` entry:
+
+```bash
+ssh -i ~/.ssh/pso-server-deploy ubuntu@<instance-ip>
+cd /home/ubuntu/pso-server
+
+# Account ID = guild-card number. newserv derives it from the username as
+# fnv1a32(name) & 0x7FFFFFFF, but login matches on the username string, so any
+# unique integer works. Compute the canonical one:
+AID=$(python3 -c 'import sys
+h=2166136261
+for c in "NewFriend".encode(): h^=c; h=h*16777619&0xffffffff
+print(h&0x7fffffff)')
+
+docker compose stop newserv          # so it can't flush stale state over the new file
+cat > system/licenses/$AID.json <<JSON
+{
+  "BBTeamID": 0, "FormatVersion": 1, "AccountID": $AID, "LastPlayerName": "",
+  "DCNTELicenses": [], "BBLicenses": [{"UserName": "NewFriend", "Password": "theirpassword"}],
+  "BanEndTime": 0, "PCLicenses": [], "AutoReplyMessage": "", "GCLicenses": [],
+  "AutoPatchesEnabled": [], "XBLicenses": [], "Flags": 0,
+  "Ep3TotalMesetaEarned": 0, "Ep3CurrentMeseta": 0, "DCLicenses": [], "UserFlags": 0
+}
+JSON
+docker compose start newserv
+```
+
+(newserv reads decimal or `0x…` integers in these files.) To let the *same*
+account also log in from GameCube, add a `GCLicenses` entry alongside — see
+*Accounts & access control* in `CLAUDE.md`.
+
+### Lock down the DNS server (optional)
+
+The DNS allowlist (UDP 53) is currently **open** (`0.0.0.0/0`) — access is gated by
+accounts now, not IPs. DNS only ever affected console clients that point their DNS
+at newserv; Blue Burst resolves `pso.joshkautz.com` via public DNS and never used
+it. If you'd rather re-lock UDP 53 to known IPs anyway:
 
 1. Get their public IPv4 (have them visit https://ifconfig.io).
 2. Edit `infra/terraform.tfvars` (local-only file, not in git):
@@ -109,16 +148,23 @@ You can also `journalctl -u docker` for container lifecycle events.
 
 ### Check who's online
 
-In PSO, use `$li` while you're in a lobby. From the shell:
+In PSO, use `$li` while you're in a lobby. The live player count is also on the
+dashboard at [pso.joshkautz.com](https://pso.joshkautz.com).
 
-```bash
-ssh ... ubuntu@<ip>
-docker exec -it newserv newserv   # opens the interactive shell
-# in the shell:
-help                # see all commands
-list-accounts       # all registered accounts
-list-clients        # who's currently connected
-```
+> **Heads up:** the upstream "`docker exec -it newserv newserv` opens the
+> interactive shell" recipe does **not** work in this Docker deployment. With no
+> ACTION argument newserv runs in *server* mode, so a second copy just aborts on a
+> port-bind conflict (PID 1 already holds the ports; the container has no TTY).
+> To inspect accounts, query newserv's HTTP API from the dashboard container:
+>
+> ```bash
+> ssh -i ~/.ssh/pso-server-deploy ubuntu@<instance-ip>
+> docker exec pso-dashboard wget -qO- http://newserv:8081/y/accounts
+> ```
+>
+> To create / edit / remove accounts, edit `system/licenses/*.json` and restart
+> the container. See *Accounts & access control* in `CLAUDE.md` for the full
+> workflow.
 
 ### Restart the server (planned downtime)
 
@@ -156,18 +202,21 @@ gh workflow run deploy.yml --ref main
 
 ### Grant yourself admin
 
-The first time you connect from PSO, newserv auto-creates an account for your guild card serial number. To give that account admin powers:
+Account privileges live in the account's JSON file. To grant root (admin), set
+`"Flags": 0x7FFFFFFF` (newserv's `ROOT` flag) in
+`system/licenses/<account-id>.json` — find the file by matching the `UserName` in
+its `BBLicenses` — then restart the container:
 
 ```bash
 ssh -i ~/.ssh/pso-server-deploy ubuntu@<instance-ip>
-docker exec -it newserv newserv
-# in the shell:
-list-accounts                                 # find your account ID
-update-account <account-id> flags=root        # grant root
-exit
+cd /home/ubuntu/pso-server
+sudo sed -i 's/"Flags": 0x0,/"Flags": 0x7FFFFFFF,/' system/licenses/<account-id>.json
+docker compose restart newserv
 ```
 
-Now in-game you can use `$ann`, `$ban`, `$kick`, `$debug`, etc.
+Now in-game you can use `$ann`, `$ban`, `$kick`, `$debug`, etc. (The upstream
+`update-account … flags=root` shell recipe isn't reachable in this Docker deploy —
+see *Accounts & access control* in `CLAUDE.md`.)
 
 ### Useful in-game chat commands
 

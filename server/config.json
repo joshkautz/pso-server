@@ -219,7 +219,7 @@
   // unregistered license (serial number and access key combination, or username and password combination on BB), a new
   // account is created for them. Accounts are addressed by serial numbers; on BB, the new account's serial number is a
   // hash of the username.
-  "AllowUnregisteredUsers": true,
+  "AllowUnregisteredUsers": false,
 
   // If this option is enabled and AllowUnregisteredUsers is enabled, the server will use temporary accounts for the
   // prototype versions (DC NTE, DC 11/2000, GC NTE, and Ep3 NTE) instead of permanent accounts. In this case, you can

@@ -6,13 +6,15 @@
 
 ssh_public_key = "ssh-ed25519 AAAA... pso-server deploy"
 
-# DNS server allowlist. Add a /32 for each player's home public IP.
-# Update when a friend joins, when an ISP rotates someone's IP, or when
-# someone takes their setup to a new location.
-allowed_dns_cidrs = [
-  "73.242.54.43/32", # josh - home
-  # "1.2.3.4/32", # friend name
-]
+# DNS server (UDP 53) allowlist. newserv's built-in DNS resolves any name to the
+# server's IP, so an open resolver is a mild DNS-reflection risk. But Blue Burst
+# clients resolve pso.joshkautz.com via public DNS (not this one) and the game
+# ports are open to all, so this allowlist only ever gated console clients. The
+# real access control is the account gate (AllowUnregisteredUsers=false in
+# server/config.json): only pre-created accounts can log in. Default is open; to
+# lock DNS down instead, list each player's home public IP as a /32:
+#   allowed_dns_cidrs = ["73.242.54.43/32", "1.2.3.4/32"]
+allowed_dns_cidrs = ["0.0.0.0/0"]
 
 # Optional overrides:
 # aws_region         = "us-east-1"
