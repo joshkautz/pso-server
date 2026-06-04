@@ -242,6 +242,13 @@ platform), and `JKautz` has `Flags=0x7FFFFFFF` (root). Characters are per-versio
 players move progress between platforms with `$savechar`/`$loadchar` — see
 [`docs/character-transfer.md`](docs/character-transfer.md).
 
+Players can pre-fill their BB UserID **and password** at the login screen via
+`client/remember-login/`. The client stores the saved password as a 48-byte
+`REG_BINARY` Blowfish blob keyed by the UserID (cipher reverse-engineered from
+`Psobb.exe`; constant tables embedded in `remember-login.py`), so the tool
+reproduces it exactly. `remember-login.py --emit <user> <pass>` makes a one-click
+login file (`.reg` for Windows, `.command` for macOS) to hand a player privately.
+
 ## Build + deploy pipeline
 
 ```

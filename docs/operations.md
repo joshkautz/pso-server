@@ -96,6 +96,14 @@ docker compose start newserv
 account also log in from GameCube, add a `GCLicenses` entry alongside — see
 *Accounts & access control* in `CLAUDE.md`.
 
+Then hand the player a one-click login file so they never type credentials:
+
+```bash
+python3 client/remember-login/remember-login.py --emit NewFriend theirpassword
+# writes NewFriend.reg (Windows) + NewFriend-macos.command (macOS) — send privately;
+# double-clicking it pre-fills the UserID + password in their client.
+```
+
 ### Lock down the DNS server (optional)
 
 The DNS allowlist (UDP 53) is currently **open** (`0.0.0.0/0`) — access is gated by

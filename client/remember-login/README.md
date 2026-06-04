@@ -1,44 +1,47 @@
-# Remember my UserID
+# Remember my login
 
-Tiny helper scripts that save your **PSO Blue Burst** UserID so the login screen
-pre-fills it every launch — no more retyping your account name.
+Pre-fill your **PSO Blue Burst** UserID **and password** on the login screen, so
+you never retype either one.
 
-They set two values under `HKEY_CURRENT_USER\Software\SonicTeam\PSOBB` (the same
-keys the client uses):
+Yes — the password too. The Tethealla client stores it the way the game expects:
+a 48-byte encrypted blob at `HKCU\Software\SonicTeam\PSOBB\PASSWORD`, equal to your
+password run through PSOBB's own 4-round Blowfish cipher **keyed by your UserID**
+(reverse-engineered from `Psobb.exe`). `remember-login.py` reproduces that exactly,
+so the game decrypts it and fills both fields in. It also sets `ACCOUNT` (your
+UserID) and `ACCOUNT_CHECK` (the remember flag).
 
-| Value | Type | Meaning |
-|---|---|---|
-| `ACCOUNT` | string | your UserID (pre-fills the **User ID** field) |
-| `ACCOUNT_CHECK` | dword `1` | the client's "remember" flag |
+## Easiest — your personal login file (no setup)
 
-## macOS
+Ask the admin for your personal login file and run it:
 
-Double-click **`remember-login-macos.command`** (or run
-`bash remember-login-macos.command`). It finds `PSOBB.app`, asks for your UserID,
-and writes it into the app's bundled Wine registry. A timestamped backup of the
-registry is saved next to it (`user.reg.bak-…`).
+- **Windows:** double-click **`yourname.reg`** → *Yes* to import.
+- **macOS:** double-click **`yourname-macos.command`**.
 
-> Close the game first if it's running — Wine rewrites the registry on exit.
-> If macOS blocks the script, right-click it → **Open**, or run it from Terminal.
+Launch the game and both fields are filled. These files contain your (encrypted)
+password, so the admin sends them privately. An admin makes one with:
 
-## Windows
+```
+python3 remember-login.py --emit YourName YourPassword
+```
 
-Double-click **`remember-login-windows.bat`**. It asks for your UserID and writes
-it to your registry. (Close `Psobb.exe` first if it's running.)
+which writes `YourName.reg` (Windows) and `YourName-macos.command` (macOS).
 
-## What about the password?
+## Do it yourself — `remember-login.py` (needs Python 3)
 
-PSO stores the password **separately and encrypted** — it's written by the game's
-own launcher, not as a plain registry value — so a script can't bake it in. The
-client's `PASSWORD` registry key holds ciphertext, so writing your password there
-in plain text does nothing (it just shows blank). Two options:
+Double-click **`remember-login-macos.command`** / **`remember-login-windows.bat`**
+(they just launch `remember-login.py`), or run `python3 remember-login.py`. It asks
+for your UserID + password and writes them into your install — the PSOBB.app Wine
+registry on macOS, or the Windows registry. Needs
+[Python 3](https://www.python.org/); works on both platforms.
 
-- **Type it each session.** Your UserID is already filled in, so it's one field.
-- **Windows only:** enable save-password in the launcher (`online.exe` → Options →
-  More). The macOS build launches the game directly and skips the launcher, so
-  there you just type it. (Known client quirk: passwords starting with `a`/`A`
-  don't save cleanly — avoid those if you use the launcher's save.)
+> Close the game first — it rewrites the registry on exit. On macOS a timestamped
+> backup of the Wine registry is saved next to it (`user.reg.bak-…`).
 
 ## Notes
 
-- Re-run any time to change the saved UserID.
+- Re-run any time to change the saved login.
+- `remember-login.py` is fully self-contained: the cipher and its constant tables
+  are embedded, so it needs no game files and no third-party packages.
+- Known client quirk (only relevant if you ever use the in-game launcher's own
+  save-password instead): passwords starting with `a`/`A` don't save cleanly there.
+  This tool writes the binary blob directly and isn't affected.

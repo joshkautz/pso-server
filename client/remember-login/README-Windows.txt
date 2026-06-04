@@ -1,22 +1,17 @@
-PSO Blue Burst - remember your UserID (Windows)
-===============================================
+PSO Blue Burst - remember your login (Windows)
+==============================================
 
-Your client is already set up for the server. To stop retyping your
-UserID every time you play:
+This fills in your UserID AND password on the login screen, so you never
+retype them.
 
-  1. Make sure the game (Psobb.exe) is closed.
-  2. Double-click   remember-login-windows.bat
-  3. Type the UserID the admin gave you.
+Easiest (no setup):
+  Ask the admin for your personal file (yourname.reg) and double-click
+  it -> Yes to import. Done.
 
-Next time you launch Psobb.exe, the login screen already has your UserID
-in it.
+Do it yourself:
+  1. Close Psobb.exe.
+  2. Double-click  remember-login-windows.bat
+     It runs remember-login.py, which needs Python 3 (from python.org),
+     and asks for your UserID + password.
 
-About the password
-------------------
-PSO saves the password separately and encrypted, so this script can't set
-it. Two choices:
-  - Just type it each time (your UserID is already filled in), or
-  - Turn on "save password" in the game launcher (online.exe -> Options ->
-    More). Note: passwords starting with 'a' or 'A' don't save cleanly.
-
-Run the script again any time to change the saved UserID.
+Re-run any time to change it.

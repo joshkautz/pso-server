@@ -1,20 +1,19 @@
-PSO Blue Burst - remember your UserID (macOS)
-=============================================
+PSO Blue Burst - remember your login (macOS)
+============================================
 
-Your client is already set up for the server. To stop retyping your
-UserID every time you play:
+This fills in your UserID AND password on the login screen, so you never
+retype them.
 
-  1. Make sure the game is closed.
-  2. Double-click   remember-login-macos.command
-        (If macOS blocks it: right-click it -> Open -> Open.)
-  3. Type the UserID the admin gave you.
+Easiest (no setup):
+  Ask the admin for your personal file (yourname-macos.command) and
+  double-click it. Done.
 
-Next time you open PSOBB, the login screen already has your UserID in it.
+Do it yourself:
+  1. Close the game.
+  2. Double-click  remember-login-macos.command
+       (If macOS blocks it: right-click it -> Open -> Open.)
+     It runs remember-login.py, which needs Python 3 (from python.org),
+     and asks for your UserID + password.
 
-About the password
-------------------
-PSO saves the password separately and encrypted, so this script can't set
-it. Your UserID is filled in for you, so just type the password once each
-time you play. (It's a single field.)
-
-Run the script again any time to change the saved UserID.
+Re-run any time to change it. A backup of the Wine registry is saved next
+to it (user.reg.bak-...).
