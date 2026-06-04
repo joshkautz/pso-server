@@ -16,7 +16,7 @@ you start — you'll enter them at the title screen.
 
 ## 2. Download
 
-Grab your platform from the **PSO Blue Burst (PC)** card on
+Grab your platform from the **PC (Blue Burst)** card on
 [pso.joshkautz.com](https://pso.joshkautz.com):
 
 | Platform | File | Notes |
@@ -52,6 +52,9 @@ Grab your platform from the **PSO Blue Burst (PC)** card on
 
 1. At the title screen, **click the window** so it has focus, then type your
    **UserID** and **password** and press **Enter**.
+   - *Tired of retyping it?* Run the **remember-login** helper once (from the
+     client tooling, `client/remember-login/`) to pre-fill your UserID and
+     password on the login screen every launch.
 2. First time in: create a character — pick a **profession** (Hunter / Ranger /
    Force), a type, and a look.
 

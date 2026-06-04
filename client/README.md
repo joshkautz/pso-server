@@ -1,7 +1,7 @@
 # Blue Burst client distribution
 
 Tooling for building and distributing the **PSO Blue Burst** client that's
-pre-pointed at this server. The dashboard's "PSO Blue Burst (PC)" card links to
+pre-pointed at this server. The dashboard's "PC (Blue Burst)" card links to
 the two downloads produced here:
 
 - **macOS** (`PSOBB-macOS.zip`) — a self-contained app. The 32-bit game runs in
@@ -9,7 +9,8 @@ the two downloads produced here:
   [Sikarugir](https://github.com/Sikarugir-App/Sikarugir)) plus a custom windowed
   Direct3D shim. Unzip → `xattr -cr PSOBB.app` → double-click.
 - **Windows** (`PSOBB-Windows.zip`) — the classic Tethealla client, repointed.
-  Unzip → run `online.exe`.
+  Unzip → run `Psobb.exe` (not `online.exe`, which is the standalone patcher and
+  isn't pointed at this server).
 
 Both are hosted on a public S3 bucket (`pso-server-downloads-<account>`) and are
 **never committed** — they embed Sega's copyrighted client. This directory holds
@@ -27,6 +28,9 @@ client/
     windowed.patch     git-apply onto crosire/d3d8to9
     build.sh           cross-compile d3d8.dll with mingw-w64
     README.md          what the patch does and why
+  remember-login/      Save your UserID+password into the client (mac + win)
+    remember-login-macos.command
+    remember-login-windows.bat
   publish.sh           zip the built clients + upload to S3
 ```
 
