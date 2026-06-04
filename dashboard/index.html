@@ -252,6 +252,8 @@
   }
   .nav {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: var(--space-4);
     margin-left: auto;
   }
@@ -265,6 +267,22 @@
   }
   .nav a:hover { color: var(--text-high); background: var(--cyan-soft); }
   .nav a[aria-current="page"] { color: var(--cyan-primary); }
+  /* Persistent download CTA in the nav — outlined so it reads as the primary
+     action without overpowering the status pill and cyan accents. */
+  .nav a.nav__download {
+    color: var(--cyan-primary);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-md);
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+  }
+  .nav a.nav__download:hover {
+    background: var(--cyan-primary);
+    color: var(--bg-deep);
+    border-color: var(--cyan-bright);
+  }
 
   .status-pill {
     display: inline-flex;
@@ -1208,6 +1226,53 @@
     line-height: 1.5;
   }
 
+  /* Anchor target for the nav/hero "Download" CTAs — reserve space for the
+     sticky header so the card title isn't tucked under it (mirrors `section`). */
+  #download { scroll-margin-top: 84px; }
+
+  /* Blue Burst client download buttons (Connect section) */
+  .client-dl {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+  }
+  .client-dl__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-md);
+    background: var(--bg-elevated);
+    color: var(--text-high);
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+  .client-dl__btn:hover {
+    transform: translateY(-1px);
+    border-color: var(--cyan-primary);
+  }
+  .client-dl__btn--primary {
+    background: var(--cyan-primary);
+    color: var(--bg-deep);
+    border-color: var(--cyan-bright);
+  }
+  .client-dl__btn--primary:hover {
+    box-shadow: var(--shadow-glow);
+    color: var(--bg-deep);
+  }
+  .client-dl__size {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: 0.78rem;
+    opacity: 0.7;
+  }
+
   /* =================================================================
      Players grid
      ================================================================= */
@@ -1365,6 +1430,7 @@
       <a href="#features">Features</a>
       <a href="#join">Join</a>
       <a href="#resources">Resources</a>
+      <a class="nav__download" href="#download">Download</a>
     </nav>
   </div>
 </header>
@@ -1387,11 +1453,11 @@
           share Episode 1 games; GC and Xbox can also share Episode 2.
           Blue Burst (Episodes 1, 2, 4) and Episode 3 stay siloed.
         </p>
-        <a class="hero__cta" href="#join">
-          How to join
+        <a class="hero__cta" href="#download">
+          Download client
           <span aria-hidden="true">→</span>
         </a>
-        <a class="hero__cta-secondary" href="#quests">Browse quests</a>
+        <a class="hero__cta-secondary" href="#join">How to join</a>
       </div>
 
       <div class="hero__side">
@@ -1722,14 +1788,23 @@
           </p>
         </article>
 
-        <article class="feature" role="listitem">
+        <article class="feature" role="listitem" id="download">
           <h3>PSO Blue Burst (PC)</h3>
-          <p>The PC continuation of PSO. Different protocol and version family
-          than the GameCube discs — uses a separate config block on the server
-          side. Friends with BB clients (Tethealla, etc.) are welcome but the
-          server-side setup is its own thing.</p>
-          <p style="margin-top: var(--space-3);">
-            <em style="color: var(--text-low); font-size: 0.85rem;">Setup guide coming.</em>
+          <p>The full PC version, pre-configured for this server — download,
+          unzip, and play. The macOS build is a self-contained app; Windows is
+          the classic client. You just need a registered UserID.</p>
+          <div class="client-dl" id="client-dl">
+            <a class="client-dl__btn" data-platform="mac" download
+               href="https://pso-server-downloads-315902154426.s3.amazonaws.com/downloads/PSOBB-macOS.zip">
+              <span aria-hidden="true">↓</span> macOS <span class="client-dl__size">Apple Silicon</span>
+            </a>
+            <a class="client-dl__btn" data-platform="win" download
+               href="https://pso-server-downloads-315902154426.s3.amazonaws.com/downloads/PSOBB-Windows.zip">
+              <span aria-hidden="true">↓</span> Windows
+            </a>
+          </div>
+          <p style="margin-top: var(--space-4);">
+            <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-blueburst.md">Setup &amp; controls guide →</a>
           </p>
         </article>
       </div>
@@ -3637,6 +3712,23 @@ document.addEventListener('visibilitychange', () => {
   else startCountdown();
 });
 
+// Highlight the visitor's platform on the Blue Burst download buttons and
+// surface it first. Progressive enhancement — both links work without JS.
+function setupClientDownloads() {
+  const wrap = document.getElementById('client-dl');
+  if (!wrap) return;
+  const ua = navigator.userAgent || '';
+  const platform = /Windows/i.test(ua) ? 'win'
+    : (/Mac/i.test(ua) && !/(iPhone|iPad|iPod)/i.test(ua)) ? 'mac'
+    : null;
+  if (!platform) return;
+  const primary = wrap.querySelector(`[data-platform="${platform}"]`);
+  if (primary) {
+    primary.classList.add('client-dl__btn--primary');
+    wrap.prepend(primary);
+  }
+}
+
 // ---------- Boot ----------
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -3652,6 +3744,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupPlayerControls();
   setupPlayerModal();
   setupPlayerCardClicks();
+  setupClientDownloads();
   startCountdown();
 
   // Fetch the per-quest provenance overlay first, then start the live
