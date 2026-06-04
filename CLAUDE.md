@@ -5,7 +5,7 @@
 A self-hosted [newserv](https://github.com/fuzziqersoftware/newserv) deployment
 on AWS Lightsail — Phantasy Star Online private server for the maintainer's
 friends. Plus a public dashboard at <https://pso.joshkautz.com> showing server
-status, the quest catalog, and registered players.
+status, the quest catalog, registered players, and Blue Burst client downloads.
 
 Not a fork of newserv; the upstream image is consumed unchanged via GHCR.
 "Custom" lives in this repo only — Terraform, Docker compose, the dashboard,
@@ -58,10 +58,15 @@ dashboard/                Public web UI (see dashboard/README.md)
   Dockerfile, package.json
 docker-compose.yml        repo-root — services: newserv, dashboard, caddy
 Caddyfile                 repo-root — TLS + reverse proxy + security headers
+client/                   Blue Burst client distribution (see client/README.md)
+  repoint/                Binary repoint tool + tests (pure Python)
+  d3d8to9-windowed/       Windowed Direct3D shim patch for the macOS app
+  publish.sh              Zip built clients + upload to the public S3 downloads bucket
 docs/
   operations.md           Day-to-day runbook (admin, backup, restore, costs)
   client-setup.md         Player-facing Batocera + Dolphin guide
   client-setup-dolphin.md Player-facing desktop Dolphin guide
+  client-setup-blueburst.md Player-facing Blue Burst download + controls guide
 scripts/bootstrap.sh      One-time TF state bucket bootstrap
 .github/workflows/
   infra.yml               terraform plan/apply, gated by production env
@@ -181,6 +186,15 @@ AWS_PROFILE=pso-server aws lightsail get-instance --instance-name pso-server
 This pattern is separate from the work `aws-vault-1password` binary
 (hardcoded to `craftcodery.1password.com`).
 
+### The downloads bucket is deliberately NOT in Terraform
+
+`pso-server-downloads-<account>` (public-read on `downloads/*`) hosts the Blue
+Burst client zips the dashboard links to. It's managed by `client/publish.sh`
+(idempotent — ensures the bucket + policy, then uploads), kept out of `infra/`
+on purpose: it belongs to client distribution, not the gated server infra, and
+infra applies do a destroy/recreate on the firewall. Don't add it to Terraform
+expecting a clean apply — `publish.sh` is the source of truth.
+
 ## Build + deploy pipeline
 
 ```
@@ -280,6 +294,8 @@ quests should get `classify: "community"`.
   `docs/operations.md`
 - Player onboarding (set up Batocera + Dolphin, real GameCube + BBA):
   `docs/client-setup.md`, `docs/client-setup-dolphin.md`
+- Blue Burst PC players (download + install + controls):
+  `docs/client-setup-blueburst.md`; build/publish tooling in `client/`
 - Bootstrap from scratch (fork-ing this stack): `infra/README.md`
 - Dashboard architecture, allowlist, build SHA flow:
   `dashboard/README.md`
