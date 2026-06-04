@@ -1,0 +1,13 @@
+# Sega's client binaries are never committed — they live in S3 only, published
+# via publish.sh. This directory holds only the tooling. The built d3d8.dll is
+# a regenerable artifact of build.sh.
+*.zip
+*.app/
+*.dll
+*.bak
+*.exe
+TethVer12513*/
+
+# Python
+__pycache__/
+*.pyc

@@ -1,0 +1,93 @@
+diff --git a/source/d3d8to9_base.cpp b/source/d3d8to9_base.cpp
+index 997a523..a98d934 100644
+--- a/source/d3d8to9_base.cpp
++++ b/source/d3d8to9_base.cpp
+@@ -13,6 +13,26 @@ static const D3DFORMAT AdapterFormats[] = {
+ 	D3DFMT_A1R5G5B5
+ };
+ 
++// d3d8to9-windowed: give the game window real title-bar buttons (close / minimize)
++// and make the red close button quit the process cleanly, so closing the macOS
++// window tears the whole app down (game + Wine) at once.
++static WNDPROC g_origWndProc = nullptr;
++static LRESULT CALLBACK WindowedWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
++{
++	if (msg == WM_CLOSE)
++		ExitProcess(0);
++	return CallWindowProc(g_origWndProc, hwnd, msg, wParam, lParam);
++}
++static void MakeWindowDecorated(HWND hwnd)
++{
++	if (hwnd == nullptr)
++		return;
++	SetWindowLongPtr(hwnd, GWL_STYLE, GetWindowLongPtr(hwnd, GWL_STYLE) | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
++	SetWindowPos(hwnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
++	if (g_origWndProc == nullptr)
++		g_origWndProc = reinterpret_cast<WNDPROC>(SetWindowLongPtr(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(WindowedWndProc)));
++}
++
+ Direct3D8::Direct3D8(IDirect3D9 *ProxyInterface) :
+ 	ProxyInterface(ProxyInterface)
+ {
+@@ -24,17 +44,16 @@ Direct3D8::Direct3D8(IDirect3D9 *ProxyInterface) :
+ 
+ 	for (UINT Adapter = 0; Adapter < CurrentAdapterCount; Adapter++)
+ 	{
++		// d3d8to9-windowed: report a clean, controlled mode list (standard PSOBB
++		// resolutions) instead of the host's real Retina/scaled modes.
++		static const UINT WModes[][2] = { {640,480}, {800,600}, {1024,768}, {1280,960} };
+ 		for (D3DFORMAT Format : AdapterFormats)
+-		{
+-			const UINT ModeCount = ProxyInterface->GetAdapterModeCount(Adapter, Format);
+-
+-			for (UINT Mode = 0; Mode < ModeCount; Mode++)
++			for (const auto &wm : WModes)
+ 			{
+-				ProxyInterface->EnumAdapterModes(Adapter, Format, Mode, &pMode);
++				pMode.Width = wm[0]; pMode.Height = wm[1]; pMode.RefreshRate = 60; pMode.Format = Format;
+ 				CurrentAdapterModes[Adapter].push_back(pMode);
+ 				CurrentAdapterModeCount[Adapter]++;
+ 			}
+-		}
+ 	}
+ }
+ Direct3D8::~Direct3D8()
+@@ -121,7 +140,9 @@ HRESULT STDMETHODCALLTYPE Direct3D8::EnumAdapterModes(UINT Adapter, UINT Mode, D
+ }
+ HRESULT STDMETHODCALLTYPE Direct3D8::GetAdapterDisplayMode(UINT Adapter, D3DDISPLAYMODE *pMode)
+ {
+-	return ProxyInterface->GetAdapterDisplayMode(Adapter, pMode);
++	const HRESULT _hr = ProxyInterface->GetAdapterDisplayMode(Adapter, pMode);
++	if (SUCCEEDED(_hr) && pMode != nullptr) { pMode->Width = 1024; pMode->Height = 768; }
++	return _hr;
+ }
+ HRESULT STDMETHODCALLTYPE Direct3D8::CheckDeviceType(UINT Adapter, D3DDEVTYPE CheckType, D3DFORMAT DisplayFormat, D3DFORMAT BackBufferFormat, BOOL bWindowed)
+ {
+@@ -186,6 +207,9 @@ HRESULT STDMETHODCALLTYPE Direct3D8::CreateDevice(UINT Adapter, D3DDEVTYPE Devic
+ 	if (FAILED(hr))
+ 		return hr;
+ 
++	// d3d8to9-windowed: add close/minimize buttons to the now-windowed game window
++	MakeWindowDecorated(hFocusWindow ? hFocusWindow : pPresentationParameters->hDeviceWindow);
++
+ 	*ppReturnedDeviceInterface = new Direct3DDevice8(this, DeviceInterface, BehaviorFlags, PresentParams.EnableAutoDepthStencil ? PresentParams.AutoDepthStencilFormat : D3DFMT_UNKNOWN, (PresentParams.Flags & D3DPRESENTFLAG_DISCARD_DEPTHSTENCIL) != 0);
+ 
+ 	// Set default vertex declaration
+diff --git a/source/d3d8types.cpp b/source/d3d8types.cpp
+index a89df23..e1ed493 100644
+--- a/source/d3d8types.cpp
++++ b/source/d3d8types.cpp
+@@ -210,6 +210,13 @@ void ConvertPresentParameters(D3DPRESENT_PARAMETERS8 &Input, D3DPRESENT_PARAMETE
+ 			}
+ 		}
+ 	}
++
++	// d3d8to9-windowed: force windowed mode so fullscreen-only games (PSOBB) run
++	// as a normal window under Wine -- moveable, Cmd+Tab, close-to-quit, no freeze.
++	Output.Windowed = TRUE;
++	Output.FullScreen_RefreshRateInHz = 0;
++	Output.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
++	Output.BackBufferFormat = D3DFMT_UNKNOWN;
+ }
+ 
+ void ConvertAdapterIdentifier(D3DADAPTER_IDENTIFIER9 &Input, D3DADAPTER_IDENTIFIER8 &Output)
