@@ -242,12 +242,15 @@ platform), and `JKautz` has `Flags=0x7FFFFFFF` (root). Characters are per-versio
 players move progress between platforms with `$savechar`/`$loadchar` — see
 [`docs/character-transfer.md`](docs/character-transfer.md).
 
-Players can pre-fill their BB UserID **and password** at the login screen via
-`client/remember-login/`. The client stores the saved password as a 48-byte
+Players pre-fill their BB UserID **and password** at the login screen with a
+one-file, zero-install helper in `client/remember-login/` (bundled in the
+downloads): `remember-login.command` (macOS — bash + Perl) / `remember-login.bat`
+(Windows — a batch/PowerShell polyglot). The saved password is a 48-byte
 `REG_BINARY` Blowfish blob keyed by the UserID (cipher reverse-engineered from
-`Psobb.exe`; constant tables embedded in `remember-login.py`), so the tool
-reproduces it exactly. `remember-login.py --emit <user> <pass>` makes a one-click
-login file (`.reg` for Windows, `.command` for macOS) to hand a player privately.
+`Psobb.exe`; constant tables embedded). `remember-login.py` is the Python reference
+(verified against the binary; `--emit <user> <pass>` writes a ready-made login
+file). The `.command`/`.bat` are verified to match it, and the `.bat` is CI-tested
+on a real Windows runner (`.github/workflows/test-windows-login.yml`).
 
 ## Build + deploy pipeline
 

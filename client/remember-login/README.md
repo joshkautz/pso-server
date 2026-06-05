@@ -1,47 +1,36 @@
 # Remember my login
 
-Pre-fill your **PSO Blue Burst** UserID **and password** on the login screen, so
-you never retype either one.
+One-file helpers that pre-fill your **PSO Blue Burst** UserID **and password** at
+the login screen. These are what ship inside the download zips:
 
-Yes — the password too. The Tethealla client stores it the way the game expects:
-a 48-byte encrypted blob at `HKCU\Software\SonicTeam\PSOBB\PASSWORD`, equal to your
-password run through PSOBB's own 4-round Blowfish cipher **keyed by your UserID**
-(reverse-engineered from `Psobb.exe`). `remember-login.py` reproduces that exactly,
-so the game decrypts it and fills both fields in. It also sets `ACCOUNT` (your
-UserID) and `ACCOUNT_CHECK` (the remember flag).
+- **`remember-login.command`** (macOS) — bash + Perl, both built into macOS.
+- **`remember-login.bat`** (Windows) — a batch/PowerShell polyglot; PowerShell is
+  built into Windows.
 
-## Easiest — your personal login file (no setup)
+Each is fully self-contained (the cipher and its constant tables are embedded) and
+needs **no installs**. Run it, type your UserID + password, done. It writes three
+values under `HKCU\Software\SonicTeam\PSOBB`: `ACCOUNT` (UserID), `ACCOUNT_CHECK`
+(remember flag), and `PASSWORD` — the 48-byte encrypted blob the game expects (the
+password run through PSOBB's custom 4-round Blowfish, keyed by the UserID;
+reverse-engineered from `Psobb.exe`).
 
-Ask the admin for your personal login file and run it:
+Player-facing instructions: [`docs/save-your-login.md`](../../docs/save-your-login.md).
 
-- **Windows:** double-click **`yourname.reg`** → *Yes* to import.
-- **macOS:** double-click **`yourname-macos.command`**.
+## `remember-login.py` — reference + admin tool
 
-Launch the game and both fields are filled. These files contain your (encrypted)
-password, so the admin sends them privately. An admin makes one with:
+The Python reference implementation of the cipher (verified byte-for-byte against
+the game binary; also used to verify the `.command`/`.bat`). Not shipped in the
+downloads. Two uses:
 
-```
-python3 remember-login.py --emit YourName YourPassword
-```
+- `python3 remember-login.py` — interactive; bakes into the local install.
+- `python3 remember-login.py --emit USER PASS` — writes a ready-made `USER.reg`
+  (Windows) / `USER-macos.command` (macOS) login file an admin can hand to a player.
 
-which writes `YourName.reg` (Windows) and `YourName-macos.command` (macOS).
+## Verification
 
-## Do it yourself — `remember-login.py` (needs Python 3)
-
-Double-click **`remember-login-macos.command`** / **`remember-login-windows.bat`**
-(they just launch `remember-login.py`), or run `python3 remember-login.py`. It asks
-for your UserID + password and writes them into your install — the PSOBB.app Wine
-registry on macOS, or the Windows registry. Needs
-[Python 3](https://www.python.org/); works on both platforms.
-
-> Close the game first — it rewrites the registry on exit. On macOS a timestamped
-> backup of the Wine registry is saved next to it (`user.reg.bak-…`).
-
-## Notes
-
-- Re-run any time to change the saved login.
-- `remember-login.py` is fully self-contained: the cipher and its constant tables
-  are embedded, so it needs no game files and no third-party packages.
-- Known client quirk (only relevant if you ever use the in-game launcher's own
-  save-password instead): passwords starting with `a`/`A` don't save cleanly there.
-  This tool writes the binary blob directly and isn't affected.
+- `remember-login.py` is checked against the game binary's own crypto functions.
+- `remember-login.command` (Perl) and `remember-login.bat` (PowerShell) are each
+  verified to produce identical output to `remember-login.py`.
+- The Windows `.bat` is exercised end-to-end on a real Windows runner by
+  [`.github/workflows/test-windows-login.yml`](../../.github/workflows/test-windows-login.yml):
+  it runs the `.bat`, reads the registry back, and compares to the Python reference.

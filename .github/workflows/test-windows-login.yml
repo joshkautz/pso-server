@@ -1,0 +1,52 @@
+name: test-windows-login
+
+# Verifies client/remember-login/remember-login.bat end-to-end on a real Windows
+# runner: the batch/PowerShell polyglot runs, computes the encrypted password
+# blob, and writes the registry — and the result must match the binary-verified
+# Python reference (remember-login.py).
+
+on:
+  push:
+    paths:
+      - 'client/remember-login/remember-login.bat'
+      - 'client/remember-login/remember-login.py'
+      - '.github/workflows/test-windows-login.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run remember-login.bat and verify against the Python reference
+        shell: pwsh
+        run: |
+          $env:RL_TEST_UID = 'TestUser'
+          $env:RL_TEST_PW  = 'testpass123'
+
+          # Run the .bat exactly as a user would (cmd.exe drives the polyglot,
+          # which invokes the built-in Windows PowerShell 5.1).
+          cmd /c "client\remember-login\remember-login.bat"
+          if ($LASTEXITCODE -ne 0) { throw "remember-login.bat exited with $LASTEXITCODE" }
+
+          $k = 'HKCU:\Software\SonicTeam\PSOBB'
+          $acct  = (Get-ItemProperty $k -Name ACCOUNT).ACCOUNT
+          $check = (Get-ItemProperty $k -Name ACCOUNT_CHECK).ACCOUNT_CHECK
+          $bytes = (Get-ItemProperty $k -Name PASSWORD).PASSWORD
+          $got   = (($bytes | ForEach-Object { '{0:x2}' -f $_ }) -join '')
+
+          $expected = (python -c "import importlib.util as u; s=u.spec_from_file_location('rl','client/remember-login/remember-login.py'); m=u.module_from_spec(s); s.loader.exec_module(m); print(m.password_blob('TestUser','testpass123').hex())").Trim()
+
+          Write-Host "ACCOUNT       = $acct"
+          Write-Host "ACCOUNT_CHECK = $check"
+          Write-Host "PASSWORD (registry) = $got"
+          Write-Host "PASSWORD (expected) = $expected"
+
+          if ($acct -ne 'TestUser')   { throw 'ACCOUNT mismatch' }
+          if ($check -ne 1)           { throw 'ACCOUNT_CHECK mismatch' }
+          if ($got -ne $expected)     { throw 'PASSWORD blob mismatch' }
+          Write-Host 'OK: remember-login.bat produced the binary-correct credentials on real Windows.'
