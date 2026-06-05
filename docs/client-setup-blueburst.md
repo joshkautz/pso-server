@@ -39,7 +39,10 @@ Grab your platform from the **PC (Blue Burst)** card on
    **Drag the folder in — don't type the path.** Dragging fills in the exact
    location and escaping; the folder is often on the **Desktop** (not Downloads),
    and a re-download may have a `(1)` in its name, so a typed path usually misses
-   (and a quoted `~` won't expand to your home folder).
+   (and a quoted `~` won't expand to your home folder). Clear quarantine **before
+   moving `PSOBB.app` to Applications** — if you already moved it, drag
+   `/Applications/PSOBB.app` into the same command too, or it stays quarantined and
+   opens as *"damaged."*
    (No Terminal? Double-click an item, click **Done** on the warning, then open
    **System Settings → Privacy & Security** and click **Open Anyway** — once per item.
    The old right-click→Open trick no longer works on recent macOS.)
