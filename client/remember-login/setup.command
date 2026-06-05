@@ -15,10 +15,18 @@ echo
 echo "  PSO Blue Burst - remember my login"
 echo "  -----------------------------------"
 
-# 1. Locate PSOBB.app.
+# 1. Locate PSOBB.app. Prefer the copy sitting right next to this script (i.e. the
+#    folder you unzipped — wherever that is), then /Applications (where the guide
+#    has you move it), then a few common spots. Falls back to asking you to drag
+#    it in.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 APP=""
-for c in "$HOME/Applications/Sikarugir/PSOBB.app" "/Applications/PSOBB.app" \
-         "$HOME/Applications/PSOBB.app" "$HOME/Desktop/PSOBB.app"; do
+for c in "$SCRIPT_DIR/PSOBB.app" \
+         "/Applications/PSOBB.app" \
+         "$HOME/Downloads/PSOBB-macOS/PSOBB.app" \
+         "$HOME/Applications/Sikarugir/PSOBB.app" \
+         "$HOME/Applications/PSOBB.app" \
+         "$HOME/Desktop/PSOBB.app"; do
   [ -d "$c" ] && { APP="$c"; break; }
 done
 if [ -z "$APP" ]; then
@@ -98,11 +106,15 @@ awk -v U="$RL_UID" -v H="$HEX" '
       if(!a) print "\"ACCOUNT\"=\"" U "\""
       if(!c) print "\"ACCOUNT_CHECK\"=dword:00000001"
       if(!p) print "\"PASSWORD\"=hex:" H } }
+  # After rewriting PASSWORD, swallow any wrapped or orphaned hex continuation
+  # lines (indented hex, no key) so no dangling tail survives.
+  inpw && /^[ \t]+[0-9a-fA-F]/ { next }
+  inpw                         { inpw=0 }
   /^[ \t]*$/        { if(inblk){ flush(); inblk=0 } print; next }
   /^\[/             { inblk=($0 ~ /SonicTeam.*PSOBB/)?1:0; a=0;c=0;p=0; print; next }
   inblk && /^"ACCOUNT"=/       { print "\"ACCOUNT\"=\"" U "\"";            a=1; next }
   inblk && /^"ACCOUNT_CHECK"=/ { print "\"ACCOUNT_CHECK\"=dword:00000001"; c=1; next }
-  inblk && /^"PASSWORD"=/      { print "\"PASSWORD\"=hex:" H;              p=1; next }
+  inblk && /^"PASSWORD"=/      { print "\"PASSWORD\"=hex:" H;       p=1; inpw=1; next }
                     { print }
   END               { flush() }
 ' "$REG" > "$REG.new" && mv "$REG.new" "$REG"
