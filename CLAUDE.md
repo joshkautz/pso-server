@@ -244,7 +244,7 @@ players move progress between platforms with `$savechar`/`$loadchar` — see
 
 Players pre-fill their BB UserID **and password** at the login screen with a
 one-file, zero-install helper in `client/remember-login/` (bundled in the
-downloads): `remember-login.command` (macOS — bash + Perl) / `remember-login.bat`
+downloads): `setup.command` (macOS — bash + Perl) / `setup.bat`
 (Windows — a batch/PowerShell polyglot). The saved password is a 48-byte
 `REG_BINARY` Blowfish blob keyed by the UserID (cipher reverse-engineered from
 `Psobb.exe`; constant tables embedded). `remember-login.py` is the Python reference

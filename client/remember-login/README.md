@@ -3,8 +3,8 @@
 One-file helpers that pre-fill your **PSO Blue Burst** UserID **and password** at
 the login screen. These are what ship inside the download zips:
 
-- **`remember-login.command`** (macOS) — bash + Perl, both built into macOS.
-- **`remember-login.bat`** (Windows) — a batch/PowerShell polyglot; PowerShell is
+- **`setup.command`** (macOS) — bash + Perl, both built into macOS.
+- **`setup.bat`** (Windows) — a batch/PowerShell polyglot; PowerShell is
   built into Windows.
 
 Each is fully self-contained (the cipher and its constant tables are embedded) and
@@ -29,7 +29,7 @@ downloads. Two uses:
 ## Verification
 
 - `remember-login.py` is checked against the game binary's own crypto functions.
-- `remember-login.command` (Perl) and `remember-login.bat` (PowerShell) are each
+- `setup.command` (Perl) and `setup.bat` (PowerShell) are each
   verified to produce identical output to `remember-login.py`.
 - The Windows `.bat` is exercised end-to-end on a real Windows runner by
   [`.github/workflows/test-windows-login.yml`](../../.github/workflows/test-windows-login.yml):

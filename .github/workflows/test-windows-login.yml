@@ -1,6 +1,6 @@
 name: test-windows-login
 
-# Verifies client/remember-login/remember-login.bat end-to-end on a real Windows
+# Verifies client/remember-login/setup.bat end-to-end on a real Windows
 # runner: the batch/PowerShell polyglot runs, computes the encrypted password
 # blob, and writes the registry — and the result must match the binary-verified
 # Python reference (remember-login.py).
@@ -8,7 +8,7 @@ name: test-windows-login
 on:
   push:
     paths:
-      - 'client/remember-login/remember-login.bat'
+      - 'client/remember-login/setup.bat'
       - 'client/remember-login/remember-login.py'
       - '.github/workflows/test-windows-login.yml'
   workflow_dispatch:
@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Run remember-login.bat and verify against the Python reference
+      - name: Run setup.bat and verify against the Python reference
         shell: pwsh
         run: |
           $env:RL_TEST_UID = 'TestUser'
@@ -30,8 +30,8 @@ jobs:
 
           # Run the .bat exactly as a user would (cmd.exe drives the polyglot,
           # which invokes the built-in Windows PowerShell 5.1).
-          cmd /c "client\remember-login\remember-login.bat"
-          if ($LASTEXITCODE -ne 0) { throw "remember-login.bat exited with $LASTEXITCODE" }
+          cmd /c "client\remember-login\setup.bat"
+          if ($LASTEXITCODE -ne 0) { throw "setup.bat exited with $LASTEXITCODE" }
 
           $k = 'HKCU:\Software\SonicTeam\PSOBB'
           $acct  = (Get-ItemProperty $k -Name ACCOUNT).ACCOUNT
@@ -49,4 +49,4 @@ jobs:
           if ($acct -ne 'TestUser')   { throw 'ACCOUNT mismatch' }
           if ($check -ne 1)           { throw 'ACCOUNT_CHECK mismatch' }
           if ($got -ne $expected)     { throw 'PASSWORD blob mismatch' }
-          Write-Host 'OK: remember-login.bat produced the binary-correct credentials on real Windows.'
+          Write-Host 'OK: setup.bat produced the binary-correct credentials on real Windows.'

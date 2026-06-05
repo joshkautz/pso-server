@@ -7,9 +7,9 @@ uses only what your OS already ships.
 
 ## macOS
 
-1. Unzip the download — you get **`PSOBB.app`** and **`remember-login.command`**.
+1. Unzip the download — you get **`PSOBB.app`** and **`setup.command`**.
 2. **Close the game** if it's open.
-3. Double-click **`remember-login.command`**.
+3. Double-click **`setup.command`**.
    - If macOS blocks it: right-click it → **Open** → **Open**.
 4. Type your **UserID** and **password** when asked.
 
@@ -20,7 +20,7 @@ again any time to change them.
 
 1. Unzip the download.
 2. **Close** `Psobb.exe` if it's open.
-3. Double-click **`remember-login.bat`**.
+3. Double-click **`setup.bat`**.
    - If SmartScreen warns (“Windows protected your PC”): **More info → Run anyway**.
 4. Type your **UserID** and **password** when asked.
 
