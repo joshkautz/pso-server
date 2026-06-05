@@ -1277,7 +1277,7 @@
      sticky header so the card title isn't tucked under it (mirrors `section`). */
   #download { scroll-margin-top: 84px; }
 
-  /* Blue Burst client download buttons (Connect section) */
+  /* Blue Burst client download buttons (Play section) */
   .client-dl {
     display: flex;
     flex-wrap: wrap;
@@ -1285,8 +1285,17 @@
     margin-top: var(--space-4);
   }
   .client-dl__btn {
+    /* flex: 1 1 0 makes both buttons share available row space equally
+       regardless of the platform-name + subtitle length difference,
+       so macOS and Windows always render the same width on a single
+       row. justify-content: center centers the icon+label cluster
+       inside each button. flex-wrap on the parent still lets them
+       stack into single full-width buttons on narrow viewports. */
+    flex: 1 1 0;
+    min-width: 200px;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: var(--space-2);
     padding: var(--space-2) var(--space-4);
     border: 1px solid var(--line-strong);
@@ -1480,7 +1489,7 @@
         <a href="#players">Players</a>
         <a href="#quests">Quests</a>
         <a href="#features">Features</a>
-        <a href="#join">Join</a>
+        <a href="#play">Play</a>
         <a href="#resources">Resources</a>
       </div>
     </nav>
@@ -1505,11 +1514,10 @@
           share Episode 1 games; GC and Xbox can also share Episode 2.
           Blue Burst (Episodes 1, 2, 4) and Episode 3 stay siloed.
         </p>
-        <a class="hero__cta" href="#download">
-          Download client
+        <a class="hero__cta" href="#play">
+          Play
           <span aria-hidden="true">→</span>
         </a>
-        <a class="hero__cta-secondary" href="#join">How to join</a>
       </div>
 
       <div class="hero__side">
@@ -1793,12 +1801,12 @@
   </section>
 
   <!-- ============================================================== -->
-  <!-- How to join                                                     -->
+  <!-- Play                                                            -->
   <!-- ============================================================== -->
-  <section id="join" aria-labelledby="join-title">
+  <section id="play" aria-labelledby="play-title">
     <div class="container">
       <div class="section-head">
-        <h2 id="join-title">Join</h2>
+        <h2 id="play-title">Play</h2>
         <span class="section-head__hint">Pick your client</span>
       </div>
 
@@ -1836,7 +1844,7 @@
           Primary DNS to <code>54.173.68.119</code> inside PSO's network setup
           screen. No emulator-side config involved.</p>
           <p style="margin-top: var(--space-3);">
-            <em style="color: var(--text-low); font-size: 0.85rem;">Dedicated guide coming.</em>
+            <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-gamecube.md">Setup guide →</a>
           </p>
         </article>
 
@@ -1854,7 +1862,7 @@
             <a class="client-dl__btn" data-platform="win" download
                href="https://pso-server-downloads-315902154426.s3.amazonaws.com/downloads/PSOBB-Windows.zip">
               <svg class="client-dl__icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-              Windows
+              Windows <span class="client-dl__size">10 / 11</span>
             </a>
           </div>
           <p style="margin-top: var(--space-4);">
@@ -1880,6 +1888,7 @@
           <h3>Our guides</h3>
           <ul style="margin: 0; padding-left: 1.25rem; line-height: 1.8; color: var(--text-mid); font-size: 0.9rem;">
             <li><a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-blueburst.md">Blue Burst — setup &amp; controls</a></li>
+            <li><a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-gamecube.md">GameCube (real hardware) — setup</a></li>
             <li><a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-dolphin.md">GameCube (Dolphin) — setup</a></li>
             <li><a href="https://github.com/joshkautz/pso-server/blob/main/docs/character-transfer.md">Moving characters between platforms</a></li>
             <li><a href="https://github.com/joshkautz/pso-server/blob/main/docs/save-your-login.md">Save your login (don't retype it)</a></li>
