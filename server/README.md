@@ -51,13 +51,12 @@ config.json changes automatically; you can also reload without restart
 
 Drop `.bin`/`.dat` files into `quests/<category>/` here (matching the
 upstream layout under `system/quests/`). They get rsynced and picked up
-on the next deploy. Or, for live updates without a redeploy:
+on the next deploy. Or, for live updates without a redeploy (the interactive
+shell isn't reachable in Docker, so signal the running process):
 
 ```bash
 ssh ubuntu@<instance-ip>
-docker exec -it newserv newserv  # opens the interactive shell
-# in the shell:
-reload quest-index
+docker kill --signal SIGUSR2 newserv  # reload config + quests + everything
 ```
 
 ## Editing config.json

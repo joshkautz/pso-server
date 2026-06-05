@@ -9,8 +9,8 @@ the two downloads produced here:
   [Sikarugir](https://github.com/Sikarugir-App/Sikarugir)) plus a custom windowed
   Direct3D shim. Unzip → `xattr -cr PSOBB.app` → double-click.
 - **Windows** (`PSOBB-Windows.zip`) — the classic Tethealla client, repointed.
-  Unzip → run `Psobb.exe` (not `online.exe`, which is the standalone patcher and
-  isn't pointed at this server).
+  Unzips to a `PSOBB` folder; run `Psobb.exe` inside it (not `online.exe`, which is
+  the standalone patcher and isn't pointed at this server).
 
 Each zip also bundles the `remember-login` helper (saves your UserID **and
 password** so the login screen pre-fills both) — see
@@ -55,7 +55,8 @@ You supply the Sega client; nothing copyrighted lives in this repo.
    the server's IP changes — you'd only update DNS. Tests:
    `python3 repoint/test_psobb_repoint.py` (14 cases, no Sega client needed).
 
-   That repointed folder **is** the Windows download. Zip it and you're done.
+   That repointed folder **is** the Windows download — `publish.sh` stages it under
+   a clean folder name (`PSOBB`) and zips it.
 
 3. **macOS only — build the windowed app:**
    ```sh
