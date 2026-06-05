@@ -52,9 +52,9 @@ Grab your platform from the **PC (Blue Burst)** card on
 
 1. At the title screen, **click the window** so it has focus, then type your
    **UserID** and **password** and press **Enter**.
-   - *Tired of retyping it?* The download includes a **remember-login** helper
-     that pre-fills your UserID **and password** at the login screen — or ask the
-     admin for your personal one-click login file. See `client/remember-login/`.
+   - *Tired of retyping it?* The download includes a one-file **remember-login**
+     helper that pre-fills your UserID **and password** — run it once and type
+     them. See [Save your login](save-your-login.md).
 2. First time in: create a character — pick a **profession** (Hunter / Ranger /
    Force), a type, and a look.
 
