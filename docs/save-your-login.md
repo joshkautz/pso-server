@@ -38,3 +38,12 @@ keys the game itself uses:
 
 It only touches your own user settings (the macOS app's bundled registry, or your
 Windows user registry). Nothing else is changed, and nothing is sent anywhere.
+
+## Why the security warning?
+
+macOS (“unidentified developer”) and Windows (SmartScreen) warn because this client
+and helper are **not code-signed** — signing needs a paid Apple Developer or
+Windows certificate, which a small private server doesn't bother with. The warning
+is about *who made it, not whether it's malware*. The one-time bypass (macOS:
+right-click → **Open**; Windows: **More info → Run anyway**) tells your OS you trust
+it, and it won't ask again.

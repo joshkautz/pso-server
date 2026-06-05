@@ -47,10 +47,12 @@ else
 fi
 
 if [ -n "$WIN_CLIENT" ] && [ -d "$WIN_CLIENT" ]; then
-  echo "==> zipping Windows client: $WIN_CLIENT"
-  # Exclude *.bak (the pristine pre-repoint Psobb.exe backup) — players run
-  # Psobb.exe, and the .bak still points at 127.0.0.1.
-  ( cd "$(dirname "$WIN_CLIENT")" && zip -r -q "$WORK/PSOBB-Windows.zip" "$(basename "$WIN_CLIENT")" -x "*.bak" )
+  echo "==> staging + zipping Windows client as PSOBB/: $WIN_CLIENT"
+  # Stage under a clean folder name "PSOBB" (the raw Tethealla folder name is
+  # ugly), then zip it. Exclude *.bak (the pristine pre-repoint Psobb.exe backup
+  # — players run Psobb.exe, and the .bak still points at 127.0.0.1).
+  rm -rf "$WORK/PSOBB"; ditto "$WIN_CLIENT" "$WORK/PSOBB"
+  ( cd "$WORK" && zip -r -q "$WORK/PSOBB-Windows.zip" "PSOBB" -x "*.bak" )
   # Bundle the login helper + instructions at the zip root, next to the client folder.
   zip -gjq "$WORK/PSOBB-Windows.zip" "$RL/setup.bat"
   echo "    uploading PSOBB-Windows.zip ($(du -h "$WORK/PSOBB-Windows.zip" | cut -f1))"

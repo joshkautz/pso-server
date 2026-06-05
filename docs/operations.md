@@ -93,15 +93,24 @@ docker compose start newserv
 ```
 
 (newserv reads decimal or `0x…` integers in these files.) To let the *same*
-account also log in from GameCube, add a `GCLicenses` entry alongside — see
-*Accounts & access control* in `CLAUDE.md`.
+account also log in from GameCube, add a `GCLicenses` entry alongside the
+`BBLicenses` one — a 10-digit serial, a 12-character access key, and a ≤8-char
+password, all **admin-assigned** (the player types these exact values on the
+console; they aren't player-chosen):
 
-Then hand the player a one-click login file so they never type credentials:
+```json
+"GCLicenses": [{"SerialNumber": 1234567890, "AccessKey": "ABCDEFGH1234", "Password": "passw0rd"}],
+```
+
+See *Accounts & access control* in `CLAUDE.md` for the full file shape.
+
+The player saves their own login by running the **`setup`** helper bundled in the
+download — no admin step needed; see [Save your login](save-your-login.md). If you'd
+rather hand them a ready-made one-click file instead, generate one:
 
 ```bash
 python3 client/remember-login/remember-login.py --emit NewFriend theirpassword
-# writes NewFriend.reg (Windows) + NewFriend-macos.command (macOS) — send privately;
-# double-clicking it pre-fills the UserID + password in their client.
+# writes NewFriend.reg (Windows) + NewFriend-macos.command (macOS) — send privately.
 ```
 
 ### Lock down the DNS server (optional)
@@ -316,15 +325,14 @@ In `server/config.json`, find `WelcomeMessage` and edit. Use newserv's escape co
 
 1. Put quest files under `server/quests/<category>/`, named `q###-<version>-<lang>.bin` and `.dat`. See upstream `README.md` for the naming convention.
 2. Push. `deploy.yml` rsyncs them to the instance, but newserv won't pick them up automatically.
-3. SSH and reload:
+3. SSH and reload. The interactive shell isn't reachable in this Docker deploy
+   (see the note under *Check who's online*), so send the reload signal instead:
    ```bash
    ssh ... ubuntu@<ip>
-   docker exec -it newserv newserv
-   # in the shell:
-   reload quest-index
+   docker kill --signal SIGUSR2 newserv   # reload config + quests + everything
    ```
 
-Or restart the container (`docker compose restart`).
+Or restart the container (`docker compose restart newserv`).
 
 ### Change the server name
 

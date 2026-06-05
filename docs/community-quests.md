@@ -216,18 +216,12 @@ then drop the `.bin`/`.dat` into a category directory.
 
 ## Reloading the quest index
 
-After dropping new files, the server picks them up without a restart:
+After dropping new files, the server picks them up without a restart. The
+interactive shell isn't reachable in this Docker deploy, so signal the running
+process:
 
 ```bash
 ssh ubuntu@<instance-ip>
-docker exec -it newserv newserv  # opens the interactive shell
-# in the shell:
-reload quest-index
-```
-
-Or send a signal from outside the shell:
-
-```bash
 docker kill --signal SIGUSR2 newserv  # full reload (config + quests + everything)
 docker kill --signal SIGUSR1 newserv  # config-only — will NOT pick up new quests
 ```
