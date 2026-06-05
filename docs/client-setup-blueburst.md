@@ -39,9 +39,10 @@ Grab your platform from the **PC (Blue Burst)** card on
    (No Terminal? Double-click an item, click **Done** on the warning, then open
    **System Settings → Privacy & Security** and click **Open Anyway** — once per item.
    The old right-click→Open trick no longer works on recent macOS.)
-3. Drag **PSOBB.app** to **Applications** (and onto your Dock if you like). Run
-   **setup.command** to save your login — see [Save your login](save-your-login.md) —
-   then open PSOBB.app; it's a normal, resizable window.
+3. Run **setup.command** to save your login — it finds **PSOBB.app** right next to
+   it in the folder; see [Save your login](save-your-login.md). Then drag
+   **PSOBB.app** to **Applications** (and onto your Dock if you like) and open it —
+   a normal, resizable window.
 
 > Apple Silicon only — this build won't run on Intel Macs.
 
@@ -56,9 +57,9 @@ Grab your platform from the **PC (Blue Burst)** card on
 
 1. At the title screen, **click the window** so it has focus, then type your
    **UserID** and **password** and press **Enter**.
-   - *Tired of retyping it?* The download includes a one-file **remember-login**
-     helper that pre-fills your UserID **and password** — run it once and type
-     them. See [Save your login](save-your-login.md).
+   - *Tired of retyping it?* The download includes a one-file **setup** helper
+     (`setup.command` on macOS, `setup.bat` on Windows) that pre-fills your UserID
+     **and password** — run it once and type them. See [Save your login](save-your-login.md).
 2. First time in: create a character — pick a **profession** (Hunter / Ranger /
    Force), a type, and a look.
 

@@ -7,14 +7,14 @@ the two downloads produced here:
 - **macOS** (`PSOBB-macOS.zip`) — a self-contained app. The 32-bit game runs in
   a native, resizable window on Apple Silicon via Wine (CrossOver engine, through
   [Sikarugir](https://github.com/Sikarugir-App/Sikarugir)) plus a custom windowed
-  Direct3D shim. Unzip → `xattr -cr PSOBB.app` → double-click.
+  Direct3D shim. Unzip → `xattr -drs com.apple.quarantine PSOBB.app` → double-click.
 - **Windows** (`PSOBB-Windows.zip`) — the classic Tethealla client, repointed.
   Unzips to a `PSOBB` folder; run `Psobb.exe` inside it (not `online.exe`, which is
   the standalone patcher and isn't pointed at this server).
 
-Each zip also bundles the `remember-login` helper (saves your UserID **and
-password** so the login screen pre-fills both) — see
-[`remember-login/`](remember-login/).
+Each zip also bundles the one-file login helper (`setup.command` on macOS,
+`setup.bat` on Windows) — it saves your UserID **and password** so the login
+screen pre-fills both. See [`remember-login/`](remember-login/).
 
 Both are hosted on a public S3 bucket (`pso-server-downloads-<account>`) and are
 **never committed** — they embed Sega's copyrighted client. This directory holds
@@ -33,8 +33,9 @@ client/
     build.sh           cross-compile d3d8.dll with mingw-w64
     README.md          what the patch does and why
   remember-login/      Save your UserID+password into the client (mac + win)
-    remember-login-macos.command
-    remember-login-windows.bat
+    setup.command      macOS one-file helper (bash + embedded Perl)
+    setup.bat          Windows one-file helper (batch + embedded PowerShell)
+    remember-login.py  Python reference implementation of the cipher
   publish.sh           zip the built clients + upload to S3
 ```
 
@@ -83,7 +84,10 @@ AWS_PROFILE=pso-server \
 ```
 
 `publish.sh` ensures the public bucket + policy exist (idempotent), zips both
-sources, and uploads them to `downloads/`. Either source can be omitted to
+sources, and uploads them to `downloads/`. On the way out it strips retail-launcher
+cruft (`online.exe`, `option.exe`, the stale `Readme.txt`, build leftovers) and
+**scrubs the saved UserID/password out of the macOS app**, so a download never ships
+your credentials — the source app is left untouched. Either source can be omitted to
 publish just one platform.
 
 ## Why the bucket isn't in Terraform
