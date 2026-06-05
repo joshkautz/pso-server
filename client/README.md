@@ -9,8 +9,7 @@ the two downloads produced here:
   [Sikarugir](https://github.com/Sikarugir-App/Sikarugir)) plus a custom windowed
   Direct3D shim. Unzip → `xattr -drs com.apple.quarantine PSOBB.app` → double-click.
 - **Windows** (`PSOBB-Windows.zip`) — the classic Tethealla client, repointed.
-  Unzips to a `PSOBB` folder; run `Psobb.exe` inside it (not `online.exe`, which is
-  the standalone patcher and isn't pointed at this server).
+  Unzips to a `PSOBB` folder; just run `Psobb.exe` inside it.
 
 Each zip also bundles the one-file login helper (`setup.command` on macOS,
 `setup.bat` on Windows) — it saves your UserID **and password** so the login

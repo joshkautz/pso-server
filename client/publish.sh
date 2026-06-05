@@ -100,16 +100,19 @@ fi
 
 if [ -n "$WIN_CLIENT" ] && [ -d "$WIN_CLIENT" ]; then
   echo "==> staging + zipping Windows client as PSOBB/: $WIN_CLIENT"
-  # Stage under a clean folder name "PSOBB" (the raw Tethealla folder name is
-  # ugly), then zip it. Exclude *.bak (the pristine pre-repoint Psobb.exe backup —
-  # players run Psobb.exe, and the .bak still points at 127.0.0.1) and the retail-
-  # launcher cruft players never use: online.exe (the old launcher), option.exe (its
-  # config tool), and Readme.txt (which points at online.exe + a dead server). The
-  # d3d8.* entries are macOS-only shim files, harmless no-ops here.
+  # Stage under a clean folder name "PSOBB" (the raw Tethealla folder name is ugly),
+  # then zip it, dropping what Windows players don't need:
+  #   *.bak                  the pristine pre-repoint Psobb.exe (still 127.0.0.1)
+  #   online.exe/option.exe  the retail launcher + its config tool (we run Psobb.exe)
+  #   Readme.txt             points players at online.exe + a dead server
+  #   d3d8.dll               a D3D8->D3D9 shim only needed under Wine on macOS; native
+  #                          Windows has its own d3d8, and the shim drags in a VC++
+  #                          runtime dependency a player may not have installed.
+  #   d3d8.dll.orig/d3d8.log build leftovers
   rm -rf "$WORK/PSOBB"; ditto "$WIN_CLIENT" "$WORK/PSOBB"
   ( cd "$WORK" && zip -r -q "$WORK/PSOBB-Windows.zip" "PSOBB" \
       -x "*.bak" "PSOBB/online.exe" "PSOBB/option.exe" "PSOBB/Readme.txt" \
-         "PSOBB/d3d8.dll.orig" "PSOBB/d3d8.log" )
+         "PSOBB/d3d8.dll" "PSOBB/d3d8.dll.orig" "PSOBB/d3d8.log" )
   # Bundle the login helper + instructions at the zip root, next to the client folder.
   zip -gjq "$WORK/PSOBB-Windows.zip" "$RL/setup.bat"
   echo "    uploading PSOBB-Windows.zip ($(du -h "$WORK/PSOBB-Windows.zip" | cut -f1))"

@@ -49,9 +49,8 @@ Grab your platform from the **PC (Blue Burst)** card on
 ### Windows
 
 1. Unzip the folder anywhere (e.g. your Desktop).
-2. Run **`Psobb.exe`** — it connects straight to the server and handles the patch
-   check itself. (Don't use `online.exe`; it's the standalone patcher and isn't
-   pointed at this server.)
+2. Run **`Psobb.exe`** — it's the only program you launch; it connects straight to
+   the server and handles the patch check itself.
 
 ## 4. Log in & play
 
