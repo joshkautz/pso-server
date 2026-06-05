@@ -38,7 +38,7 @@ if [ -d "$MAC_APP" ]; then
   echo "==> zipping macOS app: $MAC_APP"
   ditto -c -k --keepParent "$MAC_APP" "$WORK/PSOBB-macOS.zip"
   # Bundle the login helper + instructions at the zip root, next to PSOBB.app.
-  zip -gjq "$WORK/PSOBB-macOS.zip" "$RL/remember-login.command"
+  zip -gjq "$WORK/PSOBB-macOS.zip" "$RL/setup.command"
   echo "    uploading PSOBB-macOS.zip ($(du -h "$WORK/PSOBB-macOS.zip" | cut -f1))"
   aws s3 cp "$WORK/PSOBB-macOS.zip" "s3://$BUCKET/$PREFIX/PSOBB-macOS.zip" --content-type application/zip --only-show-errors
   published=$((published + 1))
@@ -52,7 +52,7 @@ if [ -n "$WIN_CLIENT" ] && [ -d "$WIN_CLIENT" ]; then
   # Psobb.exe, and the .bak still points at 127.0.0.1.
   ( cd "$(dirname "$WIN_CLIENT")" && zip -r -q "$WORK/PSOBB-Windows.zip" "$(basename "$WIN_CLIENT")" -x "*.bak" )
   # Bundle the login helper + instructions at the zip root, next to the client folder.
-  zip -gjq "$WORK/PSOBB-Windows.zip" "$RL/remember-login.bat"
+  zip -gjq "$WORK/PSOBB-Windows.zip" "$RL/setup.bat"
   echo "    uploading PSOBB-Windows.zip ($(du -h "$WORK/PSOBB-Windows.zip" | cut -f1))"
   aws s3 cp "$WORK/PSOBB-Windows.zip" "s3://$BUCKET/$PREFIX/PSOBB-Windows.zip" --content-type application/zip --only-show-errors
   published=$((published + 1))
