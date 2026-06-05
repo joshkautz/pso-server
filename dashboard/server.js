@@ -39,6 +39,18 @@ const CACHE_TTL_MS = parseInt(process.env.CACHE_TTL_MS ?? '10000', 10);
 // "unknown" when no label is available — the dashboard handles this and
 // shows "newserv —" instead of a bogus comparison.
 const NEWSERV_REV = process.env.NEWSERV_REV ?? 'unknown';
+
+// Two repos in play for the build/upstream indicator:
+//   - FORK     = our patched fork. The deployed image is built from here,
+//                and our master is where the deployed SHA must live.
+//   - UPSTREAM = fuzziqersoftware/newserv. We watch its master so we
+//                know when there are upstream commits we should pull in.
+//
+// The dashboard's "up to date" indicator answers: does our fork's master
+// already contain upstream's HEAD commit? If yes → up to date. If no →
+// there are upstream commits to merge into our fork.
+const NEWSERV_FORK_REPO = 'joshkautz/newserv';
+const NEWSERV_FORK_BRANCH = 'master';
 const NEWSERV_UPSTREAM_REPO = 'fuzziqersoftware/newserv';
 const NEWSERV_UPSTREAM_BRANCH = 'master';
 // GitHub unauth rate limit is 60/hr per IP. We make at most 2 calls
@@ -541,8 +553,27 @@ app.get('/api/:resource', async (req, res, next) => {
 });
 
 // =========================================================================
-// /api/build — surfaces the running newserv SHA and how far behind it is
-// from fuzziqersoftware/newserv master.
+// /api/build — surfaces the running newserv SHA and whether our fork is
+// in sync with fuzziqersoftware/newserv:master.
+//
+// "Up to date" here means: our fork's master already contains upstream's
+// HEAD commit in its history. The check is fork-vs-upstream, NOT
+// deployed-vs-upstream — once an upstream change is merged into the
+// fork, the indicator flips to "up to date" even before we've rebuilt
+// the image. That matches the user's intent: an at-a-glance signal for
+// "is there anything new to pull in from fuzziqersoftware/newserv?"
+//
+// Implementation: GitHub's cross-fork compare endpoint compares two
+// branches across forks in one call. With base = fork master, head =
+// upstream master:
+//   ahead_by  = commits in head (upstream) not in base (fork)
+//             = upstream commits we haven't merged → "behind upstream"
+//   behind_by = commits in base (fork) not in head (upstream)
+//             = our fork-only patches sitting on top of the merge base
+//
+// Note: the GitHub field names look backwards because they describe
+// movement relative to the base branch; "ahead_by" being the count of
+// commits we're missing is correct.
 // =========================================================================
 
 let buildInfoCache = null;
@@ -553,58 +584,97 @@ async function fetchBuildInfo() {
     Accept: 'application/vnd.github+json',
   };
 
-  let upstream = null;
-  let behindBy = null;
+  let upstreamSha = null;
+  let forkSha = null;
+  let behindUpstream = null;
+  let forkPatchCount = null;
   let upstreamError = null;
 
   try {
-    const headRes = await fetch(
+    // 1) Upstream HEAD sha (display only — the compare endpoint gives
+    //    us the actual ahead/behind numbers, this is just for tooltips
+    //    and parity with the fork field).
+    const upstreamHeadRes = await fetch(
       `https://api.github.com/repos/${NEWSERV_UPSTREAM_REPO}/commits/${NEWSERV_UPSTREAM_BRANCH}`,
       { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
     );
-
-    if (!headRes.ok) {
-      upstreamError = `github commits api: ${headRes.status}`;
+    if (upstreamHeadRes.ok) {
+      const head = await upstreamHeadRes.json();
+      upstreamSha = typeof head?.sha === 'string' ? head.sha : null;
     } else {
-      const head = await headRes.json();
-      upstream = typeof head?.sha === 'string' ? head.sha : null;
+      upstreamError = `github upstream HEAD: ${upstreamHeadRes.status}`;
+    }
 
-      if (upstream && NEWSERV_REV !== 'unknown') {
-        if (NEWSERV_REV === upstream) {
-          behindBy = 0;
-        } else {
-          // base=local, head=upstream → ahead_by is commits in upstream
-          // not in local, i.e. how far our deploy is behind master.
-          const cmpRes = await fetch(
-            `https://api.github.com/repos/${NEWSERV_UPSTREAM_REPO}/compare/${NEWSERV_REV}...${upstream}`,
-            { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
-          );
-          if (cmpRes.ok) {
-            const cmp = await cmpRes.json();
-            behindBy = typeof cmp?.ahead_by === 'number' ? cmp.ahead_by : null;
-          } else {
-            upstreamError = `github compare api: ${cmpRes.status}`;
-          }
-        }
+    // 2) Our fork's HEAD sha.
+    const forkHeadRes = await fetch(
+      `https://api.github.com/repos/${NEWSERV_FORK_REPO}/commits/${NEWSERV_FORK_BRANCH}`,
+      { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
+    );
+    if (forkHeadRes.ok) {
+      const head = await forkHeadRes.json();
+      forkSha = typeof head?.sha === 'string' ? head.sha : null;
+    } else if (!upstreamError) {
+      upstreamError = `github fork HEAD: ${forkHeadRes.status}`;
+    }
+
+    // 3) Cross-fork compare: base = fork master, head = upstream master.
+    //    GitHub takes head as `{owner}:{branch}` to reach across forks
+    //    within the same repo network.
+    if (upstreamSha && forkSha) {
+      const upstreamOwner = NEWSERV_UPSTREAM_REPO.split('/')[0];
+      const cmpRes = await fetch(
+        `https://api.github.com/repos/${NEWSERV_FORK_REPO}/compare/${NEWSERV_FORK_BRANCH}...${upstreamOwner}:${NEWSERV_UPSTREAM_BRANCH}`,
+        { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
+      );
+      if (cmpRes.ok) {
+        const cmp = await cmpRes.json();
+        behindUpstream = typeof cmp?.ahead_by === 'number' ? cmp.ahead_by : null;
+        forkPatchCount = typeof cmp?.behind_by === 'number' ? cmp.behind_by : null;
+      } else if (!upstreamError) {
+        upstreamError = `github compare api: ${cmpRes.status}`;
       }
     }
   } catch (err) {
     upstreamError = err.message;
   }
 
+  const upstreamOwner = NEWSERV_UPSTREAM_REPO.split('/')[0];
   return {
+    // The SHA of the running container's newserv build, baked into the
+    // image at build time. Rendered as the visible "newserv <sha>"
+    // label. May be slightly behind the fork's master HEAD if there are
+    // unpushed-to-image commits — that's a separate concern from the
+    // upstream-tracking indicator.
     local: NEWSERV_REV,
-    upstream,
-    behindBy,
-    upstreamError,
     commitUrl:
       NEWSERV_REV !== 'unknown'
-        ? `https://github.com/${NEWSERV_UPSTREAM_REPO}/commit/${NEWSERV_REV}`
+        ? `https://github.com/${NEWSERV_FORK_REPO}/commit/${NEWSERV_REV}`
         : null,
+    // Reference points for the upstream check.
+    fork: {
+      repo: NEWSERV_FORK_REPO,
+      branch: NEWSERV_FORK_BRANCH,
+      headSha: forkSha,
+    },
+    upstream: {
+      repo: NEWSERV_UPSTREAM_REPO,
+      branch: NEWSERV_UPSTREAM_BRANCH,
+      headSha: upstreamSha,
+    },
+    // Number of upstream commits our fork hasn't merged in yet. 0 means
+    // we're in sync with upstream → green "(up to date)" indicator.
+    behindUpstream,
+    // Number of fork-only patches we have on top of the merge base.
+    // Surfaced as "+N patches" context, never gates the up-to-date
+    // status — these are intentional additions, not staleness.
+    forkPatchCount,
+    // GitHub web view of the same cross-fork compare we ran, so the
+    // "(N behind)" chip can be a click-to-inspect link.
     compareUrl:
-      upstream && NEWSERV_REV !== 'unknown' && NEWSERV_REV !== upstream
-        ? `https://github.com/${NEWSERV_UPSTREAM_REPO}/compare/${NEWSERV_REV}...${upstream}`
+      forkSha && upstreamSha
+        ? `https://github.com/${NEWSERV_FORK_REPO}/compare/${NEWSERV_FORK_BRANCH}...${upstreamOwner}:${NEWSERV_UPSTREAM_BRANCH}`
         : null,
+    upstreamError,
   };
 }
 

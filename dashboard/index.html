@@ -3663,7 +3663,8 @@ function renderBuildInfo(info) {
   const sha = info.local.substring(0, 7);
   el.appendChild(document.createTextNode('newserv '));
 
-  // Always link the SHA to the upstream commit so it's a click to inspect.
+  // Always link the SHA to the deployed commit on our fork so it's a
+  // click-to-inspect for the actual running build.
   if (info.commitUrl) {
     const link = document.createElement('a');
     link.href = info.commitUrl;
@@ -3675,25 +3676,43 @@ function renderBuildInfo(info) {
     el.appendChild(document.createTextNode(sha));
   }
 
-  // Status suffix: "(up to date)" in green when even with master,
-  // "(N behind)" linking to the GitHub compare view in warning yellow.
-  if (info.behindBy === 0) {
+  // Status suffix reflects fork ↔ upstream sync, NOT deployed-vs-upstream:
+  //   behindUpstream === 0   → "(up to date)" in green — fork has every
+  //                            commit upstream has
+  //   behindUpstream > 0     → "(N behind upstream)" in amber, links to
+  //                            the cross-fork compare view on GitHub
+  //   behindUpstream === null → GitHub call failed (rate-limited /
+  //                            network error); render nothing rather
+  //                            than guessing
+  if (info.behindUpstream === 0) {
     const span = document.createElement('span');
     span.style.color = 'var(--success)';
+    span.title = 'Our fork has every commit fuzziqersoftware/newserv:master has.';
     span.textContent = ' (up to date)';
     el.appendChild(span);
-  } else if (Number.isInteger(info.behindBy) && info.behindBy > 0 && info.compareUrl) {
+  } else if (Number.isInteger(info.behindUpstream) && info.behindUpstream > 0 && info.compareUrl) {
     el.appendChild(document.createTextNode(' ('));
     const link = document.createElement('a');
     link.href = info.compareUrl;
     link.target = '_blank';
     link.rel = 'noopener';
     link.style.color = 'var(--warning)';
-    link.textContent = `${info.behindBy} behind`;
+    link.title = `${info.behindUpstream} commit${info.behindUpstream === 1 ? '' : 's'} on fuzziqersoftware/newserv:master have not been merged into our fork yet.`;
+    link.textContent = `${info.behindUpstream} behind upstream`;
     el.appendChild(link);
     el.appendChild(document.createTextNode(')'));
   }
-  // behindBy === null (e.g. GitHub rate-limited) → no status suffix
+  // Optional patch-count badge — only render when both we know it and
+  // the count is positive. Reassures the reader that "behind: 0" doesn't
+  // mean the fork is bare; it means we're up to date AND have N
+  // additions of our own on top.
+  if (Number.isInteger(info.forkPatchCount) && info.forkPatchCount > 0) {
+    const span = document.createElement('span');
+    span.style.color = 'var(--text-low)';
+    span.title = `Our fork has ${info.forkPatchCount} fork-only patch${info.forkPatchCount === 1 ? '' : 'es'} on top of the merge base with upstream.`;
+    span.textContent = ` +${info.forkPatchCount} ${info.forkPatchCount === 1 ? 'patch' : 'patches'}`;
+    el.appendChild(span);
+  }
 }
 
 async function refreshBuildInfo() {
