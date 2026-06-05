@@ -10,7 +10,7 @@ uses only what your OS already ships.
 1. Unzip the download — a **PSOBB-macOS** folder with **`PSOBB.app`** and
    **`setup.command`**.
 2. **Clear the download warning once** (macOS blocks unsigned downloads): open
-   **Terminal**, type `xattr -cr ` (with a space), drag the **PSOBB-macOS** folder
+   **Terminal**, type `xattr -drs com.apple.quarantine ` (with a space), drag the **PSOBB-macOS** folder
    onto the window, and press **Enter**. *(No Terminal? See "Get past the security
    warning" below.)*
 3. **Close the game** if it's open, then double-click **`setup.command`** and type
@@ -50,7 +50,7 @@ this client and helper are **not code-signed** — signing needs a paid Apple/Wi
 certificate a small private server doesn't bother with. It's about *who made it, not
 whether it's malware*. To allow it (once per machine):
 
-- **macOS:** clear the download quarantine for the whole folder — type `xattr -cr `
+- **macOS:** clear the download quarantine for the whole folder — type `xattr -drs com.apple.quarantine `
   in **Terminal**, drag the **PSOBB-macOS** folder in, press **Enter**. No Terminal?
   Double-click an item → **Done**, then **System Settings → Privacy & Security →
   Open Anyway** (once per item). The old right-click→Open shortcut no longer works on
