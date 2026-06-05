@@ -36,6 +36,10 @@ published=0
 
 if [ -d "$MAC_APP" ]; then
   echo "==> zipping macOS app: $MAC_APP"
+  # Drop stale Wine device maps (the dosdevices/X:: symlinks point at THIS machine's
+  # /dev/rdiskN; Wine regenerates them per-machine). Otherwise they ship the builder's
+  # disk layout and make `xattr` choke on them for players.
+  find "$MAC_APP/Contents/SharedSupport/prefix/dosdevices" -maxdepth 1 -name '*::' -delete 2>/dev/null || true
   ditto -c -k --keepParent "$MAC_APP" "$WORK/PSOBB-macOS.zip"
   # Bundle the login helper + instructions at the zip root, next to PSOBB.app.
   zip -gjq "$WORK/PSOBB-macOS.zip" "$RL/setup.command"

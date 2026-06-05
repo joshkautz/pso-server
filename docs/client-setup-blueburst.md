@@ -31,10 +31,10 @@ Grab your platform from the **PC (Blue Burst)** card on
 1. Double-click the zip → a **PSOBB-macOS** folder with **PSOBB.app** and
    **setup.command** inside.
 2. macOS quarantines unsigned downloads. Clear it once for the whole folder — open
-   **Terminal**, type `xattr -cr ` (with a trailing space), drag the **PSOBB-macOS**
+   **Terminal**, type `xattr -drs com.apple.quarantine ` (with a trailing space), drag the **PSOBB-macOS**
    folder onto the window, and press **Enter**:
    ```sh
-   xattr -cr ~/Downloads/PSOBB-macOS
+   xattr -drs com.apple.quarantine ~/Downloads/PSOBB-macOS 2>/dev/null
    ```
    (No Terminal? Double-click an item, click **Done** on the warning, then open
    **System Settings → Privacy & Security** and click **Open Anyway** — once per item.
@@ -109,7 +109,7 @@ DirectInput/standard gamepad and map it under **Options → Pad Button Config**.
 
 | Symptom | Fix |
 |---|---|
-| macOS: *"PSOBB is damaged / can't be opened"* | You skipped step 2 — run `xattr -cr /Applications/PSOBB.app`. |
+| macOS: *"PSOBB is damaged / can't be opened"* | You skipped step 2 — run `xattr -drs com.apple.quarantine /Applications/PSOBB.app 2>/dev/null`. |
 | Mac laptop: can't open the menu | The menu key is **Home = Fn + Left Arrow**, or use **F12**. |
 | Keystrokes do nothing at login | Click the window first so it has focus, then type. |
 | Won't connect / login fails | Confirm your UserID & password with the admin; check your internet. |
