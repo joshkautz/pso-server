@@ -16,7 +16,9 @@ set -euo pipefail
 
 BUCKET="${BUCKET:-pso-server-downloads-315902154426}"
 PREFIX="downloads"
-MAC_APP="${MAC_APP:-$HOME/Applications/Sikarugir/PSOBB.app}"
+# MAC_APP defaults to the Sikarugir app; pass MAC_APP= (empty) to skip the macOS
+# build. WIN_CLIENT is empty by default (skipped) — set it to publish Windows.
+MAC_APP="${MAC_APP-$HOME/Applications/Sikarugir/PSOBB.app}"
 WIN_CLIENT="${WIN_CLIENT:-}"
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 RL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/remember-login"  # login helpers bundled into each zip

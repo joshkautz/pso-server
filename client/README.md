@@ -86,8 +86,8 @@ AWS_PROFILE=pso-server \
 sources, and uploads them to `downloads/`. On the way out it strips retail-launcher
 cruft (`online.exe`, `option.exe`, the stale `Readme.txt`, build leftovers) and
 **scrubs the saved UserID/password out of the macOS app**, so a download never ships
-your credentials — the source app is left untouched. Either source can be omitted to
-publish just one platform.
+your credentials — the source app is left untouched. Set `MAC_APP=` (empty) to skip the macOS
+build, or omit `WIN_CLIENT` to skip the Windows one.
 
 ## Why the bucket isn't in Terraform
 
