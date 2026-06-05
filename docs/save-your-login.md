@@ -7,11 +7,15 @@ uses only what your OS already ships.
 
 ## macOS
 
-1. Unzip the download — you get **`PSOBB.app`** and **`setup.command`**.
-2. **Close the game** if it's open.
-3. Double-click **`setup.command`**.
-   - If macOS blocks it: right-click it → **Open** → **Open**.
-4. Type your **UserID** and **password** when asked.
+1. Unzip the download — a **PSOBB-macOS** folder with **`PSOBB.app`** and
+   **`setup.command`**.
+2. **Clear the download warning once** (macOS blocks unsigned downloads): open
+   **Terminal**, type `xattr -cr ` (with a space), drag the **PSOBB-macOS** folder
+   onto the window, and press **Enter**. *(No Terminal? See "Get past the security
+   warning" below.)*
+3. **Close the game** if it's open, then double-click **`setup.command`** and type
+   your **UserID** and **password**. (If it asks where PSOBB.app is, drag it from the
+   folder — or move PSOBB.app to Applications first.)
 
 Launch `PSOBB.app` — both fields are pre-filled; just press Start. Run the helper
 again any time to change them.
@@ -39,11 +43,16 @@ keys the game itself uses:
 It only touches your own user settings (the macOS app's bundled registry, or your
 Windows user registry). Nothing else is changed, and nothing is sent anywhere.
 
-## Why the security warning?
+## Get past the security warning
 
-macOS (“unidentified developer”) and Windows (SmartScreen) warn because this client
-and helper are **not code-signed** — signing needs a paid Apple Developer or
-Windows certificate, which a small private server doesn't bother with. The warning
-is about *who made it, not whether it's malware*. The one-time bypass (macOS:
-right-click → **Open**; Windows: **More info → Run anyway**) tells your OS you trust
-it, and it won't ask again.
+macOS (“Apple could not verify … malware”) and Windows (SmartScreen) warn because
+this client and helper are **not code-signed** — signing needs a paid Apple/Windows
+certificate a small private server doesn't bother with. It's about *who made it, not
+whether it's malware*. To allow it (once per machine):
+
+- **macOS:** clear the download quarantine for the whole folder — type `xattr -cr `
+  in **Terminal**, drag the **PSOBB-macOS** folder in, press **Enter**. No Terminal?
+  Double-click an item → **Done**, then **System Settings → Privacy & Security →
+  Open Anyway** (once per item). The old right-click→Open shortcut no longer works on
+  recent macOS.
+- **Windows:** on the SmartScreen prompt, click **More info → Run anyway**.

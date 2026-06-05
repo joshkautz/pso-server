@@ -28,16 +28,20 @@ Grab your platform from the **PC (Blue Burst)** card on
 
 ### macOS (Apple Silicon)
 
-1. Double-click the zip → you get **PSOBB.app**. Drag it to your **Applications**
-   folder.
-2. The app is unsigned, so macOS quarantines it. Clear that once — open
-   **Terminal** and paste:
+1. Double-click the zip → a **PSOBB-macOS** folder with **PSOBB.app** and
+   **setup.command** inside.
+2. macOS quarantines unsigned downloads. Clear it once for the whole folder — open
+   **Terminal**, type `xattr -cr ` (with a trailing space), drag the **PSOBB-macOS**
+   folder onto the window, and press **Enter**:
    ```sh
-   xattr -cr /Applications/PSOBB.app && open /Applications/PSOBB.app
+   xattr -cr ~/Downloads/PSOBB-macOS
    ```
-   (Equivalent: right-click the app → **Open** → **Open** in the dialog.)
-3. The game opens in a normal, resizable window. To keep it one click away, drag
-   **PSOBB.app** from Applications onto your Dock.
+   (No Terminal? Double-click an item, click **Done** on the warning, then open
+   **System Settings → Privacy & Security** and click **Open Anyway** — once per item.
+   The old right-click→Open trick no longer works on recent macOS.)
+3. Drag **PSOBB.app** to **Applications** (and onto your Dock if you like). Run
+   **setup.command** to save your login — see [Save your login](save-your-login.md) —
+   then open PSOBB.app; it's a normal, resizable window.
 
 > Apple Silicon only — this build won't run on Intel Macs.
 

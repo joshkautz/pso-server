@@ -19,8 +19,8 @@ what you're doing.
 - **[save-your-login.md](save-your-login.md)** — the one-file `setup` helper that
   pre-fills your UserID **and** password.
 - **[client-setup-dolphin.md](client-setup-dolphin.md)** — GameCube on Dolphin (desktop).
-- **[client-setup.md](client-setup.md)** — GameCube on Batocera + Dolphin, and real
-  hardware (Broadband Adapter).
+- **[client-setup.md](client-setup.md)** — GameCube on Batocera + Dolphin (handhelds / HTPCs).
+- **[client-setup-gamecube.md](client-setup-gamecube.md)** — GameCube on real hardware (Broadband Adapter).
 - **[character-transfer.md](character-transfer.md)** — move a character between
   platforms (`$savechar` / `$loadchar` / `$bbchar`).
 
