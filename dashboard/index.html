@@ -1821,36 +1821,21 @@
         <span class="section-head__hint">Pick your client</span>
       </div>
 
-      <div class="panel" style="margin-bottom: var(--space-5);">
-        <p style="margin: 0; color: var(--text-mid);">
-          <strong style="color: var(--text-high);">First:</strong> send the admin
-          your public IP from <a href="https://ifconfig.io" rel="noopener">ifconfig.io</a>.
-          The server's DNS only answers for allowlisted addresses — without this,
-          every other step will silently fail.
-        </p>
-      </div>
-
       <div class="features" role="list">
         <article class="feature" role="listitem">
-          <h3>GameCube (Dolphin)</h3>
-          <p>One line in <code>Dolphin.ini</code> + a per-game config for the
-          memory card. Works on macOS, Windows, and Linux.</p>
+          <h3>GameCube (Emulator)</h3>
+          <p>Override one DNS line in Dolphin's config — desktop Dolphin
+          (macOS, Windows, Linux) or Batocera handhelds/HTPCs. Same setting,
+          just a different config path.</p>
           <p style="margin-top: var(--space-3);">
-            <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-dolphin.md">Setup guide →</a>
+            <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-dolphin.md">Desktop Dolphin →</a>
+            &nbsp;·&nbsp;
+            <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup.md">Batocera →</a>
           </p>
         </article>
 
         <article class="feature" role="listitem">
-          <h3>Batocera + Dolphin</h3>
-          <p>For Batocera Linux handhelds or HTPCs running standalone Dolphin.
-          Same setting, different config paths.</p>
-          <p style="margin-top: var(--space-3);">
-            <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup.md">Setup guide →</a>
-          </p>
-        </article>
-
-        <article class="feature" role="listitem">
-          <h3>GameCube</h3>
+          <h3>GameCube (Console)</h3>
           <p>Plug a Broadband Adapter into the GameCube's serial port. Set
           Primary DNS to <code>54.173.68.119</code><button type="button" class="copy-btn copy-btn--inline" data-copy="54.173.68.119" aria-label="Copy the IP address" title="Copy IP"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button> inside PSO's network setup
           screen. No emulator-side config involved.</p>
