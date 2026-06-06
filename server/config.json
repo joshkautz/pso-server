@@ -1031,10 +1031,10 @@
   "AllowedDropModesV4Normal": 0x1D, // CLIENT not allowed
   "AllowedDropModesV4Challenge": 0x05, // CLIENT, SERVER_PRIVATE, and SERVER_DUPLICATE not allowed
   "AllowedDropModesV4Battle": 0x05, // CLIENT, SERVER_PRIVATE, and SERVER_DUPLICATE not allowed
-  "DefaultDropModeV1V2Normal": "CLIENT",
+  "DefaultDropModeV1V2Normal": "SERVER_SHARED", // server-side so the drop multiplier + rare notifications reach DC/PC, like BB
   "DefaultDropModeV1V2Battle": "CLIENT",
   "DefaultDropModeV1V2Challenge": "CLIENT",
-  "DefaultDropModeV3Normal": "CLIENT",
+  "DefaultDropModeV3Normal": "SERVER_SHARED", // server-side so the drop multiplier + rare notifications reach GameCube, like BB
   "DefaultDropModeV3Battle": "CLIENT",
   "DefaultDropModeV3Challenge": "CLIENT",
   "DefaultDropModeV4Normal": "SERVER_SHARED",
