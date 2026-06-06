@@ -1865,10 +1865,19 @@
               Windows <span class="client-dl__size">10 / 11</span>
             </a>
           </div>
-          <p style="margin-top: var(--space-4); font-size: 0.85rem; color: var(--text-low);">
-            First launch needs one OK past macOS Gatekeeper / Windows SmartScreen
-            (the build is unsigned) — the guide has the quick fix.
-          </p>
+          <div style="margin-top: var(--space-4); padding: var(--space-3) var(--space-4); background: rgba(255, 184, 74, 0.08); border: 1px solid rgba(255, 184, 74, 0.28); border-left: 3px solid var(--warning); border-radius: 8px; font-size: 0.85rem; color: var(--text-mid); line-height: 1.65;">
+            <strong style="color: var(--warning);">macOS — clear the download flag first.</strong>
+            The app is unsigned, so macOS quarantines it. Open it before clearing that and you'll see
+            <em>"PSOBB is damaged… Move it to the Trash."</em>
+            <strong style="color: var(--text-high);">Don't — click Cancel.</strong>
+            Instead open <strong>Terminal</strong>, type the line below (keep the trailing space),
+            <strong>drag the unzipped <code>PSOBB-macOS</code> folder onto the window</strong>, then press Enter —
+            <em>before</em> you move the app to Applications:
+            <div style="margin: var(--space-2) 0; padding: var(--space-2) var(--space-3); background: var(--bg-deep); border: 1px solid var(--bg-elevated); border-radius: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text-high); overflow-x: auto; white-space: nowrap;">xattr -drs com.apple.quarantine&nbsp;<span style="color: var(--text-low);">[ drag the PSOBB-macOS folder here ]</span></div>
+            Don't type the path — the folder is often on the <strong>Desktop</strong>, not Downloads.
+            (Windows is milder: SmartScreen → <em>More info → Run anyway</em>.)
+            <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-blueburst.md">Full macOS steps →</a>
+          </div>
           <p style="margin-top: var(--space-3);">
             <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-blueburst.md">Setup &amp; controls guide →</a>
           </p>
