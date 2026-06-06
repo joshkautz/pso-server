@@ -1470,6 +1470,29 @@
     white-space: nowrap;
     border: 0;
   }
+
+  /* Copy-to-clipboard buttons (commands, IPs) — wired up by setupCopyButtons(). */
+  .copy-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 4px 8px;
+    background: transparent;
+    border: 1px solid var(--line-soft);
+    border-radius: 5px;
+    color: var(--text-mid);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    line-height: 1;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .copy-btn:hover { color: var(--text-high); border-color: var(--line-strong); background: var(--cyan-soft); }
+  .copy-btn:focus-visible { outline: 2px solid var(--cyan-primary); outline-offset: 1px; }
+  .copy-btn--done { color: var(--success); border-color: var(--success); }
+  .copy-btn--inline { padding: 1px 5px; margin-left: 5px; vertical-align: middle; }
+  .copy-btn svg { display: block; }
 </style>
 </head>
 
@@ -1798,38 +1821,23 @@
         <span class="section-head__hint">Pick your client</span>
       </div>
 
-      <div class="panel" style="margin-bottom: var(--space-5);">
-        <p style="margin: 0; color: var(--text-mid);">
-          <strong style="color: var(--text-high);">First:</strong> send the admin
-          your public IP from <a href="https://ifconfig.io" rel="noopener">ifconfig.io</a>.
-          The server's DNS only answers for allowlisted addresses — without this,
-          every other step will silently fail.
-        </p>
-      </div>
-
       <div class="features" role="list">
         <article class="feature" role="listitem">
-          <h3>GameCube (Dolphin)</h3>
-          <p>One line in <code>Dolphin.ini</code> + a per-game config for the
-          memory card. Works on macOS, Windows, and Linux.</p>
+          <h3>GameCube (Emulator)</h3>
+          <p>Override one DNS line in Dolphin's config — desktop Dolphin
+          (macOS, Windows, Linux) or Batocera handhelds/HTPCs. Same setting,
+          just a different config path.</p>
           <p style="margin-top: var(--space-3);">
-            <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-dolphin.md">Setup guide →</a>
+            <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-dolphin.md">Desktop Dolphin →</a>
+            &nbsp;·&nbsp;
+            <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup.md">Batocera →</a>
           </p>
         </article>
 
         <article class="feature" role="listitem">
-          <h3>Batocera + Dolphin</h3>
-          <p>For Batocera Linux handhelds or HTPCs running standalone Dolphin.
-          Same setting, different config paths.</p>
-          <p style="margin-top: var(--space-3);">
-            <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup.md">Setup guide →</a>
-          </p>
-        </article>
-
-        <article class="feature" role="listitem">
-          <h3>GameCube</h3>
+          <h3>GameCube (Console)</h3>
           <p>Plug a Broadband Adapter into the GameCube's serial port. Set
-          Primary DNS to <code>54.173.68.119</code> inside PSO's network setup
+          Primary DNS to <code>54.173.68.119</code><button type="button" class="copy-btn copy-btn--inline" data-copy="54.173.68.119" aria-label="Copy the IP address" title="Copy IP"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button> inside PSO's network setup
           screen. No emulator-side config involved.</p>
           <p style="margin-top: var(--space-3);">
             <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-gamecube.md">Setup guide →</a>
@@ -1861,7 +1869,10 @@
             Instead open <strong>Terminal</strong>, type the line below (keep the trailing space),
             <strong>drag the unzipped <code>PSOBB-macOS</code> folder onto the window</strong>, then press Enter —
             <em>before</em> you move the app to Applications:
-            <div style="margin: var(--space-2) 0; padding: var(--space-2) var(--space-3); background: var(--bg-deep); border: 1px solid var(--bg-elevated); border-radius: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text-high); overflow-x: auto; white-space: nowrap;">xattr -drs com.apple.quarantine&nbsp;<span style="color: var(--text-low);">[ drag the PSOBB-macOS folder here ]</span></div>
+            <div style="margin: var(--space-2) 0; padding: var(--space-2) var(--space-3); background: var(--bg-deep); border: 1px solid var(--bg-elevated); border-radius: 6px; display: flex; align-items: center; gap: var(--space-2);">
+              <code style="flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text-high);">xattr -drs com.apple.quarantine&nbsp;<span style="color: var(--text-low);">[ drag the PSOBB-macOS folder here ]</span></code>
+              <button type="button" class="copy-btn" data-copy="xattr -drs com.apple.quarantine " aria-label="Copy the command" title="Copy command"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span class="copy-btn__label">Copy</span></button>
+            </div>
             Don't type the path — the folder is often on the <strong>Desktop</strong>, not Downloads.
             (Windows is milder: SmartScreen → <em>More info → Run anyway</em>.)
             <a href="https://github.com/joshkautz/pso-server/blob/main/docs/client-setup-blueburst.md">Full macOS steps →</a>
@@ -3909,6 +3920,43 @@ function setupScrollSpy() {
   spy();
 }
 
+// Copy-to-clipboard buttons: any <button data-copy="..."> copies its text and
+// briefly flashes a check. Uses the async Clipboard API with a hidden-textarea
+// fallback for older browsers / non-secure contexts.
+function setupCopyButtons() {
+  const CHECK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
+  document.querySelectorAll('button[data-copy]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const text = btn.dataset.copy ?? '';
+      let ok = false;
+      try {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      } catch (_) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+          document.body.appendChild(ta);
+          ta.focus(); ta.select();
+          ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+        } catch (_) { ok = false; }
+      }
+      if (!ok) return;
+      const hasLabel = !!btn.querySelector('.copy-btn__label');
+      const orig = btn.innerHTML;
+      btn.innerHTML = CHECK + (hasLabel ? '<span class="copy-btn__label">Copied</span>' : '');
+      btn.classList.add('copy-btn--done');
+      clearTimeout(btn._copyTimer);
+      btn._copyTimer = setTimeout(() => {
+        btn.innerHTML = orig;
+        btn.classList.remove('copy-btn--done');
+      }, 1400);
+    });
+  });
+}
+
 // ---------- Boot ----------
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -3927,6 +3975,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupClientDownloads();
   setupNav();
   setupScrollSpy();
+  setupCopyButtons();
   startCountdown();
 
   // Fetch the per-quest provenance overlay first, then start the live
