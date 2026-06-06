@@ -726,7 +726,7 @@
   // Drop rate multiplier for all server drop tables. This applies to server drop modes in all game versions. If you
   // want to scale the drop rates for only some versions, use the --multiply option to the convert-rare-item-set action
   // instead.
-  "ServerGlobalDropRateMultiplier": 1.0,
+  "ServerGlobalDropRateMultiplier": 5.0,
 
   // Client functions listed here are always enabled as auto patches for BB clients. For example, you can add
   // "StackLimits" here if you've edited the StackLimits patch and the ItemStackLimits field in this file, and want the
