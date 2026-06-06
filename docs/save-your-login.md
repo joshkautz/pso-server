@@ -14,8 +14,9 @@ uses only what your OS already ships.
    onto the window, and press **Enter**. *(No Terminal? See "Get past the security
    warning" below.)*
 3. **Close the game** if it's open, then double-click **`setup.command`** and type
-   your **UserID** and **password**. (If it asks where PSOBB.app is, drag it from the
-   folder — or move PSOBB.app to Applications first.)
+   your **UserID** and **password**. It finds **`PSOBB.app`** sitting right next to
+   it in the folder (or in **Applications**, if you already moved it there); if it
+   can't, it asks you to drag the app onto the window.
 
 Launch `PSOBB.app` — both fields are pre-filled; just press Start. Run the helper
 again any time to change them.
