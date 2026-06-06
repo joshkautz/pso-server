@@ -466,6 +466,7 @@
     font-size: 0.85rem;
     line-height: 1.45;
   }
+  .identity__build--loading { color: var(--text-low); }
 
   /* -----------------------------------------------------------------
      Side stack — identity card + compatibility matrix
@@ -580,11 +581,8 @@
      ================================================================= */
   .metrics {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
     gap: var(--space-3);
-  }
-  @media (min-width: 720px) {
-    .metrics { grid-template-columns: repeat(4, 1fr); }
   }
   .metric {
     background: var(--bg-surface);
@@ -1113,10 +1111,11 @@
     color: var(--cyan-bright);
   }
 
-  /* Completion list — one chip per character that's completed the quest
-     on any difficulty. Wraps gracefully and supports x{N} suffixes when
-     a single player has multiple saves of the same character. */
-  .completion-list {
+  /* Quest completion grid — one card per character on the server, lit up
+     if they've cleared this quest and muted (faded) if not. Steam-achievement
+     style. Built by renderQuestCompletions() from /api/quest/:n/completions
+     cross-referenced against the loaded character roster. */
+  .completion-grid {
     list-style: none;
     padding: 0;
     margin: 0;
@@ -1124,22 +1123,28 @@
     flex-wrap: wrap;
     gap: var(--space-2);
   }
-  .completion-chip {
+  .completion-card {
     display: inline-flex;
     align-items: center;
     gap: var(--space-1);
     padding: var(--space-1) var(--space-3);
-    background: var(--cyan-soft);
-    border: 1px solid var(--line-strong);
+    border: 1px solid var(--line-soft);
     border-radius: 999px;
-    color: var(--cyan-bright);
     font-size: 0.8rem;
     font-family: var(--font-mono);
   }
-  .completion-chip__count {
-    color: var(--text-low);
-    font-size: 0.7rem;
+  .completion-card--done {
+    background: var(--cyan-soft);
+    border-color: var(--line-strong);
+    color: var(--cyan-bright);
   }
+  .completion-card--todo {
+    background: transparent;
+    border-color: var(--line-subtle);
+    color: var(--text-low);
+    opacity: 0.5;
+  }
+  .completion-card__check { font-size: 0.72rem; }
 
   /* -----------------------------------------------------------------
      Player inventory
@@ -1524,7 +1529,7 @@
       <div class="hero__side">
         <dl class="identity" aria-label="Server build">
           <dt class="identity__label">Build</dt>
-          <dd id="server-build" class="identity__build">newserv —</dd>
+          <dd id="server-build" class="identity__build identity__build--loading">Loading…</dd>
         </dl>
 
         <div>
@@ -1603,14 +1608,6 @@
           </div>
           <div class="metric__value" id="metric-online" aria-live="polite">—</div>
           <div class="metric__delta" id="metric-online-delta"></div>
-        </article>
-
-        <article class="metric" role="listitem" aria-labelledby="m-games">
-          <div class="metric__label" id="m-games">
-            <span aria-hidden="true">◆</span> Active games
-          </div>
-          <div class="metric__value" id="metric-games" aria-live="polite">—</div>
-          <div class="metric__delta" id="metric-games-delta"></div>
         </article>
 
         <article class="metric" role="listitem" aria-labelledby="m-uptime">
@@ -2960,26 +2957,42 @@ function renderQuestCompletions(questNum, list, error) {
     container.innerHTML = `<p class="quest-modal__placeholder">Couldn't load completion data: ${escapeHtml(error)}</p>`;
     return;
   }
-  if (!Array.isArray(list) || list.length === 0) {
+  // Steam-achievement style: a card for every character on the server, lit
+  // up if they've cleared this quest and muted if not. Completers come from
+  // /api/quest/:n/completions ({AccountToken, SlotIndex, Name}); the full
+  // roster is the already-loaded `characters` snapshot. A character is
+  // matched on AccountToken+SlotIndex (which uniquely identifies it).
+  const completers = Array.isArray(list) ? list : [];
+  const done = new Set(completers.map((e) => `${e.AccountToken}:${e.SlotIndex}`));
+  const roster = Array.isArray(characters) ? characters : [];
+
+  // Prefer the full roster (so non-completers show muted). Fall back to just
+  // the completers if /api/characters hasn't resolved yet.
+  const source = roster.length
+    ? roster.map((c) => ({ name: c.Name, done: done.has(`${c.AccountToken}:${c.SlotIndex}`) }))
+    : completers.map((e) => ({ name: e.Name, done: true }));
+
+  if (source.length === 0) {
     container.innerHTML = `<p class="quest-modal__placeholder">No one's completed it yet.</p>`;
     return;
   }
 
-  // Render as a wrapping list of character names. Dedupe by name so a
-  // single player with multiple saved characters that all completed it
-  // doesn't appear 4× — show each unique name once with a slot count.
-  const counts = new Map();
-  for (const entry of list) {
-    const name = String(entry.Name ?? '').trim() || '?';
-    counts.set(name, (counts.get(name) || 0) + 1);
-  }
-  const chips = [...counts.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: 'base' }))
-    .map(([name, count]) => `<li class="completion-chip">${escapeHtml(name)}${count > 1 ? ` <span class="completion-chip__count">×${count}</span>` : ''}</li>`)
+  const cards = source
+    .slice()
+    .sort((a, b) =>
+      (Number(b.done) - Number(a.done)) ||
+      String(a.name ?? '').localeCompare(String(b.name ?? ''), undefined, { sensitivity: 'base' }))
+    .map((s) => {
+      const name = escapeHtml(String(s.name ?? '?').trim() || '?');
+      const tick = s.done ? '<span class="completion-card__check" aria-hidden="true">✓</span>' : '';
+      const cls  = s.done ? 'completion-card--done' : 'completion-card--todo';
+      const tip  = s.done ? 'Completed' : 'Not completed yet';
+      return `<li class="completion-card ${cls}" title="${tip}">${tick}${name}</li>`;
+    })
     .join('');
 
   container.innerHTML = `
-    <ul class="completion-list" aria-label="Characters that have completed this quest">${chips}</ul>
+    <ul class="completion-grid" aria-label="Quest completion by character">${cards}</ul>
   `;
 }
 
@@ -3493,10 +3506,8 @@ async function refreshLive() {
       };
       const srv = s?.Server ?? {};
       set('metric-online',         srv.ClientCount);
-      set('metric-games',          srv.GameCount);
       set('metric-uptime',         formatUptime(srv.UptimeUsecs));
       set('metric-uptime-delta',   formatStartedAt(srv.StartTime));
-      set('metric-games-delta',    srv.LobbyCount != null ? `across ${srv.LobbyCount} lobbies` : '');
       setServerStatus(true);
     }).catch(() => setServerStatus(false)),
     fetchJSON('lobbies').then((lobbies) => {
@@ -3666,6 +3677,7 @@ function startRareDropsStream() {
 function renderBuildInfo(info) {
   const el = document.getElementById('server-build');
   if (!el) return;
+  el.classList.remove('identity__build--loading'); // response is in — drop the muted loading style
   el.replaceChildren(); // clear without innerHTML
 
   if (!info?.local || info.local === 'unknown') {
