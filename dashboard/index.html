@@ -451,20 +451,21 @@
     backdrop-filter: blur(8px);
     border: 1px solid var(--line-soft);
     border-radius: var(--radius-lg);
-    padding: var(--space-5);
+    padding: var(--space-4) var(--space-5);
     font-family: var(--font-mono);
+  }
+  .identity__label {
+    color: var(--text-low);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+  }
+  .identity__build {
+    margin: var(--space-1) 0 0;
+    color: var(--text-high);
     font-size: 0.85rem;
+    line-height: 1.45;
   }
-  .identity__row {
-    display: flex;
-    justify-content: space-between;
-    gap: var(--space-3);
-    padding: var(--space-2) 0;
-    border-bottom: 1px solid var(--line-subtle);
-  }
-  .identity__row:last-child { border-bottom: 0; }
-  .identity__row dt { color: var(--text-low); }
-  .identity__row dd { margin: 0; color: var(--text-high); }
 
   /* -----------------------------------------------------------------
      Side stack — identity card + compatibility matrix
@@ -1485,7 +1486,7 @@
         <span class="nav__toggle-icon" aria-hidden="true"></span>
       </button>
       <div class="nav__links" id="nav-menu">
-        <a href="#live" aria-current="page">Live</a>
+        <a href="#live">Live</a>
         <a href="#players">Players</a>
         <a href="#quests">Quests</a>
         <a href="#features">Features</a>
@@ -1521,19 +1522,9 @@
       </div>
 
       <div class="hero__side">
-        <dl class="identity" aria-label="Server identity">
-          <div class="identity__row">
-            <dt>Host</dt>
-            <dd id="server-host">54.173.68.119</dd>
-          </div>
-          <div class="identity__row">
-            <dt>Platforms</dt>
-            <dd>DC · GC · PC · Xbox · BB</dd>
-          </div>
-          <div class="identity__row">
-            <dt>Build</dt>
-            <dd id="server-build">newserv —</dd>
-          </div>
+        <dl class="identity" aria-label="Server build">
+          <dt class="identity__label">Build</dt>
+          <dd id="server-build" class="identity__build">newserv —</dd>
         </dl>
 
         <div>
@@ -3864,6 +3855,48 @@ function setupNav() {
   document.addEventListener('click', (e) => { if (!nav.contains(e.target)) setOpen(false); });
 }
 
+// Scroll-spy: highlight the nav link whose section is currently in view by
+// setting aria-current="page" (which the CSS paints cyan). Progressive
+// enhancement — the anchors work without it; this only tracks "you are here".
+function setupScrollSpy() {
+  const targets = Array.from(document.querySelectorAll('.nav__links a[href^="#"]'))
+    .map((a) => {
+      const el = document.getElementById(a.getAttribute('href').slice(1));
+      return el ? { a, el } : null;
+    })
+    .filter(Boolean);
+  if (!targets.length) return;
+  let current = null;
+  const setCurrent = (a) => {
+    if (a === current) return;
+    if (current) current.removeAttribute('aria-current');
+    if (a) a.setAttribute('aria-current', 'page');
+    current = a;
+  };
+  const spy = () => {
+    const line = window.innerHeight * 0.3; // "you are here" trigger, ~30% down
+    let active = targets[0];
+    for (const t of targets) {
+      if (t.el.getBoundingClientRect().top <= line) active = t;
+    }
+    // At the very bottom, force the last link — a short final section may
+    // never cross the trigger line.
+    if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) {
+      active = targets[targets.length - 1];
+    }
+    setCurrent(active.a);
+  };
+  let ticking = false;
+  const onScroll = () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => { spy(); ticking = false; });
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll, { passive: true });
+  spy();
+}
+
 // ---------- Boot ----------
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -3881,6 +3914,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupPlayerCardClicks();
   setupClientDownloads();
   setupNav();
+  setupScrollSpy();
   startCountdown();
 
   // Fetch the per-quest provenance overlay first, then start the live
