@@ -170,15 +170,19 @@ jobs:
              docker compose up -d --remove-orphans && \
              docker image prune -f'
 
-      - name: reload newserv config
+      - name: reload newserv config + dependencies
         run: |
-          # config.json is bind-mounted, so a config-only change (e.g. drop
-          # rates) doesn't recreate the newserv container above. SIGUSR1 makes
-          # the running server re-read config.json live, with no player
-          # disconnects. If the container was just recreated it already has the
-          # new config, so this is a harmless second reload.
+          # The system/ tree is bind-mounted, so changes to config.json, quests,
+          # or client-function patches don't recreate the newserv container
+          # above. SIGUSR2 makes the running server re-read config.json AND all
+          # dependencies (quests, maps, client-function patches) live, with no
+          # player disconnects. SIGUSR1 reloads only config.json, which would
+          # miss patch changes (e.g. BankSize/StackLimits) and could leave
+          # BBRequiredPatches pointing at unloaded patches. If the container was
+          # just recreated it already has everything, so this is a harmless
+          # second reload.
           ssh -i ~/.ssh/deploy ubuntu@${{ steps.lightsail.outputs.ip }} \
-            'docker kill --signal SIGUSR1 newserv || true'
+            'docker kill --signal SIGUSR2 newserv || true'
 
       - name: install backup pipeline (script + systemd timer)
         env:

@@ -591,8 +591,8 @@
 
   // BB bank size. If you change either of these values, you must also add "BankSize" to BBRequiredPatches, and change
   // the patch contents in system/client-functions/BlueBurstExclusive/BankSize.5___.patch.s to reflect the counts here.
-  "BBMaxBankItems": 200,
-  "BBMaxBankMeseta": 999999,
+  "BBMaxBankItems": 1000,
+  "BBMaxBankMeseta": 2000000000,
 
   // Item stack limits. Note that changing these does not affect the client's behavior automatically - this only exists
   // to allow the server to understand the behavior of clients that are already patched with different stack limits.
@@ -616,7 +616,7 @@
     {"MesetaLimit": 999999, "ToolLimits": [10, 10, 1, 10, 10, 10, 10, 10, 10, 1, 1, 1, 1, 1, 1, 1, 99, 1]}, // GC Ep3 NTE
     {"MesetaLimit": 999999, "ToolLimits": [10, 10, 1, 10, 10, 10, 10, 10, 10, 1, 1, 1, 1, 1, 1, 1, 99, 1]}, // GC Ep3
     {"MesetaLimit": 999999, "ToolLimits": [10, 10, 1, 10, 10, 10, 10, 10, 10, 1, 1, 1, 1, 1, 1, 1, 99, 1]}, // XB
-    {"MesetaLimit": 999999, "ToolLimits": [10, 10, 1, 10, 10, 10, 10, 10, 10, 1, 1, 1, 1, 1, 1, 1, 99, 1]}, // BB
+    {"MesetaLimit": 999999, "ToolLimits": [99, 99, 1, 99, 99, 99, 99, 99, 99, 1, 1, 1, 1, 1, 1, 1, 99, 1]}, // BB
   ],
 
   // Quest result item definitions for opcode F95E (used in Black Paper's Dangerous Deal 1 and 2). This list is indexed
@@ -710,7 +710,7 @@
 
   // EXP multiplier for BB games. If this is not an integer, the client will display incorrect EXP values, unless you
   // also add "ServerEXPDisplay" to BBRequiredPatches.
-  "BBGlobalEXPMultiplier": 1,
+  "BBGlobalEXPMultiplier": 2,
   // EXP share multiplier for BB games. The logic for EXP computation is:
   // - If the player lands the killing blow on an enemy they get full EXP (or multiplied by this value, if this value
   //   is greater than 1).
@@ -733,6 +733,8 @@
   // limits to take effect on BB clients. If a client connects using a client version that isn't compatible with one of
   // these patches, the client will be disconnected.
   "BBRequiredPatches": [
+    "BankSize",    // bigger bank (1000 items / 2,000,000,000 meseta) - matches BBMaxBank* + BankSize.s
+    "StackLimits", // consumables stack to 99 - matches ItemStackLimits[BB] + StackLimits.s
     // You will probably want to uncomment the following line if you want to use items that were unreleased on the
     // original Sega servers.
     // "ClearUnreleasedItemList",
@@ -1053,15 +1055,15 @@
   "RareEnemyRates-Normal": {
     // These are probabilities out of 0xFFFFFFFF - so 0 means that rare enemy will never appear, and 0xFFFFFFFF means
     // it will always appear (until 16 rare enemies have been assigned).
-    "Hildeblue": 0x0083126E, // 1/500
-    "Rappy": 0x0083126E, // 1/500
-    "NarLily": 0x0083126E, // 1/500
-    "PouillySlime": 0x0083126E, // 1/500
-    "Mericarand": 0x33333333, // 1/5
-    "MerissaAA": 0x0083126E, // 1/500
-    "Pazuzu": 0x0083126E, // 1/500
-    "DorphonEclair": 0x0083126E, // 1/500
-    "Kondrieu": 0x1999999A, // 1/10
+    "Hildeblue": 0x028F5C29, // ~1/100 (5x)
+    "Rappy": 0x028F5C29, // ~1/100 (5x)
+    "NarLily": 0x028F5C29, // ~1/100 (5x)
+    "PouillySlime": 0x028F5C29, // ~1/100 (5x)
+    "Mericarand": 0x33333333, // 1/5 (unchanged - 5x overflows to always-on)
+    "MerissaAA": 0x028F5C29, // ~1/100 (5x)
+    "Pazuzu": 0x028F5C29, // ~1/100 (5x)
+    "DorphonEclair": 0x028F5C29, // ~1/100 (5x)
+    "Kondrieu": 0x80000000, // 1/2 (5x of 1/10)
   },
   // "RareEnemyRates-Hard": {...},
   // "RareEnemyRates-VeryHard": {...},
