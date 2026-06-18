@@ -196,6 +196,41 @@ jobs:
           fi
           REMOTE
 
+      - name: normalize account license filenames
+        run: |
+          # Guard against the duplicate-account startup crash. newserv saves
+          # account license files as {account_id:010}.json; a non-padded
+          # filename left over from before that format change collides with the
+          # canonical name once the account is saved, and newserv then aborts at
+          # startup with "account already exists with this ... serial number".
+          # Normalize every license file to the canonical padded name before we
+          # (re)start newserv. Safe + idempotent: newserv loads accounts by the
+          # AccountID read from file content (not the filename), and any stale
+          # duplicate is moved aside, never deleted.
+          ssh -i ~/.ssh/deploy ubuntu@${{ steps.lightsail.outputs.ip }} 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          D=/home/ubuntu/pso-server/system/licenses
+          [ -d "$D" ] || { echo "no licenses dir — nothing to normalize"; exit 0; }
+          DUP="$D/../licenses-superseded"
+          for f in "$D"/*.json; do
+            [ -e "$f" ] || continue
+            base=$(basename "$f" .json)
+            aidhex=$(grep -oE '"AccountID": 0x[0-9A-Fa-f]+' "$f" | grep -oE '0x[0-9A-Fa-f]+' | head -1 || true)
+            [ -z "$aidhex" ] && { echo "skip $base (no AccountID field)"; continue; }
+            canon=$(printf '%010d' $((aidhex)))
+            [ "$base" = "$canon" ] && continue
+            if [ -e "$D/$canon.json" ]; then
+              mkdir -p "$DUP"
+              mv -f "$f" "$DUP/$base.json.$(date +%s)"
+              echo "deduped: moved stale $base.json aside; kept canonical $canon.json"
+            else
+              mv -f "$f" "$D/$canon.json"
+              echo "renamed $base.json -> $canon.json"
+            fi
+          done
+          echo "license filename normalization complete"
+          REMOTE
+
       - name: restart container
         run: |
           ssh -i ~/.ssh/deploy ubuntu@${{ steps.lightsail.outputs.ip }} \
@@ -267,9 +302,24 @@ jobs:
 
       - name: health check
         run: |
-          # Give newserv a few seconds to start up, then check the
-          # container is running and the DNS port is bound.
-          sleep 10
-          ssh -i ~/.ssh/deploy ubuntu@${{ steps.lightsail.outputs.ip }} \
-            'docker ps --filter name=newserv --format "{{.Status}}" | grep -q "Up" && \
-             docker logs --tail=20 newserv'
+          # Wait up to ~80s for newserv to be Up AND to log "[Config] Ready"
+          # (its fully-started marker). The old check was a single 10s docker-ps
+          # race that false-failed on a slow cold start and couldn't tell a slow
+          # boot from a crash loop. On failure, dump recent logs so the cause is
+          # visible in CI instead of needing an SSH session.
+          ssh -i ~/.ssh/deploy ubuntu@${{ steps.lightsail.outputs.ip }} 'bash -s' <<'REMOTE'
+          for i in $(seq 1 16); do
+            status=$(docker ps --filter name=newserv --format '{{.Status}}' 2>/dev/null)
+            if echo "$status" | grep -q "Up" && docker logs newserv 2>&1 | grep -q '\[Config\] Ready'; then
+              echo "newserv healthy: $status"
+              docker logs --tail=8 newserv 2>&1
+              exit 0
+            fi
+            echo "waiting for newserv... ($i/16; status: ${status:-not running})"
+            sleep 5
+          done
+          echo "::error::newserv did not reach [Config] Ready within ~80s"
+          docker ps -a --filter name=newserv
+          docker logs --tail=50 newserv 2>&1
+          exit 1
+          REMOTE
