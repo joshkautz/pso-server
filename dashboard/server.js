@@ -350,12 +350,22 @@ function stripCharacters(rawCharacters, rawAccounts, levelTables) {
     if (!c || typeof c !== 'object') continue;
     if (typeof c.AccountID !== 'number') continue;
     const isLikelyBB = bbIndex.has(c.AccountID) ? bbIndex.get(c.AccountID) : null;
+    // EXP / play-time are server-authoritative (and therefore trustworthy) when
+    // the SNAPSHOT itself was taken from a Blue Burst session — which newserv
+    // now records per snapshot as SnapshotVersion. This is more precise than the
+    // old account-license heuristic: an account can hold both BB and disc
+    // licenses, which left isLikelyBB null and wrongly hid BB EXP. Fall back to
+    // the license heuristic for legacy snapshots predating the .version sidecar.
+    const snapshotVersion = typeof c.SnapshotVersion === 'string' ? c.SnapshotVersion : null;
+    const isBBSnapshot = snapshotVersion
+      ? snapshotVersion.startsWith('BB')
+      : isLikelyBB === true;
     const expToNext = computeExpToNextLevel(
       c.Class,
       typeof c.Level === 'number' ? c.Level : 0,
       typeof c.EXP === 'number' ? c.EXP : 0,
       levelTables,
-      isLikelyBB,
+      isBBSnapshot,
     );
     out.push({
       AccountToken:    accountToken(c.AccountID),
@@ -367,13 +377,15 @@ function stripCharacters(rawCharacters, rawAccounts, levelTables) {
       Meseta:          c.Meseta,
       Stats:           c.Stats,
       IsLikelyBB:      isLikelyBB,
-      // EXP / PlayTime: keep raw values for BB (trustworthy) and null
-      // for non-BB (frontend renders "—"). The dashboard never displays
-      // a misleading "0" for EXP/play-time on a level-50 disc-version
-      // character.
-      EXP:             isLikelyBB === true ? (typeof c.EXP === 'number' ? c.EXP : null) : null,
-      EXPToNextLevel:  isLikelyBB === true ? expToNext : null,
-      PlayTimeSeconds: isLikelyBB === true ? (typeof c.PlayTimeSeconds === 'number' ? c.PlayTimeSeconds : null) : null,
+      SnapshotVersion: snapshotVersion,
+      // IsBBSnapshot drives the EXP / play-time trust gate in the frontend.
+      IsBBSnapshot:    isBBSnapshot,
+      // EXP / PlayTime: raw values for BB snapshots (server-authoritative),
+      // null otherwise (frontend renders "—"). The dashboard never shows a
+      // misleading "0" for EXP/play-time on a disc-version character.
+      EXP:             isBBSnapshot ? (typeof c.EXP === 'number' ? c.EXP : null) : null,
+      EXPToNextLevel:  isBBSnapshot ? expToNext : null,
+      PlayTimeSeconds: isBBSnapshot ? (typeof c.PlayTimeSeconds === 'number' ? c.PlayTimeSeconds : null) : null,
       // Inventory passthrough — already sanitized server-side:
       // newserv's /y/characters resolves names via describe_item and
       // returns just {Name, Kind, Equipped} per entry. No raw item
@@ -390,16 +402,18 @@ function stripCharacters(rawCharacters, rawAccounts, levelTables) {
 // Quest-completion lists also include raw AccountID (so the frontend can
 // match a completion entry to a character row by account). Same security
 // concern, same fix.
-function stripQuestCompletions(rawCompletions) {
-  if (!Array.isArray(rawCompletions)) return [];
+function stripQuestPlays(rawPlays) {
+  if (!Array.isArray(rawPlays)) return [];
   const out = [];
-  for (const entry of rawCompletions) {
+  for (const entry of rawPlays) {
     if (!entry || typeof entry !== 'object') continue;
     if (typeof entry.AccountID !== 'number') continue;
     out.push({
-      AccountToken: accountToken(entry.AccountID),
-      SlotIndex:    entry.SlotIndex,
-      Name:         entry.Name,
+      AccountToken:    accountToken(entry.AccountID),
+      SlotIndex:       entry.SlotIndex,
+      Name:            entry.Name,
+      PlayCount:       typeof entry.PlayCount === 'number' ? entry.PlayCount : 0,
+      LastPlayedUsecs: typeof entry.LastPlayedUsecs === 'number' ? entry.LastPlayedUsecs : 0,
     });
   }
   return out;
@@ -442,29 +456,33 @@ async function fetchCachedLongTTL(key, url, ttlMs) {
 // =========================================================================
 
 // =========================================================================
-// /api/quest/:num/completions
+// /api/quest/:num/plays
 //
-// Per-quest "who has completed this" — proxies newserv's parameterized
-// /y/data/quest/:num/completions endpoint. Quest number must be a
-// non-negative integer; anything else returns 400 without touching
-// newserv. The response is already sanitized server-side (each entry
-// is just {AccountID, SlotIndex, Name}).
+// Per-quest "who has played this" — proxies newserv's parameterized
+// /y/data/quest/:num/plays endpoint. Quest number must be a non-negative
+// integer; anything else returns 400 without touching newserv. newserv
+// records a play whenever a quest is loaded into a game (the only quest
+// event the server authoritatively observes — online quests run
+// client-side, so there is no reliable "completed" signal). Each entry is
+// {AccountID, SlotIndex, Name, PlayCount, LastPlayedUsecs}; AccountID is
+// HMAC'd to AccountToken before it reaches the browser.
 // =========================================================================
 
 // =========================================================================
-// /api/character/:token/:slot/completions
+// /api/character/:token/:slot/quest-plays
 //
-// The inverse of /api/quest/:num/completions — for one character, lists
-// every quest they've cleared and on which difficulties. The frontend
-// renders this as "Completed quests" in the player modal, mirroring how
-// /api/quest/:num/completions feeds "Completed by" in the quest modal.
+// The inverse of /api/quest/:num/plays — for one character, the quests
+// they've played with per-quest play count, last-played time, and the
+// difficulties seen. The frontend renders this as "Quests played" in the
+// player modal, mirroring how /api/quest/:num/plays feeds "Played by" in
+// the quest modal.
 //
 // :token is the AccountToken (HMAC of the real account_id); we reverse
 // it via the per-process token index before forwarding. Slot is a
 // 0–3 integer (PSO's per-account character slot range).
 // =========================================================================
 
-app.get('/api/character/:token/:slot/completions', async (req, res) => {
+app.get('/api/character/:token/:slot/quest-plays', async (req, res) => {
   const slot = Number.parseInt(req.params.slot, 10);
   if (!Number.isInteger(slot) || slot < 0 || slot > 3 || String(slot) !== req.params.slot) {
     return res.status(400).json({ error: 'slot must be 0..3' });
@@ -475,35 +493,34 @@ app.get('/api/character/:token/:slot/completions', async (req, res) => {
   }
   try {
     const data = await fetchCached(
-      `character-completions:${accountId}:${slot}`,
-      `${NEWSERV_API}/y/character/${accountId}/${slot}/completions`,
+      `character-quest-plays:${accountId}:${slot}`,
+      `${NEWSERV_API}/y/character/${accountId}/${slot}/quest-plays`,
     );
-    // Response is pure quest data — {QuestNumber, Difficulties[]} entries,
-    // no account or character PII. Passthrough is safe.
+    // Response is pure quest data — {QuestNumber, PlayCount, LastPlayedUsecs,
+    // Difficulties[]} entries, no account or character PII. Passthrough is safe.
     res.json(Array.isArray(data) ? data : []);
   } catch (err) {
-    console.error(`[api/character/${req.params.token}/${slot}/completions] ${err.message}`);
+    console.error(`[api/character/${req.params.token}/${slot}/quest-plays] ${err.message}`);
     res.status(502).json({ error: 'upstream unavailable' });
   }
 });
 
-app.get('/api/quest/:num/completions', async (req, res) => {
+app.get('/api/quest/:num/plays', async (req, res) => {
   const num = Number.parseInt(req.params.num, 10);
   if (!Number.isInteger(num) || num < 0 || String(num) !== req.params.num) {
     return res.status(400).json({ error: 'quest number must be a non-negative integer' });
   }
   try {
     const data = await fetchCached(
-      `quest-completions:${num}`,
-      `${NEWSERV_API}/y/data/quest/${num}/completions`,
+      `quest-plays:${num}`,
+      `${NEWSERV_API}/y/data/quest/${num}/plays`,
     );
-    // newserv's response includes raw AccountID — strip it through the
-    // same HMAC path the /api/characters route uses so the frontend can
-    // still match completions against character rows without ever seeing
-    // the underlying serial.
-    res.json(stripQuestCompletions(data));
+    // newserv's response includes raw AccountID — strip it through the same
+    // HMAC path /api/characters uses so the frontend can still match plays
+    // against character rows without ever seeing the underlying serial.
+    res.json(stripQuestPlays(data));
   } catch (err) {
-    console.error(`[api/quest/${num}/completions] ${err.message}`);
+    console.error(`[api/quest/${num}/plays] ${err.message}`);
     res.status(502).json({ error: 'upstream unavailable' });
   }
 });

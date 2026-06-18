@@ -1135,9 +1135,9 @@
     color: var(--cyan-bright);
   }
 
-  /* Quest completion grid — one card per character on the server, lit up
-     if they've cleared this quest and muted (faded) if not. Steam-achievement
-     style. Built by renderQuestCompletions() from /api/quest/:n/completions
+  /* Quest plays grid — one card per character on the server, lit up if
+     they've played this quest and muted (faded) if not. Steam-achievement
+     style. Built by renderQuestPlays() from /api/quest/:n/plays
      cross-referenced against the loaded character roster. */
   .completion-grid {
     list-style: none;
@@ -1214,7 +1214,7 @@
   }
 
   /* -----------------------------------------------------------------
-     Character → completed quests (inverse of /api/quest/:n/completions)
+     Character → quests played (inverse of /api/quest/:n/plays)
      -----------------------------------------------------------------
      Episode group → quest rows. Each row is the quest name and a row
      of small pills naming the difficulties the character has cleared
@@ -2700,10 +2700,10 @@ function adaptQuest(q) {
     // quest so we always have them.
     maxPlayers:       Number.isInteger(meta.MaxPlayers) ? meta.MaxPlayers : null,
     joinable:         typeof meta.Joinable === 'boolean' ? meta.Joinable : null,
-    // Per-quest completion totals aren't on the bulk /api/quests payload —
-    // newserv exposes them per quest at /api/quest/:num/completions, which
-    // the modal fetches on open. Leave these null in the card view so the
-    // progress bar stays hidden and the footer shows the category instead.
+    // Per-quest play data isn't on the bulk /api/quests payload — the modal
+    // fetches it per quest from /api/quest/:num/plays on open. Leave these
+    // null in the card view so the progress bar stays hidden and the footer
+    // shows the category instead.
     completions:      null,
     total:            null,
   };
@@ -3188,9 +3188,9 @@ function renderQuests() {
 
     // The card view hides the progress bar because per-quest aggregate
     // totals aren't on the bulk /api/quests payload — those would need a
-    // separate fan-out across /api/quest/:num/completions. For now the
-    // footer shows the category name instead of the completion summary;
-    // the modal still fetches per-quest completion data on open.
+    // separate fan-out across /api/quest/:num/plays. For now the footer
+    // shows the category name instead; the modal still fetches per-quest
+    // play data on open.
     const hasCompletions = Number.isInteger(q.completions)
                         && Number.isInteger(q.total)
                         && q.total > 0;
@@ -3311,16 +3311,15 @@ function openQuestModal(questId) {
 
   const hasFullBriefing = q.fullDescription && q.fullDescription !== q.description;
 
-  // Per-quest completion data is fetched async after the modal opens
-  // (one network call per modal open is fine; the dashboard backend
-  // caches /api/quest/:num/completions for 10s). The "Completed by"
-  // section starts as a loading placeholder and is filled in by
-  // fetchQuestCompletions() — see below.
-  const completionsBlock = `
-    <section class="quest-modal__section" aria-label="Per-character completion status">
-      <h3>Completed by</h3>
-      <div id="quest-modal-completions" data-quest-number="${escapeHtml(String(q.number).replace(/^q0*/, '') || '0')}">
-        <p class="quest-modal__placeholder">Checking who's completed it…</p>
+  // Per-quest play data is fetched async after the modal opens (one network
+  // call per modal open is fine; the dashboard backend caches
+  // /api/quest/:num/plays for 10s). The "Played by" section starts as a
+  // loading placeholder and is filled in by fetchQuestPlays() — see below.
+  const playsBlock = `
+    <section class="quest-modal__section" aria-label="Per-character play status">
+      <h3>Played by</h3>
+      <div id="quest-modal-plays" data-quest-number="${escapeHtml(String(q.number).replace(/^q0*/, '') || '0')}">
+        <p class="quest-modal__placeholder">Checking who's played it…</p>
       </div>
     </section>
   `;
@@ -3348,7 +3347,7 @@ function openQuestModal(questId) {
 
     ${notesBlock}
 
-    ${completionsBlock}
+    ${playsBlock}
   `;
 
   // Native showModal() traps focus inside the dialog and handles ESC.
@@ -3358,27 +3357,27 @@ function openQuestModal(questId) {
   // first stop and Tab cycles through the dialog content from there.
   modal.querySelector('[data-action="close-quest-modal"]')?.focus();
 
-  // Async-fetch the completion list. The quest's id is `q${num}`, so
-  // stripping the leading 'q' gives us the raw integer. The backend
-  // caches the completion result for 10s so reopen-thrash is cheap.
+  // Async-fetch the play list. The quest's id is `q${num}`, so stripping the
+  // leading 'q' gives us the raw integer. The backend caches the result for
+  // 10s so reopen-thrash is cheap.
   const questNum = parseInt(q.id.substring(1), 10);
   if (Number.isInteger(questNum)) {
-    fetchQuestCompletions(questNum).catch((err) => {
-      console.warn('[quest-modal] completions fetch failed:', err.message);
-      renderQuestCompletions(questNum, null, err.message);
+    fetchQuestPlays(questNum).catch((err) => {
+      console.warn('[quest-modal] plays fetch failed:', err.message);
+      renderQuestPlays(questNum, null, err.message);
     });
   }
 }
 
-async function fetchQuestCompletions(questNum) {
-  const data = await fetchJSON(`quest/${questNum}/completions`);
+async function fetchQuestPlays(questNum) {
+  const data = await fetchJSON(`quest/${questNum}/plays`);
   // Could already be navigated away — guard with the data-attribute so
   // we don't write stale data into a modal showing a different quest.
-  renderQuestCompletions(questNum, Array.isArray(data) ? data : []);
+  renderQuestPlays(questNum, Array.isArray(data) ? data : []);
 }
 
-function renderQuestCompletions(questNum, list, error) {
-  const container = document.getElementById('quest-modal-completions');
+function renderQuestPlays(questNum, list, error) {
+  const container = document.getElementById('quest-modal-plays');
   if (!container) return;
   // The data-quest-number attribute was set with the quest number the
   // modal was opened for. If the user navigated to a different quest
@@ -3386,45 +3385,47 @@ function renderQuestCompletions(questNum, list, error) {
   if (container.dataset.questNumber !== String(questNum)) return;
 
   if (error) {
-    container.innerHTML = `<p class="quest-modal__placeholder">Couldn't load completion data: ${escapeHtml(error)}</p>`;
+    container.innerHTML = `<p class="quest-modal__placeholder">Couldn't load play data: ${escapeHtml(error)}</p>`;
     return;
   }
   // Steam-achievement style: a card for every character on the server, lit
-  // up if they've cleared this quest and muted if not. Completers come from
-  // /api/quest/:n/completions ({AccountToken, SlotIndex, Name}); the full
-  // roster is the already-loaded `characters` snapshot. A character is
-  // matched on AccountToken+SlotIndex (which uniquely identifies it).
-  const completers = Array.isArray(list) ? list : [];
-  const done = new Set(completers.map((e) => `${e.AccountToken}:${e.SlotIndex}`));
+  // up if they've played this quest and muted if not. Players come from
+  // /api/quest/:n/plays ({AccountToken, SlotIndex, Name, PlayCount,
+  // LastPlayedUsecs}); the full roster is the already-loaded `characters`
+  // snapshot. A character is matched on AccountToken+SlotIndex.
+  const players = Array.isArray(list) ? list : [];
+  const playCounts = new Map(players.map((e) => [`${e.AccountToken}:${e.SlotIndex}`, e.PlayCount || 0]));
   const roster = Array.isArray(characters) ? characters : [];
 
-  // Prefer the full roster (so non-completers show muted). Fall back to just
-  // the completers if /api/characters hasn't resolved yet.
+  // Prefer the full roster (so non-players show muted). Fall back to just
+  // the players if /api/characters hasn't resolved yet.
   const source = roster.length
-    ? roster.map((c) => ({ name: c.Name, done: done.has(`${c.AccountToken}:${c.SlotIndex}`) }))
-    : completers.map((e) => ({ name: e.Name, done: true }));
+    ? roster.map((c) => ({ name: c.Name, plays: playCounts.get(`${c.AccountToken}:${c.SlotIndex}`) || 0 }))
+    : players.map((e) => ({ name: e.Name, plays: e.PlayCount || 0 }));
 
   if (source.length === 0) {
-    container.innerHTML = `<p class="quest-modal__placeholder">No one's completed it yet.</p>`;
+    container.innerHTML = `<p class="quest-modal__placeholder">No one's played it yet.</p>`;
     return;
   }
 
   const cards = source
     .slice()
     .sort((a, b) =>
-      (Number(b.done) - Number(a.done)) ||
+      (Number(b.plays > 0) - Number(a.plays > 0)) ||
+      (b.plays - a.plays) ||
       String(a.name ?? '').localeCompare(String(b.name ?? ''), undefined, { sensitivity: 'base' }))
     .map((s) => {
-      const name = escapeHtml(String(s.name ?? '?').trim() || '?');
-      const tick = s.done ? '<span class="completion-card__check" aria-hidden="true">✓</span>' : '';
-      const cls  = s.done ? 'completion-card--done' : 'completion-card--todo';
-      const tip  = s.done ? 'Completed' : 'Not completed yet';
+      const name   = escapeHtml(String(s.name ?? '?').trim() || '?');
+      const played = s.plays > 0;
+      const tick   = played ? '<span class="completion-card__check" aria-hidden="true">✓</span>' : '';
+      const cls    = played ? 'completion-card--done' : 'completion-card--todo';
+      const tip    = played ? `Played ${s.plays}×` : 'Not played yet';
       return `<li class="completion-card ${cls}" title="${tip}">${tick}${name}</li>`;
     })
     .join('');
 
   container.innerHTML = `
-    <ul class="completion-grid" aria-label="Quest completion by character">${cards}</ul>
+    <ul class="completion-grid" aria-label="Quest plays by character">${cards}</ul>
   `;
 }
 
@@ -3534,12 +3535,12 @@ function renderPlayerModalCharacter(c, titleEl, subEl, bodyEl) {
   const stats  = c.Stats || {};
   const fmt    = (n) => (Number.isFinite(n) ? n.toLocaleString() : '—');
 
-  // EXP / play-time trust gate. The backend nulls these out for disc
-  // versions because the server doesn't track them live there — the
-  // values that arrive at the dashboard are stale until the client's
-  // next 61/98 upload (lobby/quest transition). For BB they're
-  // server-authoritative and trustworthy.
-  const showLiveFields = c.IsLikelyBB === true;
+  // EXP / play-time trust gate. The backend nulls these out unless the
+  // character's last snapshot was taken from a Blue Burst session
+  // (IsBBSnapshot), where they're server-authoritative. For disc versions
+  // the values are stale until the client's next 61/98 upload, and an
+  // account holding both BB and disc licenses no longer hides BB EXP.
+  const showLiveFields = c.IsBBSnapshot === true;
   const totalExpHtml   = showLiveFields ? escapeHtml(fmt(c.EXP)) : '<span title="Disc versions don\'t track EXP server-side — refreshes on lobby return.">—</span>';
   const toNextHtml     = showLiveFields && Number.isFinite(c.EXPToNextLevel)
     ? escapeHtml(fmt(c.EXPToNextLevel))
@@ -3577,30 +3578,29 @@ function renderPlayerModalCharacter(c, titleEl, subEl, bodyEl) {
 
     ${renderInventorySections(c)}
 
-    <section class="quest-modal__section" aria-label="Completed quests">
-      <h3>Completed quests</h3>
-      <div id="player-modal-completions"
+    <section class="quest-modal__section" aria-label="Quests played">
+      <h3>Quests played</h3>
+      <div id="player-modal-quest-plays"
            data-account-token="${escapeHtml(String(c.AccountToken))}"
            data-slot-index="${escapeHtml(String(c.SlotIndex))}">
-        <p class="quest-modal__placeholder">Checking which quests they've completed…</p>
+        <p class="quest-modal__placeholder">Checking which quests they've played…</p>
       </div>
     </section>
   `;
 
-  // Lazy-fetch the completion list once the modal body is in the DOM.
-  // Mirrors the fetch pattern fetchQuestCompletions uses for the quest
-  // modal — one network call per modal open, response is small and
-  // cached server-side.
+  // Lazy-fetch the play list once the modal body is in the DOM. Mirrors the
+  // fetch pattern fetchQuestPlays uses for the quest modal — one network call
+  // per modal open, response is small and cached server-side.
   if (typeof c.AccountToken === 'string' && Number.isInteger(c.SlotIndex)) {
-    fetchCharacterCompletions(c.AccountToken, c.SlotIndex).catch((err) => {
-      console.warn('[player-modal] completions fetch failed:', err.message);
-      renderCharacterCompletions(c.AccountToken, c.SlotIndex, null, err.message);
+    fetchCharacterQuestPlays(c.AccountToken, c.SlotIndex).catch((err) => {
+      console.warn('[player-modal] quest-plays fetch failed:', err.message);
+      renderCharacterQuestPlays(c.AccountToken, c.SlotIndex, null, err.message);
     });
   }
 }
 
 // =========================================================================
-// Character → completed quests (lazy fetch on modal open)
+// Character → quests played (lazy fetch on modal open)
 // =========================================================================
 
 // Build a lookup map: integer quest number → quest object from the
@@ -3631,13 +3631,13 @@ const DIFFICULTY_PILL_LABEL = {
 };
 const DIFFICULTY_PILL_ORDER = ['Normal', 'Hard', 'VHard', 'Ultimate'];
 
-async function fetchCharacterCompletions(accountToken, slotIndex) {
-  const data = await fetchJSON(`character/${accountToken}/${slotIndex}/completions`);
-  renderCharacterCompletions(accountToken, slotIndex, Array.isArray(data) ? data : []);
+async function fetchCharacterQuestPlays(accountToken, slotIndex) {
+  const data = await fetchJSON(`character/${accountToken}/${slotIndex}/quest-plays`);
+  renderCharacterQuestPlays(accountToken, slotIndex, Array.isArray(data) ? data : []);
 }
 
-function renderCharacterCompletions(accountToken, slotIndex, list, error) {
-  const container = document.getElementById('player-modal-completions');
+function renderCharacterQuestPlays(accountToken, slotIndex, list, error) {
+  const container = document.getElementById('player-modal-quest-plays');
   if (!container) return;
   // If the user has navigated to a different player while the fetch
   // was in flight, the data-attrs no longer match — drop the result.
@@ -3645,17 +3645,17 @@ function renderCharacterCompletions(accountToken, slotIndex, list, error) {
   if (container.dataset.slotIndex   !== String(slotIndex))   return;
 
   if (error) {
-    container.innerHTML = `<p class="quest-modal__placeholder">Couldn't load completion data: ${escapeHtml(error)}</p>`;
+    container.innerHTML = `<p class="quest-modal__placeholder">Couldn't load play data: ${escapeHtml(error)}</p>`;
     return;
   }
   if (!Array.isArray(list) || list.length === 0) {
-    container.innerHTML = `<p class="quest-modal__placeholder">No quests completed yet.</p>`;
+    container.innerHTML = `<p class="quest-modal__placeholder">No quests played yet.</p>`;
     return;
   }
 
   // Resolve each entry against the loaded quest list. Entries with no
   // matching quest (e.g. a quest pack that was uninstalled after the
-  // character cleared it) are still rendered with "Quest #N" so they
+  // character played it) are still rendered with "Quest #N" so they
   // don't silently disappear — but they sort to the end of their group.
   const lookup = getQuestNumberLookup();
   // Group by episode. Episode 0 = "Other" (unknown quests / quests
@@ -3687,6 +3687,11 @@ function renderCharacterCompletions(accountToken, slotIndex, list, error) {
   const groupsHtml = episodeOrder.map((episode) => {
     const rows = groups.get(episode).map(({ entry, q }) => {
       const name = q ? q.name : `Quest #${entry.QuestNumber}`;
+      const playCount = Number.isInteger(entry.PlayCount) ? entry.PlayCount : 0;
+      // Show a subtle ×N when a quest has been played more than once.
+      const countBadge = playCount > 1
+        ? ` <span style="color: var(--text-low); font-weight: normal; font-size: 0.85em;" title="${playCount} plays">×${playCount}</span>`
+        : '';
       const pills = (Array.isArray(entry.Difficulties) ? entry.Difficulties : [])
         .slice()
         .sort((a, b) => DIFFICULTY_PILL_ORDER.indexOf(a) - DIFFICULTY_PILL_ORDER.indexOf(b))
@@ -3698,7 +3703,7 @@ function renderCharacterCompletions(accountToken, slotIndex, list, error) {
         .join('');
       return `
         <li class="char-completion-row">
-          <span class="char-completion-row__name">${escapeHtml(name)}</span>
+          <span class="char-completion-row__name">${escapeHtml(name)}${countBadge}</span>
           <span class="char-completion-row__diffs">${pills}</span>
         </li>
       `;
@@ -3759,7 +3764,7 @@ function renderInventorySections(c) {
   // subcommands, but commits to disp only at 61/98 boundaries). Show a
   // small italic note so the reader understands why an item they just
   // picked up isn't here.
-  const stalenessNote = c.IsLikelyBB === false
+  const stalenessNote = c.IsBBSnapshot === false
     ? `<p class="inventory-staleness">As of last lobby return — disc versions only refresh inventory between quests.</p>`
     : '';
 
