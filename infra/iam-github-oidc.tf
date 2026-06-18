@@ -74,10 +74,10 @@ resource "aws_iam_role" "github_actions" {
 
 locals {
   # Resources this role is allowed to touch.
-  tf_state_bucket_arn = "arn:aws:s3:::pso-server-tfstate-${data.aws_caller_identity.current.account_id}"
-  backup_bucket_arn   = "arn:aws:s3:::${var.instance_name}-backups-${data.aws_caller_identity.current.account_id}"
-  role_arn            = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/github-actions-${var.instance_name}"
-  oidc_provider_arn   = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
+  tf_state_bucket_arn  = "arn:aws:s3:::pso-server-tfstate-${data.aws_caller_identity.current.account_id}"
+  backup_bucket_arn    = "arn:aws:s3:::${var.instance_name}-backups-${data.aws_caller_identity.current.account_id}"
+  role_arn             = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/github-actions-${var.instance_name}"
+  oidc_provider_arn    = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
   backup_user_arn      = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/${var.instance_name}-backup"
   cost_reader_user_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/${var.instance_name}-cost-reader"
 }
