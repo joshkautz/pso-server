@@ -114,23 +114,29 @@ Not present in newserv's bundle; downloaded, decoded, verified via
 | q667 | Maximum Attack E: Episode 4 | 4 | Extermination |
 | q668 | Christmas Fiasco | 4 | Events |
 
-### ♻️ Already bundled — 29 quests (reclassified, not re-installed)
+### ♻️ Already bundled — reclassified (then partly corrected — see audit below)
 
-These Ephinea quests already ship in newserv at their original numbers; we
-**reclassified them in `quest-provenance.json` from `original` → `custom`**
-(author Sega → Ephinea) rather than installing duplicates. Installing copies
-would have shown each quest twice in the in-game menu.
+> **⚠️ This subsection's original reclassification was PARTLY WRONG and was
+> corrected the same day.** See "[2026-06-18 — Audit & corrections](#2026-06-18--audit--corrections)"
+> below. Short version: of the families listed here, only the *Maximum Attack*
+> ones (q144–146, q237, q303–305, q314, q494) are genuinely community. The
+> rest — **Endless Nightmare, Phantasmal World, Point of Disaster, The Robots'
+> Reckoning, War of Limits, New Mop-Up Operation** — are **Sega-original** and
+> were reverted to `original`.
 
-- Endless Nightmare #1–#4 → bundled **q108–q111**
-- Maximum Attack 4th Stage -1A/-1B/-1C- → bundled **q144–q146**
-- Phantasmal World #1–#4 → bundled **q233–q236**
-- Maximum Attack 1 Ver2 → bundled **q237**
-- Maximum Attack 4th Stage -4A/-4B/-4C- → bundled **q303–q305**
-- Maximum Attack 3 Ver2 → bundled **q314**
-- Maximum Attack 2 Ver2 → bundled **q494**
-- Point of Disaster → bundled **q709**; The Robots' Reckoning → **q710**
-- War of Limits 1–5 → bundled **q811–q815**
-- New Mop-Up Operation #1–#5 → bundled **q816–q820**
+These Ephinea-tree quests already ship in newserv at their original numbers,
+so rather than installing duplicates we adjusted their `quest-provenance.json`
+classification:
+
+- ~~Endless Nightmare #1–#4 → q108–q111~~ → **Sega-original** (reverted)
+- Maximum Attack 4th Stage -1A/-1B/-1C- → **q144–q146** (custom ✓)
+- ~~Phantasmal World #1–#4 → q233–q236~~ → **Sega-original** (reverted)
+- Maximum Attack 1 Ver2 → **q237** (custom ✓)
+- Maximum Attack 4th Stage -4A/-4B/-4C- → **q303–q305** (custom ✓)
+- Maximum Attack 3 Ver2 → **q314** (custom ✓); Maximum Attack 2 Ver2 → **q494** (custom ✓)
+- ~~Point of Disaster q709; Robots' Reckoning q710~~ → **Sega-original** (reverted)
+- ~~War of Limits 1–5 → q811–q815~~ → **Sega-original** (reverted)
+- ~~New Mop-Up Operation #1–#5 → q816–q820~~ → **Sega-original** (reverted)
 
 ### ⏭️ Skipped / deferred
 
@@ -151,6 +157,93 @@ would have shown each quest twice in the in-game menu.
 
 ---
 
+## 2026-06-18 — Audit & corrections
+
+A bidirectional classification audit (cross-referenced against the
+**[Sylverant quest-list](https://sylverant.net/quest-list/)** "Common (Sega)
+Quests" split and the **[Ephinea wiki](https://wiki.pioneer2.net/w/Quests)**
+per-quest `Author` fields) found the initial install batch had errors in
+**both** directions. All fixed in `quest-provenance.json`.
+
+### Direction 2 — Sega-original wrongly marked custom (the over-correction)
+
+The first pass assumed "in Ephinea's quest tree ⇒ Ephinea custom." That's
+false — **Ephinea hosts Sega-original quests too.** Sylverant lists Endless
+Nightmare and Phantasmal World under "Common (Sega) Quests"; the Ephinea wiki
+credits the Ep4 families to "Sonic Team." **20 quests reverted to
+`original`:** Endless Nightmare (q108–111), Phantasmal World (q233–236),
+Point of Disaster (q709), The Robots' Reckoning (q710), War of Limits
+(q811–815), New Mop-Up Operation (q816–820).
+
+### Direction 1 — community wrongly marked original
+
+The **Maximum Attack 4th Stage (MA4)** series is fan-made (originated on
+Schthack, hosted by Ephinea, credited "Matt"); Sega never made an MA4. **5
+flipped to `custom`:** q147, q497, q498, q499, q500 — for consistency with
+the already-custom q144–146 / q303–305.
+
+### Real duplicates removed
+
+My install of "MA4 -2A-/-2B-/-2C-" (q628–630) duplicated bundled
+**q497–499** ("Maximum Attack 4th Stage -2A-…"). My dedup missed it because I
+compared the *short* source name ("MA4 -2A-") against the *long* bundled name.
+**q628–630 removed.** This is the bug the alias system below now prevents.
+
+### Held for manual review
+
+- **q504** "To The Deepest Blue -MA4 Venue-" — "-MA4 Venue-" implies community,
+  but the wiki says Author: Sonic Team. Left `original`, flagged.
+- **q501 / q502** "Maximum Attack E: VR / Gal Da Val" (GC/XB, classified
+  `original`) — the "Maximum Attack E" prefix is an Ephinea community-series
+  marker, but they're GC/XB-bundled (odd for a BB-era series). Left `original`,
+  flagged; the BB versions (my q631/q632) are confirmed custom and kept.
+
+### Borderline names resolved (Agent research)
+
+| Quest | Verdict | Author |
+|---|---|---|
+| Forsaken Friends | **custom** | FireFox276 |
+| Rescue from Ragol | **custom** | Tofuman |
+| Tyrell's Ego | **custom** | Tofuman |
+| Revisiting Darkness | **custom** | RikaPSO & Ilitsa |
+| Sugoroku, Dream Messenger, Reach for the Dream, Respective Tomorrow, Beyond the Horizon, LOGiN | **Sega-original** | Sonic Team |
+
+The four customs above aren't in our set (Ephinea server-side only); they're
+listed as future candidates in the independently-authored table. The six Sega
+ones are correctly `original` already — no change.
+
+Net: custom-classified quests **74 → 56** of **285** total (after reverts +
+dup removal).
+
+---
+
+## Dedup / alias system
+
+To stop the same quest entering the catalog twice under different names, every
+provenance entry may carry an **`aliases`** list (short forms, source-filename
+variants, case/spacing variants). The checker normalizes names + aliases and
+folds the common `MA4`↔`Maximum Attack 4th Stage`, `MAE`↔`Maximum Attack E`
+abbreviations.
+
+```bash
+# Before installing a download, check it isn't already present:
+python3 scripts/quest-dedup-check.py "MA4 -2A-"
+#   → ✗ DUPLICATES existing: q497 (Maximum Attack 4th Stage -2A-)
+
+# Audit the whole catalog for collisions (CI / pre-commit gate):
+python3 scripts/quest-dedup-check.py --self-check
+
+# Check a folder of freshly-downloaded .qst files by filename:
+python3 scripts/quest-dedup-check.py --dir /tmp/new-quests
+```
+
+`--self-check` suppresses the expected noise of Sega quests bundled at multiple
+version-numbers (e.g. Planet Ragol at DC q151 / GC q180 / BB q401) and only
+flags collisions that involve a custom entry, annotating each with platform so
+genuine per-version copies (BB vs GC) are distinguishable from true duplicates.
+
+---
+
 ## Source registry
 
 Where custom quests actually live, and what it takes to get them. Verified
@@ -168,6 +261,8 @@ Where custom quests actually live, and what it takes to get them. Verified
 | **Schtserv forums** | schtserv.com | **Yes** | Historically the "42-pack". Threads linked from older guides now 404. | Mixed |
 | **PSO Palace (forumotion mirror)** | [psopalace.forumotion.com](https://psopalace.forumotion.com/t13-downloads-custom-quests) | **Yes** | A real "Custom Quests" thread, but **GameCube Ver.1/2 era**, not BB. | Mostly shareable (GC) |
 | **psoarchive.neocities** | [psoarchive.neocities.org](https://psoarchive.neocities.org/quests/quests) | No | Dreamcast `.vmi/.vmu`, Sega-originals. Wrong format + not custom. | N/A |
+| **PSO Palace — Aleron Ives/Jodin** | [psopalace.sylverant.net/downloads.html](https://psopalace.sylverant.net/downloads.html) + [downloads_pc.html](https://psopalace.sylverant.net/downloads_pc.html) | No (torrents/zips) | The richest genuinely-**custom** vein: 100%-original fan quests (Christmas Catastrophe, Lost HAVOC VULCAN, Resurgent Darkness, Frantic Fauna, Halloween Horror, Acrid Aquifer…). Shipped as **DC/PC disc torrents** + a no-login `Ives_PC_PSO_Quests.zip` and `Offline_Quest_Pack` (11 `.qst`). **DC/PC format → needs `newserv` conversion to BB.** | Shareable (Ives released them) |
+| **waytim/psobb** (GitHub) | [github.com/waytim/psobb](https://github.com/waytim/psobb) `quest/` | No | 145 `.qst` — the standard **Sega/Tethealla** bundle (whiteday, ma1, sunset base, etc.). Clean no-login mirror of the Sega set; **not custom**, redundant with our bundle. | N/A (not custom) |
 
 ### Tools (not quests, but how you make/inspect them)
 
@@ -249,7 +344,11 @@ forum login to download, hence `blocked` until someone grabs them.
 
 | Quest | Author | # | Episode | Bucket | Status | Notes |
 |---|---|---|---|---|---|---|
-| (Aleron Ives releases) | Aleron Ives | — | — | Shareable | blocked | PSO-Palace forum, login required. His "Aberrant Grove" is already bundled in newserv as q075. Browse [pso-palace.com](https://www.pso-palace.com/) Quests subforum filtered by author. |
+| Forsaken Friends | FireFox276 | — | 1 | Shareable | catalogued | Ephinea server-side; not in our set. Confirmed community (Ephinea wiki Author field). Acquisition needs Pioneer 2 login or the phantasmal-world mirror (`episode_1/guild/retrieval/`). |
+| Rescue from Ragol | Tofuman | — | 1 | Shareable | catalogued | Community (Tofuman) — boss-rush of every Ep1 boss. Same acquisition as above. |
+| Tyrell's Ego | Tofuman | — | 1 | Shareable | catalogued | Community (Tofuman). Same acquisition. |
+| Revisiting Darkness | RikaPSO & Ilitsa | — | 2 | Shareable | catalogued | Community (Ephinea wiki). Same acquisition. |
+| (Aleron Ives / Jodin releases) | Aleron Ives, Jodin | — | — | Shareable | blocked | PSO Palace. **100% custom** quests (Christmas Catastrophe, Lost HAVOC VULCAN, Resurgent Darkness, Frantic Fauna, Acrid Aquifer…). Distributed as **DC/PC disc torrents** + a no-login `Ives_PC_PSO_Quests.zip` / `Offline_Quest_Pack` (11 `.qst`). DC/PC format → needs newserv conversion to BB. See source registry. |
 | Subterranean Patrol #3 | Varista | — | 1 | Unknown | blocked | Ephinea June 2026 release. Ask [@Varista on Pioneer 2](https://www.pioneer2.net/community/) if available standalone. |
 | Underworld Patrol #1 | Varista | — | 1 | Unknown | blocked | Ephinea June 2026 release. Same as above. |
 
@@ -305,3 +404,4 @@ then **500–599**, then **600–699**.
 |---|---|
 | 2026-06-18 | Document created. Source registry verified. Ephinea custom tree (Ep 1/2/4) catalogued from the phantasmal-world mirror; download + `decode-qst` pipeline proven. |
 | 2026-06-18 | Owner approved the full Ephinea tree. Installed **28 new** Ephinea quests (q605–q668, BB) into `server/quests/`; found **29 already bundled** in newserv and reclassified them `original`→`custom` in `quest-provenance.json`; skipped 1 name-dup (Maximum Attack 2 Ver2 = bundled q494) + borderline-provenance names. Custom-classified quests in the dashboard: 17 → **74**. See "Install results" above. |
+| 2026-06-18 | **Audit & correction.** Bidirectional classification audit vs Sylverant + Ephinea wiki. Reverted **20** Sega-original quests wrongly flipped to custom (Endless Nightmare, Phantasmal World, Point of Disaster, Robots' Reckoning, War of Limits, New Mop-Up); flipped **5** genuine MA4 community quests to custom; removed **3** real duplicates (q628–630 = bundled q497–499). Added the **`aliases`** field + `scripts/quest-dedup-check.py` (the alias gap is what let the q628–630 dup through). Resolved 10 borderline names (4 custom future-candidates, 6 confirmed Sega). Flagged q501/q502/q504 for manual review. New sources: PSO Palace (Aleron Ives/Jodin customs), waytim/psobb mirror. Custom now **56 / 285**. See "Audit & corrections" above. |
