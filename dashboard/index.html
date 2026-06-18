@@ -3632,11 +3632,22 @@ const DIFFICULTY_PILL_LABEL = {
 const DIFFICULTY_PILL_ORDER = ['Normal', 'Hard', 'VHard', 'Ultimate'];
 
 async function fetchCharacterQuestPlays(accountToken, slotIndex) {
-  const data = await fetchJSON(`character/${accountToken}/${slotIndex}/quest-plays`);
-  renderCharacterQuestPlays(accountToken, slotIndex, Array.isArray(data) ? data : []);
+  // Fetch plays + completions together. Completions only exist for quests with a
+  // mapped CompletionFlag, so this list may be empty; a failure (e.g. an older
+  // newserv without the endpoint) degrades gracefully to "no cleared markers".
+  const [playsRaw, completionsRaw] = await Promise.all([
+    fetchJSON(`character/${accountToken}/${slotIndex}/quest-plays`),
+    fetchJSON(`character/${accountToken}/${slotIndex}/quest-completions`).catch(() => []),
+  ]);
+  renderCharacterQuestPlays(
+    accountToken, slotIndex,
+    Array.isArray(playsRaw) ? playsRaw : [],
+    null,
+    Array.isArray(completionsRaw) ? completionsRaw : [],
+  );
 }
 
-function renderCharacterQuestPlays(accountToken, slotIndex, list, error) {
+function renderCharacterQuestPlays(accountToken, slotIndex, list, error, completions = []) {
   const container = document.getElementById('player-modal-quest-plays');
   if (!container) return;
   // If the user has navigated to a different player while the fetch
@@ -3651,6 +3662,13 @@ function renderCharacterQuestPlays(accountToken, slotIndex, list, error) {
   if (!Array.isArray(list) || list.length === 0) {
     container.innerHTML = `<p class="quest-modal__placeholder">No quests played yet.</p>`;
     return;
+  }
+
+  // Quests this character has CLEARED (CompletionFlag-driven, reliable). Used to
+  // mark rows below; stays empty for quests with no mapped completion flag.
+  const completedByQuest = new Map();
+  for (const c of (Array.isArray(completions) ? completions : [])) {
+    if (c && Number.isInteger(c.QuestNumber)) completedByQuest.set(c.QuestNumber, c);
   }
 
   // Resolve each entry against the loaded quest list. Entries with no
@@ -3692,6 +3710,12 @@ function renderCharacterQuestPlays(accountToken, slotIndex, list, error) {
       const countBadge = playCount > 1
         ? ` <span style="color: var(--text-low); font-weight: normal; font-size: 0.85em;" title="${playCount} plays">×${playCount}</span>`
         : '';
+      // Reliable "cleared" marker (only present for quests with a mapped
+      // CompletionFlag that this character has actually completed).
+      const comp = completedByQuest.get(entry.QuestNumber);
+      const clearedBadge = comp
+        ? ` <span style="color: var(--success, #5fcf80); font-weight: 600; font-size: 0.78em; margin-left: 6px;" title="Cleared${(comp.CompletionCount > 1) ? ' ' + comp.CompletionCount + ' times' : ''}">✓ cleared</span>`
+        : '';
       const pills = (Array.isArray(entry.Difficulties) ? entry.Difficulties : [])
         .slice()
         .sort((a, b) => DIFFICULTY_PILL_ORDER.indexOf(a) - DIFFICULTY_PILL_ORDER.indexOf(b))
@@ -3703,7 +3727,7 @@ function renderCharacterQuestPlays(accountToken, slotIndex, list, error) {
         .join('');
       return `
         <li class="char-completion-row">
-          <span class="char-completion-row__name">${escapeHtml(name)}${countBadge}</span>
+          <span class="char-completion-row__name">${escapeHtml(name)}${countBadge}${clearedBadge}</span>
           <span class="char-completion-row__diffs">${pills}</span>
         </li>
       `;

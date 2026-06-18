@@ -419,6 +419,23 @@ function stripQuestPlays(rawPlays) {
   return out;
 }
 
+function stripQuestCompletions(rawCompletions) {
+  if (!Array.isArray(rawCompletions)) return [];
+  const out = [];
+  for (const entry of rawCompletions) {
+    if (!entry || typeof entry !== 'object') continue;
+    if (typeof entry.AccountID !== 'number') continue;
+    out.push({
+      AccountToken:       accountToken(entry.AccountID),
+      SlotIndex:          entry.SlotIndex,
+      Name:               entry.Name,
+      CompletionCount:    typeof entry.CompletionCount === 'number' ? entry.CompletionCount : 0,
+      LastCompletedUsecs: typeof entry.LastCompletedUsecs === 'number' ? entry.LastCompletedUsecs : 0,
+    });
+  }
+  return out;
+}
+
 // =========================================================================
 // Small TTL cache to avoid hammering newserv on every dashboard refresh
 // =========================================================================
@@ -521,6 +538,50 @@ app.get('/api/quest/:num/plays', async (req, res) => {
     res.json(stripQuestPlays(data));
   } catch (err) {
     console.error(`[api/quest/${num}/plays] ${err.message}`);
+    res.status(502).json({ error: 'upstream unavailable' });
+  }
+});
+
+// /api/character/:token/:slot/quest-completions and /api/quest/:num/completions
+// mirror the /plays routes but read newserv's CompletionFlag-driven completion
+// log. Only quests with a mapped CompletionFlag ever appear, so these never
+// report a false clear (unlike the old flag-guessing endpoint we removed).
+app.get('/api/character/:token/:slot/quest-completions', async (req, res) => {
+  const slot = Number.parseInt(req.params.slot, 10);
+  if (!Number.isInteger(slot) || slot < 0 || slot > 3 || String(slot) !== req.params.slot) {
+    return res.status(400).json({ error: 'slot must be 0..3' });
+  }
+  const accountId = await resolveAccountToken(req.params.token);
+  if (accountId == null) {
+    return res.status(404).json({ error: 'unknown account' });
+  }
+  try {
+    const data = await fetchCached(
+      `character-quest-completions:${accountId}:${slot}`,
+      `${NEWSERV_API}/y/character/${accountId}/${slot}/quest-completions`,
+    );
+    // Pure quest data — {QuestNumber, CompletionCount, LastCompletedUsecs,
+    // Difficulties[]}, no PII. Passthrough is safe.
+    res.json(Array.isArray(data) ? data : []);
+  } catch (err) {
+    console.error(`[api/character/${req.params.token}/${slot}/quest-completions] ${err.message}`);
+    res.status(502).json({ error: 'upstream unavailable' });
+  }
+});
+
+app.get('/api/quest/:num/completions', async (req, res) => {
+  const num = Number.parseInt(req.params.num, 10);
+  if (!Number.isInteger(num) || num < 0 || String(num) !== req.params.num) {
+    return res.status(400).json({ error: 'quest number must be a non-negative integer' });
+  }
+  try {
+    const data = await fetchCached(
+      `quest-completions:${num}`,
+      `${NEWSERV_API}/y/data/quest/${num}/completions`,
+    );
+    res.json(stripQuestCompletions(data));
+  } catch (err) {
+    console.error(`[api/quest/${num}/completions] ${err.message}`);
     res.status(502).json({ error: 'upstream unavailable' });
   }
 });
