@@ -731,30 +731,56 @@
   /* =================================================================
      Quest browser
      ================================================================= */
+  /* Shared height so the search input and every chip line up exactly. */
+  .quest-controls { --control-h: 38px; }
   .quest-controls {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-3);
-    align-items: center;
+    gap: var(--space-4);
+    /* Bottom-align the groups so each group's control sits on the same
+       row even though each has a label stacked above it. */
+    align-items: flex-end;
     margin-bottom: var(--space-5);
     padding: var(--space-4);
     background: var(--bg-surface);
     border: 1px solid var(--line-soft);
     border-radius: var(--radius-lg);
   }
+  /* Each control group is a column: uppercase label on top, control below. */
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+  .filter-group--search { flex: 1 1 240px; min-width: 200px; }
+  .filter-group__label {
+    font-size: 0.78rem;
+    color: var(--text-low);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+  }
+  .filter-group__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    align-items: center;
+  }
   .quest-search {
-    flex: 1 1 240px;
-    min-width: 200px;
+    height: var(--control-h);
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    padding: 0 var(--space-3);
     background: var(--bg-elevated);
     border: 1px solid var(--line-soft);
+    /* Same radius as the chips below — one unified toolbar look. */
     border-radius: var(--radius-md);
   }
   .quest-search input {
     flex: 1;
+    min-width: 0;
     background: transparent;
     border: 0;
     color: var(--text-high);
@@ -763,29 +789,16 @@
     outline: none;
   }
   .quest-search input::placeholder { color: var(--text-low); }
-
-  .filter-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    align-items: center;
-  }
-  .filter-group__label {
-    font-size: 0.78rem;
-    color: var(--text-low);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-right: var(--space-2);
-    font-weight: 600;
-  }
   .chip {
+    height: var(--control-h, 38px);
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    padding: 0 var(--space-3);
     background: var(--bg-elevated);
     border: 1px solid var(--line-soft);
-    border-radius: 999px;
+    /* Same radius as the search input above — unified toolbar look. */
+    border-radius: var(--radius-md);
     color: var(--text-mid);
     font-size: 0.8rem;
     font-weight: 500;
@@ -798,6 +811,13 @@
     background: var(--cyan-soft);
     border-color: var(--cyan-primary);
     color: var(--cyan-primary);
+  }
+  /* Empty filter (e.g. Episode 3 — no quests exist): visible for
+     completeness but greyed out and non-interactive. */
+  .chip--empty {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
   }
   .chip__count {
     font-family: var(--font-mono);
@@ -2170,28 +2190,40 @@
       </div>
 
       <form class="quest-controls" role="search" aria-label="Quest filters">
-        <div class="quest-search">
-          <span aria-hidden="true">⌕</span>
-          <label for="quest-search" class="sr-only">Search quests</label>
-          <input
-            type="search"
-            id="quest-search"
-            placeholder="Search by name or description…"
-            autocomplete="off"
-          />
+        <!-- Three inline groups, each a column: an uppercase label on top
+             and its control(s) below. The search input and the chips share
+             the same corner radius + height so they read as one toolbar. -->
+        <div class="filter-group filter-group--search">
+          <span class="filter-group__label" id="quest-search-label">Search</span>
+          <div class="quest-search">
+            <span aria-hidden="true">⌕</span>
+            <input
+              type="search"
+              id="quest-search"
+              aria-labelledby="quest-search-label"
+              placeholder="Search by name or description…"
+              autocomplete="off"
+            />
+          </div>
         </div>
 
-        <fieldset class="filter-group" style="border: 0; margin: 0; padding: 0;">
-          <legend class="filter-group__label">Episode</legend>
-          <button type="button" class="chip" aria-pressed="false" data-filter="episode" data-value="1">Ep 1</button>
-          <button type="button" class="chip" aria-pressed="false" data-filter="episode" data-value="2">Ep 2</button>
-        </fieldset>
+        <div class="filter-group">
+          <span class="filter-group__label">Episode</span>
+          <div class="filter-group__chips">
+            <button type="button" class="chip" aria-pressed="false" data-filter="episode" data-value="1">Ep 1</button>
+            <button type="button" class="chip" aria-pressed="false" data-filter="episode" data-value="2">Ep 2</button>
+            <button type="button" class="chip" aria-pressed="false" data-filter="episode" data-value="3">Ep 3</button>
+            <button type="button" class="chip" aria-pressed="false" data-filter="episode" data-value="4">Ep 4</button>
+          </div>
+        </div>
 
-        <fieldset class="filter-group" style="border: 0; margin: 0; padding: 0;">
-          <legend class="filter-group__label">Source</legend>
-          <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="original">Original</button>
-          <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="custom">Custom</button>
-        </fieldset>
+        <div class="filter-group">
+          <span class="filter-group__label">Source</span>
+          <div class="filter-group__chips">
+            <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="original">Original</button>
+            <button type="button" class="chip" aria-pressed="false" data-filter="source" data-value="custom">Custom</button>
+          </div>
+        </div>
       </form>
 
       <div class="quest-grid" id="quest-grid">
@@ -2557,18 +2589,20 @@ function questIsHidden(catId) {
 }
 
 // The server enables every PSO platform newserv supports (DC / PC / GC /
-// XB / BB) so anyone with a compatible client can join. The quest
-// library is curated around the GameCube experience — the friend group
-// runs Dolphin and real-GameCube hardware — so any quest with a GC
-// variant is shown. BB/PC/XB players still see it if they join (newserv
-// routes them the variant for their version when present); if a quest
-// lacks a variant for their version they just can't load it, same as
-// any private server.
+// XB / BB) so anyone with a compatible client can join. The server is
+// Blue Burst-first (all players use BB), so the quest library is curated
+// around BB: any quest with a BB variant is shown. BB covers Episodes 1,
+// 2, AND 4 — which is why the Episode 4 quests now appear (GameCube,
+// the previous filter, has no Episode 4, so they were hidden before).
+// GC/PC/XB players still see a quest if they join when it has a variant
+// for their version; if not, they just can't load it, same as any
+// private server.
 //
-// GC_V3 is the canonical GameCube release (Episode I & II, Plus). Trial
-// edition (GC_NTE) and Episode 3 (GC_EP3, GC_EP3_NTE) are excluded —
-// GC_NTE is a demo, Ep3 is a different game (C.A.R.D. Revolution).
-const REQUIRED_PLATFORM_FAMILIES = ['GC'];
+// BB_V4 is the canonical Blue Burst release. Episode 3 (GC_EP3) is a
+// different game (C.A.R.D. Revolution) with no BB variant, so it doesn't
+// appear here — the Ep 3 filter chip exists for completeness but stays
+// empty/greyed.
+const REQUIRED_PLATFORM_FAMILIES = ['BB'];
 
 function questPlatformFamilies(q) {
   const families = new Set();
@@ -3138,7 +3172,7 @@ function updateChipCounts() {
   // fills in asynchronously (and stay correct when filters narrow the
   // catalog — the chip count is always the TOTAL available, not the
   // filtered subset, so users can see what each chip would surface).
-  const epCounts  = { '1': 0, '2': 0 };
+  const epCounts  = { '1': 0, '2': 0, '3': 0, '4': 0 };
   const srcCounts = { original: 0, custom: 0 };
   for (const q of quests) {
     epCounts[String(q.episode)]  = (epCounts[String(q.episode)]  || 0) + 1;
@@ -3153,6 +3187,11 @@ function updateChipCounts() {
       chip.appendChild(badge);
     }
     badge.textContent = String(count);
+    // Grey out + disable a filter with no quests (e.g. Episode 3) so it
+    // reads as "exists but nothing here" rather than a dead click.
+    const empty = count === 0;
+    chip.classList.toggle('chip--empty', empty);
+    chip.disabled = empty;
   };
   document.querySelectorAll('.chip[data-filter="episode"]').forEach((c) => writeBadge(c, epCounts[c.dataset.value]  ?? 0));
   document.querySelectorAll('.chip[data-filter="source"]' ).forEach((c) => writeBadge(c, srcCounts[c.dataset.value] ?? 0));
