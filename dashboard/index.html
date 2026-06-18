@@ -629,7 +629,11 @@
   .metric__delta--up { color: var(--success); }
 
   /* =================================================================
-     Live activity (games + rare drops)
+     Live activity (games + rare drops + collapsible hosting cost)
+     -----------------------------------------------------------------
+     One column on mobile (stack), three equal columns on desktop.
+     The cost card occupies one column when collapsed; spans all
+     three when expanded (see .cost-card[data-expanded="true"] below).
      ================================================================= */
   .activity {
     display: grid;
@@ -637,7 +641,7 @@
     gap: var(--space-5);
   }
   @media (min-width: 900px) {
-    .activity { grid-template-columns: 1.5fr 1fr; }
+    .activity { grid-template-columns: repeat(3, 1fr); }
   }
 
   .panel {
@@ -1258,15 +1262,29 @@
          from "actual spend" cyan
      ----------------------------------------------------------------- */
   .cost-card {
-    margin-top: var(--space-6);
-    /* Layered background: glass + a faint cyan radial glow in the
-       top-left so the card has a soft "live readout" feel rather than
-       a flat panel. Repeated 1px dot grid for the lobby-compass vibe. */
+    /* No margin-top — sits inside the .activity grid now, gap handled
+       by the parent. Layered background: glass + faint cyan radial
+       glow in the top-left so the card has a soft "live readout" feel
+       rather than a flat panel. Repeated 1px dot grid for the lobby-
+       compass vibe. */
     background:
       radial-gradient(circle at 5% 10%, rgba(0, 212, 255, 0.05), transparent 35%),
       radial-gradient(circle at 95% 90%, rgba(255, 46, 133, 0.04), transparent 40%),
       var(--bg-surface);
     position: relative;
+    /* View Transitions: name the element so Chrome/Edge/Safari 18+
+       smoothly animate its layout shift (collapsed grid cell ⇄
+       expanded full-width row). Browsers without VT support snap
+       instantly — graceful degradation. */
+    view-transition-name: cost-card;
+  }
+  /* Expanded state: span the full activity grid row so the card sits
+     by itself on row 2 with games + drops occupying row 1. The grid
+     auto-flow takes care of row placement; we just toggle column span. */
+  @media (min-width: 900px) {
+    .cost-card[data-expanded="true"] {
+      grid-column: 1 / -1;
+    }
   }
   .cost-card::before {
     /* Inner highlight stripe under the top border — PSO menus carry a
@@ -1278,13 +1296,129 @@
     background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.35), transparent);
     pointer-events: none;
   }
-  .cost-card__header {
+
+  /* ---- Toggle (always-visible header strip) ---- */
+  .cost-card__toggle {
+    /* Reset native button styles to look like a card header. The
+       <button> tag preserves keyboard activation (Enter/Space) and
+       AT semantics without us reinventing them. */
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
     gap: var(--space-3);
-    flex-wrap: wrap;
-    margin-bottom: var(--space-4);
+    width: 100%;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    /* Subtle interactive affordance — the cyan rim brightens on hover
+       and focus, matching the PSO menu-hover highlight. */
+    transition: color 0.15s ease;
+  }
+  .cost-card__toggle:hover .cost-card__title,
+  .cost-card__toggle:focus-visible .cost-card__title { color: var(--cyan-bright); }
+  .cost-card__toggle:focus-visible {
+    outline: 2px solid var(--cyan-primary);
+    outline-offset: 4px;
+    border-radius: var(--radius-sm);
+  }
+  .cost-card__title {
+    /* Replaces the per-card <h3> styling; matches sibling panels. */
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-high);
+    transition: color 0.15s ease;
+  }
+  /* Summary line — only visible while collapsed. The big MTD figure
+     in cyan + a quiet "MTD" label, so the card always communicates
+     its primary number without being clicked. */
+  .cost-card__summary {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    font-family: var(--font-mono);
+    transition: opacity 0.2s ease;
+  }
+  .cost-card__summary-value {
+    color: var(--cyan-bright);
+    font-size: 1.05rem;
+    font-weight: 600;
+    text-shadow: 0 0 10px rgba(0, 212, 255, 0.35);
+  }
+  .cost-card__summary-note {
+    color: var(--text-low);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  /* When expanded, fade the summary out — the three big readouts
+     inside the details block carry the same info more thoroughly. */
+  .cost-card[data-expanded="true"] .cost-card__summary {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .cost-card__chevron {
+    color: var(--text-low);
+    font-size: 0.85rem;
+    transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.2s ease;
+    transform-origin: center;
+  }
+  .cost-card[data-expanded="true"] .cost-card__chevron {
+    transform: rotate(-180deg);
+    color: var(--cyan-bright);
+  }
+
+  /* ---- Animated details wrap ----
+     The grid-template-rows: 0fr ⇄ 1fr trick animates to/from auto
+     height. The inner element is overflow:hidden so content clips
+     during the animation; min-height: 0 is required for it to clip
+     in CSS Grid. Supported in Chrome 117+ / Safari 17+ / Firefox 124+;
+     older browsers snap instead of animating. */
+  .cost-card__details-wrap {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .cost-card[data-expanded="true"] .cost-card__details-wrap {
+    grid-template-rows: 1fr;
+  }
+  .cost-card__details {
+    overflow: hidden;
+    min-height: 0;
+  }
+  /* Add the top margin only when the panel is open so the chevron
+     row collapses tight when closed. */
+  .cost-card[data-expanded="true"] .cost-card__details > * {
+    /* Fade-in cascade for the details content — gives the impression
+       the data is "loading in" rather than abruptly appearing. The
+       JS toggle handler enables this animation only when expanding. */
+  }
+  .cost-card[data-expanded="true"] .cost-card__details {
+    padding-top: var(--space-4);
+  }
+  .cost-card__asof-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--space-3);
+  }
+
+  /* Respect prefers-reduced-motion: skip all transitions/animations
+     and the View Transitions API path (handled in JS). The state
+     change still happens — just instantly. */
+  @media (prefers-reduced-motion: reduce) {
+    .cost-card,
+    .cost-card__toggle,
+    .cost-card__title,
+    .cost-card__summary,
+    .cost-card__chevron,
+    .cost-card__details-wrap { transition: none !important; }
   }
   .cost-card__asof {
     color: var(--text-low);
@@ -1864,6 +1998,15 @@
         </article>
       </div>
 
+      <!-- Live activity grid: Now playing + Rare drops + collapsed
+           Hosting cost. Three equal-width columns on desktop, single
+           column on mobile. When the hosting-cost card is expanded
+           (data-expanded="true") it spans the full grid row and breaks
+           into row 2; games + drops stay in row 1 unchanged.
+
+           The layout shift is animated via the View Transitions API
+           (Chrome/Edge/Safari 18+). Browsers without it just snap to
+           the new layout — graceful, no functional break. -->
       <div class="activity" style="margin-top: var(--space-6)">
         <!-- Active games panel -->
         <div class="panel" aria-labelledby="games-title">
@@ -1880,56 +2023,85 @@
             <!-- Populated by JS -->
           </ul>
         </div>
+
+        <!-- ================================================== -->
+        <!-- Hosting cost card (collapsible)                     -->
+        <!--   Collapsed: 1 of 3 equal columns, shows MTD only   -->
+        <!--   Expanded:  spans the full grid row, shows         -->
+        <!--              readouts + chart + services + check    -->
+        <!--   Backed by /api/cost (AWS Cost Explorer 12h cache) -->
+        <!-- ================================================== -->
+        <section class="panel cost-card" id="cost-card" data-expanded="false">
+          <!-- Real <button> so keyboard activation (Enter/Space) works
+               out of the box. aria-controls points to the details
+               element; aria-expanded mirrors data-expanded for AT. -->
+          <button class="cost-card__toggle" type="button"
+                  id="cost-card-toggle"
+                  aria-expanded="false"
+                  aria-controls="cost-card-details">
+            <h3 class="cost-card__title">
+              <span aria-hidden="true">◇</span> Hosting cost
+            </h3>
+            <!-- Visible summary line: just MTD spend. JS rewrites
+                 #cost-mtd-summary on data refresh. -->
+            <span class="cost-card__summary">
+              <span class="cost-card__summary-value" id="cost-mtd-summary">—</span>
+              <span class="cost-card__summary-note" id="cost-mtd-summary-note">MTD</span>
+            </span>
+            <span class="cost-card__chevron" aria-hidden="true">▾</span>
+          </button>
+
+          <!-- Animated wrap. The grid-template-rows: 0fr / 1fr trick
+               animates to/from auto height; the inner element is
+               overflow:hidden so content clips during the animation. -->
+          <div class="cost-card__details-wrap">
+            <div class="cost-card__details" id="cost-card-details">
+              <div class="cost-card__asof-row">
+                <span class="cost-card__asof" id="cost-asof" aria-live="polite">—</span>
+              </div>
+
+              <!-- Three big readouts: MTD spend, end-of-month forecast,
+                   prior month. JS replaces the placeholders once
+                   /api/cost resolves. -->
+              <div class="cost-card__numbers" id="cost-numbers">
+                <div class="cost-readout cost-readout--mtd">
+                  <span class="cost-readout__label">Month to date</span>
+                  <span class="cost-readout__value" id="cost-mtd-value">—</span>
+                  <span class="cost-readout__note" id="cost-mtd-note">&nbsp;</span>
+                </div>
+                <div class="cost-readout cost-readout--forecast">
+                  <span class="cost-readout__label">→ End-of-month</span>
+                  <span class="cost-readout__value" id="cost-forecast-value">—</span>
+                  <span class="cost-readout__note" id="cost-forecast-note">forecast</span>
+                </div>
+                <div class="cost-readout cost-readout--prior">
+                  <span class="cost-readout__label">Prior month</span>
+                  <span class="cost-readout__value" id="cost-prior-value">—</span>
+                  <span class="cost-readout__note" id="cost-prior-note">&nbsp;</span>
+                </div>
+              </div>
+
+              <!-- SVG area chart + sr-only data table for assistive tech.
+                   The SVG is injected by renderCostChart() — viewBox-based
+                   so it scales with container width without distorting
+                   stroke widths. -->
+              <div class="cost-chart-wrap" id="cost-chart-wrap" aria-hidden="false">
+                <p class="cost-card__placeholder" id="cost-chart-placeholder">Loading cost data…</p>
+              </div>
+
+              <!-- Per-service chips. Filled by renderCostServices(). -->
+              <div class="cost-services" id="cost-services" role="list">
+                <span class="cost-services__label" aria-hidden="true">By service:</span>
+              </div>
+
+              <!-- Tag-vs-account-wide cross-check note. Hidden until the
+                   data arrives; turns warning-amber if there's untagged
+                   drift, or success-green if everything's accounted for. -->
+              <p class="cost-crosscheck" id="cost-crosscheck" hidden></p>
+            </div>
+          </div>
+        </section>
       </div>
-
-      <!-- ================================================== -->
-      <!-- Hosting cost card                                  -->
-      <!--   Backed by /api/cost (AWS Cost Explorer 12h cache) -->
-      <!--   JS rendering lives in renderCostCard() below.    -->
-      <!-- ================================================== -->
-      <section class="panel cost-card" aria-labelledby="cost-title" id="cost-card">
-        <div class="cost-card__header">
-          <h3 id="cost-title"><span aria-hidden="true">◇</span> Hosting cost</h3>
-          <span class="cost-card__asof" id="cost-asof" aria-live="polite">—</span>
-        </div>
-
-        <!-- Three big readouts: MTD spend, end-of-month forecast, prior month.
-             JS replaces the placeholders once /api/cost resolves. -->
-        <div class="cost-card__numbers" id="cost-numbers">
-          <div class="cost-readout cost-readout--mtd">
-            <span class="cost-readout__label">Month to date</span>
-            <span class="cost-readout__value" id="cost-mtd-value">—</span>
-            <span class="cost-readout__note" id="cost-mtd-note">&nbsp;</span>
-          </div>
-          <div class="cost-readout cost-readout--forecast">
-            <span class="cost-readout__label">→ End-of-month</span>
-            <span class="cost-readout__value" id="cost-forecast-value">—</span>
-            <span class="cost-readout__note" id="cost-forecast-note">forecast</span>
-          </div>
-          <div class="cost-readout cost-readout--prior">
-            <span class="cost-readout__label">Prior month</span>
-            <span class="cost-readout__value" id="cost-prior-value">—</span>
-            <span class="cost-readout__note" id="cost-prior-note">&nbsp;</span>
-          </div>
-        </div>
-
-        <!-- SVG area chart + sr-only data table for assistive tech. The
-             SVG is injected by renderCostChart() — viewBox-based so it
-             scales with container width without distorting stroke widths. -->
-        <div class="cost-chart-wrap" id="cost-chart-wrap" aria-hidden="false">
-          <p class="cost-card__placeholder" id="cost-chart-placeholder">Loading cost data…</p>
-        </div>
-
-        <!-- Per-service chips. Filled by renderCostServices(). -->
-        <div class="cost-services" id="cost-services" role="list">
-          <span class="cost-services__label" aria-hidden="true">By service:</span>
-        </div>
-
-        <!-- Tag-vs-account-wide cross-check note. Hidden until the data
-             arrives; turns warning-amber if there's untagged drift, or
-             success-green if everything's accounted for. -->
-        <p class="cost-crosscheck" id="cost-crosscheck" hidden></p>
-      </section>
     </div>
   </section>
 
@@ -4064,6 +4236,10 @@ function renderCostNumbers(data) {
   const forecastNoteEl= document.getElementById('cost-forecast-note');
   const priorValEl    = document.getElementById('cost-prior-value');
   const priorNoteEl   = document.getElementById('cost-prior-note');
+  // Also update the collapsed-state summary so the header strip
+  // always shows MTD spend without needing to expand.
+  const summaryValueEl = document.getElementById('cost-mtd-summary');
+  if (summaryValueEl) summaryValueEl.textContent = formatUSD(cm.spendUSD, { currency: data?.currency });
 
   if (mtdValueEl)  mtdValueEl.textContent  = formatUSD(cm.spendUSD, { currency: data?.currency });
   if (mtdNoteEl)   mtdNoteEl.textContent   = cm.label || '';
@@ -4309,6 +4485,70 @@ async function refreshCostCard() {
   }
 }
 
+// ---------- Cost-card collapse / expand ----------
+//
+// The cost card is one of three tiles in the Live activity grid by
+// default. Clicking the header toggles a data-expanded attribute on
+// the card; CSS responds by:
+//   1. setting grid-column: 1 / -1 so the card spans the full row
+//   2. animating grid-template-rows: 0fr -> 1fr on the inner wrapper
+//      so the details slide open at their natural height
+//   3. rotating the chevron and fading the summary line out
+//
+// The grid-column change is animated by the View Transitions API
+// when available (Chrome/Edge/Safari 18+). Browsers without VT
+// snap to the new layout, which is the right fallback — the
+// content still slides open via the grid-template-rows animation.
+//
+// State is persisted in localStorage so the user's preference
+// sticks across page loads.
+
+const COST_EXPANDED_KEY = 'pso-cost-card-expanded';
+
+function setCostCardExpanded(expanded) {
+  const card   = document.getElementById('cost-card');
+  const toggle = document.getElementById('cost-card-toggle');
+  if (!card || !toggle) return;
+  const value = expanded ? 'true' : 'false';
+  card.dataset.expanded = value;
+  toggle.setAttribute('aria-expanded', value);
+  try { localStorage.setItem(COST_EXPANDED_KEY, value); } catch {}
+}
+
+function restoreCostCardState() {
+  let saved = null;
+  try { saved = localStorage.getItem(COST_EXPANDED_KEY); } catch {}
+  // Default is collapsed; only honor a stored 'true'.
+  if (saved === 'true') setCostCardExpanded(true);
+}
+
+function toggleCostCard() {
+  const card = document.getElementById('cost-card');
+  if (!card) return;
+  const willExpand = card.dataset.expanded !== 'true';
+
+  const apply = () => setCostCardExpanded(willExpand);
+
+  // Skip the layout-shift animation when the user has opted out via
+  // prefers-reduced-motion, or when the browser doesn't ship the
+  // View Transitions API. The CSS-driven content animation (chevron
+  // rotation, summary fade, grid-template-rows expand) still runs
+  // in both cases — those respect prefers-reduced-motion at the
+  // CSS layer.
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!reducedMotion && typeof document.startViewTransition === 'function') {
+    document.startViewTransition(apply);
+  } else {
+    apply();
+  }
+}
+
+function setupCostCardToggle() {
+  const toggle = document.getElementById('cost-card-toggle');
+  if (!toggle) return;
+  toggle.addEventListener('click', toggleCostCard);
+}
+
 // ---------- Countdown to July 20, 2026 ----------
 //
 // Targets local midnight on the destination day so the visible day count
@@ -4545,6 +4785,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Hosting cost. The backend caches /api/cost for 12h (Cost Explorer
   // itself lags real spend by ~24h, so polling faster gains nothing
   // truthful). One hourly refresh handles cache-rotation edges.
+  // The card is collapsed by default; setupCostCardToggle wires the
+  // header click; restoreCostCardState reopens it if the user had
+  // previously expanded it (persisted in localStorage).
+  setupCostCardToggle();
+  restoreCostCardState();
   refreshCostCard();
   setInterval(refreshCostCard, 60 * 60 * 1000);
 });
