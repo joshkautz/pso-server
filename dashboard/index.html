@@ -1317,41 +1317,34 @@
     pointer-events: none;
   }
 
-  /* ---- Toggle (always-visible header strip) ---- */
-  .cost-card__toggle {
-    /* Reset native button styles to look like a sibling card header
-       (.panel h3): title on the left, chevron on the right, with a
-       full-width underline beneath. The <button> tag preserves keyboard
-       activation (Enter/Space) and AT semantics for free. */
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    width: 100%;
+  /* The whole card is the clickable toggle. Pointer cursor signals it;
+     hover brightens the title; keyboard focus shows a ring. */
+  .cost-card { cursor: pointer; }
+  .cost-card:hover .cost-card__title { color: var(--cyan-bright); }
+  .cost-card:focus-visible {
+    outline: 2px solid var(--cyan-primary);
+    outline-offset: 3px;
+  }
+
+  /* ---- Header: just the title + the single full-width underline,
+     exactly like the sibling cards' .panel h3. ---- */
+  .cost-card__header {
     margin: 0 0 var(--space-4);
     padding: 0 0 var(--space-3);
-    background: transparent;
-    border: 0;
     border-bottom: 1px solid var(--line-soft);
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-    /* Subtle interactive affordance — the cyan rim brightens on hover
-       and focus, matching the PSO menu-hover highlight. */
-    transition: color 0.15s ease, border-color 0.15s ease;
+    transition: border-color 0.15s ease;
   }
-  .cost-card__toggle:hover { border-bottom-color: var(--line-strong); }
-  .cost-card__toggle:hover .cost-card__title,
-  .cost-card__toggle:focus-visible .cost-card__title { color: var(--cyan-bright); }
-  .cost-card__toggle:focus-visible {
-    outline: 2px solid var(--cyan-primary);
-    outline-offset: 4px;
-    border-radius: var(--radius-sm);
-  }
+  .cost-card:hover .cost-card__header { border-bottom-color: var(--line-strong); }
   .cost-card__title {
-    /* Replaces the per-card <h3> styling; matches sibling panels. */
+    /* Neutralize the inherited .panel h3 rule (which would add a SECOND,
+       shorter underline under just the title text) — the header above
+       owns the single full-width line. */
     margin: 0;
+    padding: 0;
+    border: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     font-family: var(--font-display);
     font-size: 1rem;
     font-weight: 600;
@@ -1387,16 +1380,6 @@
     color: var(--cyan-bright);
     font-weight: 600;
     text-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
-  }
-  .cost-card__chevron {
-    color: var(--text-low);
-    font-size: 0.85rem;
-    transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.2s ease;
-    transform-origin: center;
-  }
-  .cost-card[data-expanded="true"] .cost-card__chevron {
-    transform: rotate(-180deg);
-    color: var(--cyan-bright);
   }
 
   /* ---- Animated details wrap ----
@@ -1438,10 +1421,9 @@
      change still happens — just instantly. */
   @media (prefers-reduced-motion: reduce) {
     .cost-card,
-    .cost-card__toggle,
     .cost-card__title,
+    .cost-card__header,
     .cost-card__preview,
-    .cost-card__chevron,
     .cost-card__details-wrap { transition: none !important; }
   }
   .cost-card__asof {
@@ -2055,19 +2037,19 @@
         <!--              readouts + chart + services + check    -->
         <!--   Backed by /api/cost (AWS Cost Explorer 12h cache) -->
         <!-- ================================================== -->
-        <section class="panel cost-card" id="cost-card" data-expanded="false">
-          <!-- Real <button> so keyboard activation (Enter/Space) works
-               out of the box. aria-controls points to the details
-               element; aria-expanded mirrors data-expanded for AT. -->
-          <button class="cost-card__toggle" type="button"
-                  id="cost-card-toggle"
-                  aria-expanded="false"
-                  aria-controls="cost-card-details">
+        <!-- The whole card is the toggle: role=button + tabindex makes it
+             keyboard-activatable (Enter/Space) and the pointer cursor
+             signals clickability — no chevron needed. aria-expanded /
+             aria-controls describe the collapsible region for AT. -->
+        <section class="panel cost-card" id="cost-card" data-expanded="false"
+                 role="button" tabindex="0"
+                 aria-expanded="false" aria-controls="cost-card-details"
+                 aria-label="Server costs — click to expand or collapse">
+          <div class="cost-card__header">
             <h3 class="cost-card__title">
               <span aria-hidden="true">◇</span> Server Costs
             </h3>
-            <span class="cost-card__chevron" aria-hidden="true">▾</span>
-          </button>
+          </div>
 
           <!-- Collapsed preview: an ultra-minimal sparkline of daily spend
                + a small MTD caption, filling the collapsed body the way
@@ -4601,12 +4583,13 @@ async function refreshCostCard() {
 const COST_EXPANDED_KEY = 'pso-cost-card-expanded';
 
 function setCostCardExpanded(expanded) {
-  const card   = document.getElementById('cost-card');
-  const toggle = document.getElementById('cost-card-toggle');
-  if (!card || !toggle) return;
+  const card = document.getElementById('cost-card');
+  if (!card) return;
   const value = expanded ? 'true' : 'false';
   card.dataset.expanded = value;
-  toggle.setAttribute('aria-expanded', value);
+  // The card itself is the role=button toggle now, so aria-expanded
+  // lives on it directly.
+  card.setAttribute('aria-expanded', value);
   try { localStorage.setItem(COST_EXPANDED_KEY, value); } catch {}
 }
 
@@ -4626,10 +4609,9 @@ function toggleCostCard() {
 
   // Skip the layout-shift animation when the user has opted out via
   // prefers-reduced-motion, or when the browser doesn't ship the
-  // View Transitions API. The CSS-driven content animation (chevron
-  // rotation, summary fade, grid-template-rows expand) still runs
-  // in both cases — those respect prefers-reduced-motion at the
-  // CSS layer.
+  // View Transitions API. The CSS-driven content animation (the
+  // grid-template-rows expand of the details) still runs in both
+  // cases — it respects prefers-reduced-motion at the CSS layer.
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!reducedMotion && typeof document.startViewTransition === 'function') {
     document.startViewTransition(apply);
@@ -4639,9 +4621,18 @@ function toggleCostCard() {
 }
 
 function setupCostCardToggle() {
-  const toggle = document.getElementById('cost-card-toggle');
-  if (!toggle) return;
-  toggle.addEventListener('click', toggleCostCard);
+  const card = document.getElementById('cost-card');
+  if (!card) return;
+  // Whole card is clickable. role=button + tabindex are in the markup;
+  // wire click plus Enter/Space (native <button> keyboard behavior we
+  // now reproduce ourselves).
+  card.addEventListener('click', toggleCostCard);
+  card.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault();
+      toggleCostCard();
+    }
+  });
 }
 
 // ---------- Countdown to July 20, 2026 ----------
