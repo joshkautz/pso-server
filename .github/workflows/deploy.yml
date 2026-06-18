@@ -97,7 +97,7 @@ jobs:
              cd /home/ubuntu/pso-server && \
              docker compose pull'
 
-      - name: seed system/ from image (no-clobber)
+      - name: seed system/ from image (no-clobber) + rebuild quests/
         run: |
           # The newserv image bundles a fully-populated /newserv/system
           # directory (blueburst keys, ep3 data, default quests, etc.).
@@ -106,12 +106,26 @@ jobs:
           # host dir with cp -rn so the image's files exist there before
           # our overrides land. -n (no-clobber) preserves anything our
           # rsync already wrote.
+          #
+          # quests/ is a special case. The rsync below runs without
+          # --delete (so image-provided files survive), which means a
+          # custom quest REMOVED from the repo would otherwise orphan on
+          # the box forever (this bit us with q628-630). So we rebuild
+          # quests/ from scratch off the image on every deploy: wipe it,
+          # re-copy the image's bundled set, and let the rsync re-add our
+          # server/quests/ customs on top. Net per deploy:
+          #   system/quests = (image bundled set) ∪ (repo server/quests)
+          # so repo removals propagate. Assumes every quest reaches the
+          # box via the image or the repo — no hand-placed quests.
           ssh -i ~/.ssh/deploy ubuntu@${{ steps.lightsail.outputs.ip }} \
             'docker run --rm \
                -v /home/ubuntu/pso-server/system:/host-system \
                --entrypoint sh \
                ghcr.io/joshkautz/pso-server:main \
-               -c "cp -rn /newserv/system/. /host-system/ && chown -R 1000:1000 /host-system"'
+               -c "cp -rn /newserv/system/. /host-system/ && \
+                   rm -rf /host-system/quests && \
+                   cp -r /newserv/system/quests /host-system/quests && \
+                   chown -R 1000:1000 /host-system"'
 
       - name: substitute instance IP into config.json
         run: |
@@ -131,7 +145,8 @@ jobs:
       - name: rsync overrides to instance
         run: |
           # No --delete: image-provided files in /home/ubuntu/pso-server/system
-          # would be wiped on every deploy otherwise.
+          # would be wiped on every deploy otherwise. (Quest REMOVALS are
+          # handled by the quests/ rebuild in the seed step above, not here.)
           rsync -avz \
             -e "ssh -i ~/.ssh/deploy" \
             --exclude='README.md' \

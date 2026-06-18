@@ -19,7 +19,8 @@
     "Earlier counts of '2 custom' were wrong — the Solo Challenge mode quests were missed because they live in the challenge-solo-ep1/ep2 categories rather than the download/ folder, and q075's reclassification took confirming Matt Swift's git commit log.",
     "Year distribution: 20 from 2000 (DC v1), 57 from 2001 (DC v2 + events), 80 from 2003 (GC), 99 from 2004 (BB Sega-originals), 1 from 2006 (q000 soulja224466), 15 from 2024 (Matt Swift contributions), 1 from 2025 (Aleron Ives via Matt Swift).",
     "2026-06-18 update: installed 28 new Ephinea custom quests (q605-q668) from the phantasmal-world mirror, and reclassified 29 already-bundled Ephinea quests (Endless Nightmare, Phantasmal World, War of Limits, New Mop-Up Operation, Point of Disaster, The Robots' Reckoning, Maximum Attack Ver2/4th Stage) from original->custom. Catalog now tracks 74 custom of 288 total entries. All Ephinea quests are Blue Burst format (BB clients only).",
-    "2026-06-18 CORRECTION audit: the earlier same-day batch over-corrected. Reverted 20 Sega-original quests (Endless Nightmare q108-111, Phantasmal World q233-236, Point of Disaster q709, The Robots' Reckoning q710, War of Limits q811-815, New Mop-Up Operation q816-820) that were wrongly flipped to custom — confirmed Sega via Sylverant quest-list + Ephinea wiki (Author: Sonic Team). Flipped 5 genuinely-community MA4 quests (q147, q497-500) original->custom. Removed 3 installed duplicates (q628-630 == bundled q497-499; the alias gap that motivated the new aliases field). Refined 20 author attributions and added aliases to 32 entries. Custom now 56/285."
+    "2026-06-18 CORRECTION audit: the earlier same-day batch over-corrected. Reverted 20 Sega-original quests (Endless Nightmare q108-111, Phantasmal World q233-236, Point of Disaster q709, The Robots' Reckoning q710, War of Limits q811-815, New Mop-Up Operation q816-820) that were wrongly flipped to custom — confirmed Sega via Sylverant quest-list + Ephinea wiki (Author: Sonic Team). Flipped 5 genuinely-community MA4 quests (q147, q497-500) original->custom. Removed 3 installed duplicates (q628-630 == bundled q497-499; the alias gap that motivated the new aliases field). Refined 20 author attributions and added aliases to 32 entries. Custom now 56/285.",
+    "2026-06-18: installed 4 confirmed-community borderline quests — Forsaken Friends (q670, FireFox276), Rescue from Ragol (q671, Tofuman), Tyrell's Ego (q672, Tofuman), Revisiting Darkness (q673, RikaPSO & Ilitsa) — from the phantasmal-world mirror; dedup-checked + internal numbers verified not-bundled first. Also resolved review flags: q501/q502 (Maximum Attack E, Matt/Ephinea) flipped to custom; q504 kept original (wiki Author: Sonic Team). Custom 62/289."
   ],
   "0": {
     "classify": "custom",
@@ -2434,31 +2435,31 @@
     ]
   },
   "501": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Maximum Attack E: VR",
-    "author": "Sega",
+    "author": "Matt (Ephinea)",
     "year": 2003,
     "platform": "GameCube",
     "distribution": "disc-included",
     "sourceUrl": "https://wiki.pioneer2.net/w/Maximum_Attack_E:_VR",
     "category": "Virtual Reality",
     "episode": 2,
-    "notes": "Sega Virtual Reality lobby teleport quest. [2026-06-18 audit: NEEDS REVIEW — name uses the \"Maximum Attack E\" prefix, which is a documented Ephinea community event-series marker, but this entry is bundled as GameCube/Xbox and classified original. Left original to avoid a second over-correction; confirm by decoding vs the BB MA E quests (q631/q632) before flipping.]",
+    "notes": "Community quest — part of the \"Maximum Attack E\" event series created by Matt for Ephinea's Anniversary event (confirmed via the Ephinea wiki Maximum Attack E page; not an official Sega event). This is the GameCube/Xbox version; the Blue Burst version is installed as q631/q632. Resolved 2026-06-18 (was briefly flagged for review).",
     "aliases": [
       "MAE VR"
     ]
   },
   "502": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Maximum Attack E: Gal Da Val",
-    "author": "Sega",
+    "author": "Matt (Ephinea)",
     "year": 2003,
     "platform": "GameCube",
     "distribution": "disc-included",
     "sourceUrl": "https://wiki.pioneer2.net/w/Maximum_Attack_E:_Gal_Da_Val",
     "category": "Virtual Reality",
     "episode": 2,
-    "notes": "Sega Virtual Reality lobby teleport quest. [2026-06-18 audit: NEEDS REVIEW — name uses the \"Maximum Attack E\" prefix, which is a documented Ephinea community event-series marker, but this entry is bundled as GameCube/Xbox and classified original. Left original to avoid a second over-correction; confirm by decoding vs the BB MA E quests (q631/q632) before flipping.]",
+    "notes": "Community quest — part of the \"Maximum Attack E\" event series created by Matt for Ephinea's Anniversary event (confirmed via the Ephinea wiki Maximum Attack E page; not an official Sega event). This is the GameCube/Xbox version; the Blue Burst version is installed as q631/q632. Resolved 2026-06-18 (was briefly flagged for review).",
     "aliases": [
       "MAE GDV",
       "Maximum Attack E: GDV"
@@ -2474,7 +2475,7 @@
     "sourceUrl": "https://wiki.pioneer2.net/w/To_the_Deepest_Blue_-MA4_Venue-",
     "category": "Events",
     "episode": 2,
-    "notes": "Sega event quest (holiday/seasonal/promotional); originally limited-time release. [2026-06-18 audit: AMBIGUOUS — \"-MA4 Venue-\" ties this to the community MA4 event, but the Ephinea wiki reports Author: Sonic Team (likely reuses a Sega base map). Left as original pending manual decode/review.]"
+    "notes": "Sega-original per the Ephinea wiki (Author: Sonic Team). It's the shop/venue quest used during the community MA4 event (players spend MA4 Tickets at a Seabed terminal). The MA4 *event* is community, but this shop venue is wiki-credited to Sonic Team, so kept original. Resolved 2026-06-18."
   },
   "701": {
     "classify": "original",
@@ -3403,7 +3404,7 @@
     "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/maximum_attack/MAE%20GDV.qst",
     "category": "Extermination",
     "episode": 2,
-    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set.",
+    "notes": "Ephinea \"Maximum Attack E\" community event quest (by Matt), Blue Burst version. Installed 2026-06-18 from the phantasmal-world mirror. The GameCube/Xbox counterpart is bundled as q502 (also classified custom).",
     "aliases": [
       "MAE GDV",
       "Maximum Attack E: GDV"
@@ -3419,7 +3420,7 @@
     "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/maximum_attack/MAE%20VR.qst",
     "category": "Extermination",
     "episode": 2,
-    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set.",
+    "notes": "Ephinea \"Maximum Attack E\" community event quest (by Matt), Blue Burst version. Installed 2026-06-18 from the phantasmal-world mirror. The GameCube/Xbox counterpart is bundled as q501 (also classified custom).",
     "aliases": [
       "MAE VR"
     ]
@@ -3566,5 +3567,59 @@
     "category": "Events",
     "episode": 4,
     "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "670": {
+    "classify": "custom",
+    "name": "Forsaken Friends",
+    "author": "FireFox276",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/retrieval/Forsaken%20Friends.qst",
+    "category": "Retrieval",
+    "episode": 1,
+    "notes": "Community quest installed 2026-06-18 from the phantasmal-world mirror of Ephinea's quest tree. Blue Burst format (BB clients only). Authorship confirmed via the Ephinea wiki Author field; not present in newserv's bundled set.",
+    "aliases": [
+      "Forsaken Friends"
+    ]
+  },
+  "671": {
+    "classify": "custom",
+    "name": "Rescue from Ragol",
+    "author": "Tofuman",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/retrieval/Rescue%20From%20Ragol.qst",
+    "category": "Retrieval",
+    "episode": 1,
+    "notes": "Community quest installed 2026-06-18 from the phantasmal-world mirror of Ephinea's quest tree. Blue Burst format (BB clients only). Authorship confirmed via the Ephinea wiki Author field; not present in newserv's bundled set.",
+    "aliases": [
+      "Rescue From Ragol"
+    ]
+  },
+  "672": {
+    "classify": "custom",
+    "name": "Tyrell's Ego",
+    "author": "Tofuman",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/vr/Tyrell%27s%20Ego.qst",
+    "category": "Virtual Reality",
+    "episode": 1,
+    "notes": "Community quest installed 2026-06-18 from the phantasmal-world mirror of Ephinea's quest tree. Blue Burst format (BB clients only). Authorship confirmed via the Ephinea wiki Author field; not present in newserv's bundled set."
+  },
+  "673": {
+    "classify": "custom",
+    "name": "Revisiting Darkness",
+    "author": "RikaPSO & Ilitsa",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/retrieval/Revisiting%20Darkness.qst",
+    "category": "Retrieval",
+    "episode": 2,
+    "notes": "Community quest installed 2026-06-18 from the phantasmal-world mirror of Ephinea's quest tree. Blue Burst format (BB clients only). Authorship confirmed via the Ephinea wiki Author field; not present in newserv's bundled set."
   }
 }
