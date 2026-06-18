@@ -1299,24 +1299,29 @@
 
   /* ---- Toggle (always-visible header strip) ---- */
   .cost-card__toggle {
-    /* Reset native button styles to look like a card header. The
-       <button> tag preserves keyboard activation (Enter/Space) and
-       AT semantics without us reinventing them. */
+    /* Reset native button styles to look like a sibling card header
+       (.panel h3): title on the left, chevron on the right, with a
+       full-width underline beneath. The <button> tag preserves keyboard
+       activation (Enter/Space) and AT semantics for free. */
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: var(--space-3);
     width: 100%;
-    padding: 0;
+    margin: 0 0 var(--space-4);
+    padding: 0 0 var(--space-3);
     background: transparent;
     border: 0;
+    border-bottom: 1px solid var(--line-soft);
     color: inherit;
     font: inherit;
     text-align: left;
     cursor: pointer;
     /* Subtle interactive affordance — the cyan rim brightens on hover
        and focus, matching the PSO menu-hover highlight. */
-    transition: color 0.15s ease;
+    transition: color 0.15s ease, border-color 0.15s ease;
   }
+  .cost-card__toggle:hover { border-bottom-color: var(--line-strong); }
   .cost-card__toggle:hover .cost-card__title,
   .cost-card__toggle:focus-visible .cost-card__title { color: var(--cyan-bright); }
   .cost-card__toggle:focus-visible {
@@ -1335,34 +1340,33 @@
     color: var(--text-high);
     transition: color 0.15s ease;
   }
-  /* Summary line — only visible while collapsed. The big MTD figure
-     in cyan + a quiet "MTD" label, so the card always communicates
-     its primary number without being clicked. */
-  .cost-card__summary {
-    margin-left: auto;
-    display: inline-flex;
-    align-items: baseline;
+  /* Collapsed preview — the cost card's equivalent of the sibling cards'
+     "No active games…" placeholder body: an ultra-minimal sparkline of
+     daily spend plus a small MTD caption. Shown only while collapsed;
+     when expanded, the full readouts + chart take over and this hides. */
+  .cost-card__preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     gap: var(--space-2);
+    padding: var(--space-3) 0 var(--space-2);
+  }
+  .cost-card[data-expanded="true"] .cost-card__preview { display: none; }
+  .cost-sparkline {
+    width: 100%;
+    max-width: 240px;
+    line-height: 0;
+  }
+  .cost-sparkline svg { width: 100%; height: auto; display: block; }
+  .cost-card__preview-caption {
     font-family: var(--font-mono);
-    transition: opacity 0.2s ease;
-  }
-  .cost-card__summary-value {
-    color: var(--cyan-bright);
-    font-size: 1.05rem;
-    font-weight: 600;
-    text-shadow: 0 0 10px rgba(0, 212, 255, 0.35);
-  }
-  .cost-card__summary-note {
+    font-size: 0.8rem;
     color: var(--text-low);
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
   }
-  /* When expanded, fade the summary out — the three big readouts
-     inside the details block carry the same info more thoroughly. */
-  .cost-card[data-expanded="true"] .cost-card__summary {
-    opacity: 0;
-    pointer-events: none;
+  .cost-card__preview-caption strong {
+    color: var(--cyan-bright);
+    font-weight: 600;
+    text-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
   }
   .cost-card__chevron {
     color: var(--text-low);
@@ -1416,7 +1420,7 @@
     .cost-card,
     .cost-card__toggle,
     .cost-card__title,
-    .cost-card__summary,
+    .cost-card__preview,
     .cost-card__chevron,
     .cost-card__details-wrap { transition: none !important; }
   }
@@ -2040,16 +2044,19 @@
                   aria-expanded="false"
                   aria-controls="cost-card-details">
             <h3 class="cost-card__title">
-              <span aria-hidden="true">◇</span> Hosting cost
+              <span aria-hidden="true">◇</span> Server Costs
             </h3>
-            <!-- Visible summary line: just MTD spend. JS rewrites
-                 #cost-mtd-summary on data refresh. -->
-            <span class="cost-card__summary">
-              <span class="cost-card__summary-value" id="cost-mtd-summary">—</span>
-              <span class="cost-card__summary-note" id="cost-mtd-summary-note">MTD</span>
-            </span>
             <span class="cost-card__chevron" aria-hidden="true">▾</span>
           </button>
+
+          <!-- Collapsed preview: an ultra-minimal sparkline of daily spend
+               + a small MTD caption, filling the collapsed body the way
+               the sibling cards fill theirs. Hidden when expanded (the
+               full chart takes over). JS fills #cost-sparkline. -->
+          <div class="cost-card__preview" id="cost-preview">
+            <div class="cost-sparkline" id="cost-sparkline" aria-hidden="true"></div>
+            <span class="cost-card__preview-caption" id="cost-preview-caption">—&nbsp;MTD</span>
+          </div>
 
           <!-- Animated wrap. The grid-template-rows: 0fr / 1fr trick
                animates to/from auto height; the inner element is
@@ -3952,8 +3959,14 @@ async function refreshLive() {
       };
       const srv = s?.Server ?? {};
       set('metric-online',         srv.ClientCount);
-      set('metric-uptime',         formatUptime(srv.UptimeUsecs));
-      set('metric-uptime-delta',   formatStartedAt(srv.StartTime));
+      // Guard against a bogus start time. If newserv reports
+      // StartTimeUsecs <= 0 (uninitialized creation_time), its UptimeUsecs
+      // is absolute epoch-now (~56 years) and StartTime is 1970 — show a
+      // dash instead of nonsense. (Root cause fixed server-side, but keep
+      // the dashboard resilient to it.)
+      const startValid = Number.isFinite(srv.StartTimeUsecs) && srv.StartTimeUsecs > 0;
+      set('metric-uptime',         startValid ? formatUptime(srv.UptimeUsecs) : '—');
+      set('metric-uptime-delta',   startValid ? formatStartedAt(srv.StartTime) : '');
       setServerStatus(true);
     }).catch(() => setServerStatus(false)),
     fetchJSON('lobbies').then((lobbies) => {
@@ -4236,10 +4249,13 @@ function renderCostNumbers(data) {
   const forecastNoteEl= document.getElementById('cost-forecast-note');
   const priorValEl    = document.getElementById('cost-prior-value');
   const priorNoteEl   = document.getElementById('cost-prior-note');
-  // Also update the collapsed-state summary so the header strip
-  // always shows MTD spend without needing to expand.
-  const summaryValueEl = document.getElementById('cost-mtd-summary');
-  if (summaryValueEl) summaryValueEl.textContent = formatUSD(cm.spendUSD, { currency: data?.currency });
+  // Collapsed-preview caption under the mini sparkline — keeps the MTD
+  // figure visible without expanding (just not crammed next to the title).
+  const previewCaptionEl = document.getElementById('cost-preview-caption');
+  if (previewCaptionEl) {
+    previewCaptionEl.innerHTML =
+      `<strong>${escapeHtml(formatUSD(cm.spendUSD, { currency: data?.currency }))}</strong> MTD`;
+  }
 
   if (mtdValueEl)  mtdValueEl.textContent  = formatUSD(cm.spendUSD, { currency: data?.currency });
   if (mtdNoteEl)   mtdNoteEl.textContent   = cm.label || '';
@@ -4410,6 +4426,45 @@ function renderCostChart(data) {
   wrap.innerHTML = buildCostChartSvg(data?.daily, data?.currentMonth, data?.currency);
 }
 
+// Ultra-minimal sparkline for the collapsed card: just the cyan area +
+// line from the last ~21 days of daily spend, no axes/grid/labels. A
+// scaled-down cousin of buildCostChartSvg.
+function buildCostSparkline(daily) {
+  const pts = (Array.isArray(daily) ? daily : []).slice(-21);
+  // Drop leading zero-only days so the line starts where spend starts.
+  let first = pts.findIndex((d) => (d.usd ?? 0) > 0);
+  if (first < 0) first = 0;
+  const vis = pts.slice(first);
+  if (vis.length < 2) return '';   // nothing meaningful to draw
+  const W = 240, H = 34, pad = 2;
+  const maxUsd = Math.max(...vis.map((d) => d.usd ?? 0), 0.0001);
+  const stepX = (W - pad * 2) / (vis.length - 1);
+  const x = (i) => pad + i * stepX;
+  const y = (v) => pad + (H - pad * 2) * (1 - Math.max(0, v) / maxUsd);
+  const line = vis.map((d, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(d.usd ?? 0).toFixed(1)}`).join(' ');
+  const area = `${line} L${x(vis.length - 1).toFixed(1)} ${H - pad} L${x(0).toFixed(1)} ${H - pad} Z`;
+  return `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
+         aria-label="Daily server cost trend, last ${vis.length} days" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="cost-spark-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="rgba(0,212,255,0.35)"/>
+          <stop offset="100%" stop-color="rgba(0,212,255,0.02)"/>
+        </linearGradient>
+      </defs>
+      <path d="${area}" fill="url(#cost-spark-grad)"/>
+      <path d="${line}" fill="none" stroke="var(--cyan-bright)" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+}
+
+function renderCostSparkline(data) {
+  const el = document.getElementById('cost-sparkline');
+  if (!el) return;
+  const svg = buildCostSparkline(data?.daily);
+  el.innerHTML = svg || '<span class="cost-card__placeholder">No spend yet.</span>';
+}
+
 function renderCostServices(data) {
   const container = document.getElementById('cost-services');
   if (!container) return;
@@ -4475,6 +4530,7 @@ async function refreshCostCard() {
       return;
     }
     renderCostNumbers(data);
+    renderCostSparkline(data);
     renderCostChart(data);
     renderCostServices(data);
     renderCostCrosscheck(data);
