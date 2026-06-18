@@ -1400,13 +1400,6 @@
     overflow: hidden;
     min-height: 0;
   }
-  /* Add the top margin only when the panel is open so the chevron
-     row collapses tight when closed. */
-  .cost-card[data-expanded="true"] .cost-card__details > * {
-    /* Fade-in cascade for the details content — gives the impression
-       the data is "loading in" rather than abruptly appearing. The
-       JS toggle handler enables this animation only when expanding. */
-  }
   .cost-card[data-expanded="true"] .cost-card__details {
     padding-top: var(--space-4);
   }
@@ -4570,7 +4563,7 @@ async function refreshCostCard() {
 //   1. setting grid-column: 1 / -1 so the card spans the full row
 //   2. animating grid-template-rows: 0fr -> 1fr on the inner wrapper
 //      so the details slide open at their natural height
-//   3. rotating the chevron and fading the summary line out
+//   3. hiding the collapsed mini-sparkline preview
 //
 // The grid-column change is animated by the View Transitions API
 // when available (Chrome/Edge/Safari 18+). Browsers without VT
