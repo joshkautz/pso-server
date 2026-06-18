@@ -10,6 +10,7 @@
     "dev": "NODE_ENV=development node --watch server.js"
   },
   "dependencies": {
+    "@aws-sdk/client-cost-explorer": "^3.1071.0",
     "express": "^4.21.2",
     "ws": "^8.21.0"
   },

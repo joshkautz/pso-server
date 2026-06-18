@@ -140,28 +140,46 @@ jobs:
             server/ \
             ubuntu@${{ steps.lightsail.outputs.ip }}:/home/ubuntu/pso-server/system/
 
-      - name: record deployed newserv revision
+      - name: write .env on the host
+        env:
+          # All interpolated values flow through env: so the run: block
+          # never embeds GitHub Actions `${{ }}` expressions directly in
+          # shell. Prevents command injection in the unlikely event any
+          # upstream output ever carries shell metacharacters; see
+          # https://github.blog/security/vulnerability-research/how-to-catch-github-actions-workflow-injections-before-attackers-do/
+          IP:                         ${{ steps.lightsail.outputs.ip }}
+          COST_AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_COST_READER_ACCESS_KEY_ID }}
+          COST_AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_COST_READER_SECRET_ACCESS_KEY }}
         run: |
-          # Extract the upstream commit SHA from the OCI label baked in by
-          # build-image.yml. Compose reads this from .env via
-          # ${NEWSERV_REV} and exposes it to the dashboard backend, which
-          # surfaces it through /api/build for the "newserv <sha>
-          # (up to date)" indicator in the identity card.
-          #
-          # Older images (built before build-image.yml started writing
-          # the label) won't have the revision. In that case we leave the
-          # existing .env alone and compose defaults to "unknown".
-          ssh -i ~/.ssh/deploy ubuntu@${{ steps.lightsail.outputs.ip }} \
-            'cd /home/ubuntu/pso-server && \
-             REV=$(docker inspect ghcr.io/joshkautz/pso-server:main \
-                   --format "{{ index .Config.Labels \"org.opencontainers.image.revision\"}}" \
-                   2>/dev/null) && \
-             if [ -n "$REV" ] && [ "$REV" != "<no value>" ]; then \
-               echo "NEWSERV_REV=$REV" > .env && \
-               echo "recorded newserv revision: $REV"; \
-             else \
-               echo "no revision label on current image; .env unchanged"; \
-             fi'
+          # Builds /home/ubuntu/pso-server/.env atomically with everything
+          # docker-compose interpolates. Two reasons it lives here rather
+          # than baked into the image:
+          #   - NEWSERV_REV is the SHA of the *pulled* image, which is
+          #     only knowable on the host (via the OCI label).
+          #   - COST_AWS_* are runtime credentials. We never want them
+          #     in image layers or git history.
+          # If the OCI label is missing on an older image we still emit
+          # NEWSERV_REV=unknown so compose substitution doesn't fail.
+          ssh -i ~/.ssh/deploy "ubuntu@${IP}" bash -s <<REMOTE
+          set -euo pipefail
+          cd /home/ubuntu/pso-server
+          REV=\$(docker inspect ghcr.io/joshkautz/pso-server:main \
+                 --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
+                 2>/dev/null || true)
+          if [ -z "\$REV" ] || [ "\$REV" = "<no value>" ]; then
+            REV=unknown
+          fi
+          umask 077
+          cat > .env <<ENV
+          NEWSERV_REV=\$REV
+          COST_AWS_ACCESS_KEY_ID=${COST_AWS_ACCESS_KEY_ID}
+          COST_AWS_SECRET_ACCESS_KEY=${COST_AWS_SECRET_ACCESS_KEY}
+          ENV
+          echo "recorded newserv revision: \$REV"
+          if [ -z "${COST_AWS_ACCESS_KEY_ID}" ]; then
+            echo "::warning::AWS_COST_READER_* secrets not set — /api/cost will be 503"
+          fi
+          REMOTE
 
       - name: restart container
         run: |

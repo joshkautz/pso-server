@@ -85,6 +85,17 @@ services:
       # the label is missing (e.g. images built before the label landed).
       NEWSERV_REV: "${NEWSERV_REV:-unknown}"
 
+      # Read-only AWS credentials for the dashboard's /api/cost endpoint.
+      # Created by terraform (infra/cost.tf), with permission only to
+      # call ce:GetCostAndUsage and ce:GetCostForecast — nothing else.
+      # The deploy workflow writes both into .env on the host from the
+      # AWS_COST_* GitHub secrets so they never appear in this file.
+      # If unset the cost endpoint returns 503 and the dashboard's cost
+      # card renders a "unavailable" placeholder rather than crashing.
+      AWS_REGION: "${AWS_REGION:-us-east-1}"
+      AWS_ACCESS_KEY_ID: "${COST_AWS_ACCESS_KEY_ID:-}"
+      AWS_SECRET_ACCESS_KEY: "${COST_AWS_SECRET_ACCESS_KEY:-}"
+
     # No published ports — Caddy is in front and reaches us via the
     # internal network at http://dashboard:8080.
     networks:

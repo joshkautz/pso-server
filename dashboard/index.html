@@ -1245,6 +1245,220 @@
   .diff-pill--vhard    { background: rgba(255, 122, 24, 0.08);  border-color: rgba(255, 122, 24, 0.32);  color: #ff9a3a; }
   .diff-pill--ultimate { background: rgba(255, 46, 133, 0.10);  border-color: rgba(255, 46, 133, 0.40);  color: var(--magenta); }
 
+  /* -----------------------------------------------------------------
+     Hosting cost card — PSO HUD aesthetic
+     -----------------------------------------------------------------
+     Visual cues borrowed from the PSO menu/HUD:
+       - Cyan-edged frame matching the in-game menu cyan border treatment
+         (pso-highres-ui's "Dreamburst" project shows it best)
+       - Monospace numeric readouts in the style of stat panels
+       - Faint dotted grid background like the lobby compass
+       - Magenta callouts for projected/forward-looking values (PSO uses
+         magenta on the boss HP bar) so they're chromatically distinct
+         from "actual spend" cyan
+     ----------------------------------------------------------------- */
+  .cost-card {
+    margin-top: var(--space-6);
+    /* Layered background: glass + a faint cyan radial glow in the
+       top-left so the card has a soft "live readout" feel rather than
+       a flat panel. Repeated 1px dot grid for the lobby-compass vibe. */
+    background:
+      radial-gradient(circle at 5% 10%, rgba(0, 212, 255, 0.05), transparent 35%),
+      radial-gradient(circle at 95% 90%, rgba(255, 46, 133, 0.04), transparent 40%),
+      var(--bg-surface);
+    position: relative;
+  }
+  .cost-card::before {
+    /* Inner highlight stripe under the top border — PSO menus carry a
+       brighter cyan rim on the inside of the frame. */
+    content: "";
+    position: absolute;
+    top: 1px; left: var(--space-3); right: var(--space-3);
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.35), transparent);
+    pointer-events: none;
+  }
+  .cost-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-4);
+  }
+  .cost-card__asof {
+    color: var(--text-low);
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+  }
+  .cost-card__numbers {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+  @media (min-width: 600px) {
+    .cost-card__numbers { grid-template-columns: repeat(3, 1fr); }
+  }
+  .cost-readout {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: var(--space-2) var(--space-3);
+    border-left: 2px solid var(--line-soft);
+    /* PSO-style sharpened corner — single 4px notch top-right matches
+       the lobby info-pane styling */
+    clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 0 100%);
+  }
+  .cost-readout--mtd      { border-left-color: var(--cyan-primary); }
+  .cost-readout--forecast { border-left-color: var(--magenta); }
+  .cost-readout--prior    { border-left-color: var(--text-low); }
+  .cost-readout__label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-low);
+    font-family: var(--font-mono);
+  }
+  .cost-readout__value {
+    font-size: 1.6rem;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .cost-readout--mtd      .cost-readout__value { color: var(--cyan-bright); text-shadow: 0 0 12px rgba(0, 212, 255, 0.4); }
+  .cost-readout--forecast .cost-readout__value { color: var(--magenta);     text-shadow: 0 0 12px rgba(255, 46, 133, 0.35); }
+  .cost-readout--prior    .cost-readout__value { color: var(--text-mid); }
+  .cost-readout__note {
+    font-size: 0.7rem;
+    color: var(--text-low);
+    font-family: var(--font-mono);
+  }
+
+  /* -- Chart ------------------------------------------------------- */
+  .cost-chart-wrap {
+    position: relative;
+    margin-bottom: var(--space-4);
+    border: 1px solid var(--line-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-3) var(--space-2);
+    background:
+      /* Faint dotted lattice — 1px dots every 12px, like the lobby
+         compass background. Reduced opacity so the data line stays
+         the visual hero. */
+      radial-gradient(circle, rgba(0, 212, 255, 0.06) 0.5px, transparent 1px) 0 0 / 12px 12px,
+      transparent;
+  }
+  .cost-chart {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .cost-chart__grid {
+    stroke: rgba(0, 212, 255, 0.08);
+    stroke-width: 1;
+    stroke-dasharray: 1 2;
+  }
+  .cost-chart__area {
+    /* Filled below the line — gradient defined in <defs> below */
+    fill: url(#cost-area-gradient);
+  }
+  .cost-chart__line {
+    fill: none;
+    stroke: var(--cyan-bright);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: url(#cost-line-glow);
+  }
+  .cost-chart__forecast-line {
+    fill: none;
+    stroke: var(--magenta);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 4;
+    stroke-linecap: round;
+  }
+  .cost-chart__today-marker {
+    stroke: rgba(0, 212, 255, 0.45);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+  }
+  .cost-chart__axis-text {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    fill: var(--text-low);
+  }
+  .cost-chart__y-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    fill: var(--text-low);
+    text-anchor: end;
+  }
+
+  /* -- Per-service chips ------------------------------------------- */
+  .cost-services {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+  .cost-services__label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-low);
+    font-family: var(--font-mono);
+    margin: 0 var(--space-2) 0 0;
+    align-self: center;
+  }
+  .cost-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    background: rgba(0, 212, 255, 0.05);
+    border: 1px solid rgba(0, 212, 255, 0.20);
+    border-radius: 999px;
+    color: var(--text-mid);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+  }
+  .cost-chip__amount { color: var(--cyan-bright); font-weight: 600; }
+
+  /* -- Crosscheck / drift note ------------------------------------- */
+  .cost-crosscheck {
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    background: rgba(255, 184, 74, 0.04);
+    border-left: 2px solid rgba(255, 184, 74, 0.4);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    color: var(--text-mid);
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+  .cost-crosscheck--ok {
+    background: rgba(95, 255, 170, 0.04);
+    border-left-color: rgba(95, 255, 170, 0.4);
+  }
+
+  /* -- Placeholder + error states ---------------------------------- */
+  .cost-card__placeholder {
+    color: var(--text-low);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    padding: var(--space-3) 0;
+  }
+
+  /* Screen-reader-only data table beneath the chart. Keeps the chart's
+     numeric content reachable for assistive tech without cluttering
+     the visual layout. */
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
   /* =================================================================
      Features list
      ================================================================= */
@@ -1667,6 +1881,55 @@
           </ul>
         </div>
       </div>
+
+      <!-- ================================================== -->
+      <!-- Hosting cost card                                  -->
+      <!--   Backed by /api/cost (AWS Cost Explorer 12h cache) -->
+      <!--   JS rendering lives in renderCostCard() below.    -->
+      <!-- ================================================== -->
+      <section class="panel cost-card" aria-labelledby="cost-title" id="cost-card">
+        <div class="cost-card__header">
+          <h3 id="cost-title"><span aria-hidden="true">◇</span> Hosting cost</h3>
+          <span class="cost-card__asof" id="cost-asof" aria-live="polite">—</span>
+        </div>
+
+        <!-- Three big readouts: MTD spend, end-of-month forecast, prior month.
+             JS replaces the placeholders once /api/cost resolves. -->
+        <div class="cost-card__numbers" id="cost-numbers">
+          <div class="cost-readout cost-readout--mtd">
+            <span class="cost-readout__label">Month to date</span>
+            <span class="cost-readout__value" id="cost-mtd-value">—</span>
+            <span class="cost-readout__note" id="cost-mtd-note">&nbsp;</span>
+          </div>
+          <div class="cost-readout cost-readout--forecast">
+            <span class="cost-readout__label">→ End-of-month</span>
+            <span class="cost-readout__value" id="cost-forecast-value">—</span>
+            <span class="cost-readout__note" id="cost-forecast-note">forecast</span>
+          </div>
+          <div class="cost-readout cost-readout--prior">
+            <span class="cost-readout__label">Prior month</span>
+            <span class="cost-readout__value" id="cost-prior-value">—</span>
+            <span class="cost-readout__note" id="cost-prior-note">&nbsp;</span>
+          </div>
+        </div>
+
+        <!-- SVG area chart + sr-only data table for assistive tech. The
+             SVG is injected by renderCostChart() — viewBox-based so it
+             scales with container width without distorting stroke widths. -->
+        <div class="cost-chart-wrap" id="cost-chart-wrap" aria-hidden="false">
+          <p class="cost-card__placeholder" id="cost-chart-placeholder">Loading cost data…</p>
+        </div>
+
+        <!-- Per-service chips. Filled by renderCostServices(). -->
+        <div class="cost-services" id="cost-services" role="list">
+          <span class="cost-services__label" aria-hidden="true">By service:</span>
+        </div>
+
+        <!-- Tag-vs-account-wide cross-check note. Hidden until the data
+             arrives; turns warning-amber if there's untagged drift, or
+             success-green if everything's accounted for. -->
+        <p class="cost-crosscheck" id="cost-crosscheck" hidden></p>
+      </section>
     </div>
   </section>
 
@@ -3762,6 +4025,290 @@ async function refreshBuildInfo() {
   }
 }
 
+// ---------- Hosting cost ----------
+//
+// Backed by /api/cost. The backend caches Cost Explorer responses for
+// 12h (CE itself lags real spend by ~24h), so polling more often than
+// hourly buys nothing real. We fetch once on load and refresh hourly
+// to pick up the next backend cache rotation cleanly.
+//
+// Rendering is split into four small functions so each section's
+// failure mode is independent: a malformed daily array won't blank
+// out the MTD figure, etc.
+
+function formatUSD(amount, opts = {}) {
+  if (!Number.isFinite(amount)) return '—';
+  const decimals = amount < 1 ? 4 : amount < 100 ? 2 : 0;
+  return amount.toLocaleString('en-US', {
+    style: 'currency',
+    currency: opts.currency || 'USD',
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+function formatShortDate(iso) {
+  // "2026-06-18" → "Jun 18"
+  if (!iso || typeof iso !== 'string') return '';
+  const d = new Date(iso + 'T00:00:00Z');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+function renderCostNumbers(data) {
+  const cm = data?.currentMonth || {};
+  const lm = data?.lastMonth || {};
+
+  const mtdValueEl    = document.getElementById('cost-mtd-value');
+  const mtdNoteEl     = document.getElementById('cost-mtd-note');
+  const forecastValEl = document.getElementById('cost-forecast-value');
+  const forecastNoteEl= document.getElementById('cost-forecast-note');
+  const priorValEl    = document.getElementById('cost-prior-value');
+  const priorNoteEl   = document.getElementById('cost-prior-note');
+
+  if (mtdValueEl)  mtdValueEl.textContent  = formatUSD(cm.spendUSD, { currency: data?.currency });
+  if (mtdNoteEl)   mtdNoteEl.textContent   = cm.label || '';
+
+  if (Number.isFinite(cm.forecastUSD)) {
+    if (forecastValEl)  forecastValEl.textContent  = formatUSD(cm.forecastUSD, { currency: data?.currency });
+    if (forecastNoteEl) forecastNoteEl.textContent = 'projected end of month';
+  } else {
+    if (forecastValEl)  forecastValEl.textContent  = '—';
+    if (forecastNoteEl) forecastNoteEl.textContent = 'forecast unavailable (needs more history)';
+  }
+
+  if (priorValEl)  priorValEl.textContent  = formatUSD(lm.spendUSD, { currency: data?.currency });
+  if (priorNoteEl) priorNoteEl.textContent = lm.label || '';
+}
+
+// Build the SVG chart. Returns the chart's outer HTML so the caller
+// can swap it into the chart-wrap. The chart shows the last 35 days
+// of daily spend as a cyan-glow area, with a magenta dashed line
+// extending past "today" to the end-of-month forecast (if available).
+function buildCostChartSvg(daily, currentMonth, currency) {
+  if (!Array.isArray(daily) || daily.length === 0) {
+    return '<p class="cost-card__placeholder">No cost data yet.</p>';
+  }
+  // Keep the last 35 entries so the chart shows ~full current month
+  // plus a few days of context from the prior month.
+  const visible = daily.slice(-35);
+  // We never want to scale Y by an outlier zero-row. Treat values < a
+  // floor as zero for the bar/area but still as real points.
+  const maxUsd = Math.max(...visible.map((d) => d.usd ?? 0), 0.01);
+
+  // Chart geometry. viewBox makes everything resolution-independent;
+  // preserveAspectRatio defaults to xMidYMid meet which keeps the
+  // aspect intact as the container scales.
+  const W = 600;
+  const H = 150;
+  const padL = 36, padR = 12, padT = 10, padB = 22;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const stepX = visible.length > 1 ? plotW / (visible.length - 1) : 0;
+  const xFor = (i) => padL + i * stepX;
+  const yFor = (v) => padT + plotH - (Math.max(0, v) / maxUsd) * plotH;
+
+  // Determine the "today" index — the most recent date we have
+  // non-zero data for (Cost Explorer often returns today's row as 0
+  // because that day's billing hasn't aggregated yet).
+  const todayIdx = visible.length - 1;
+
+  // Build line + area paths from the data. Skip leading zero-only
+  // entries so the chart starts where real spend starts; this avoids
+  // a flat-at-zero left edge for accounts with old empty days.
+  let firstNonZero = visible.findIndex((d) => (d.usd ?? 0) > 0);
+  if (firstNonZero < 0) firstNonZero = 0;
+  const lineCmds = [];
+  for (let i = firstNonZero; i < visible.length; i++) {
+    lineCmds.push(`${i === firstNonZero ? 'M' : 'L'}${xFor(i).toFixed(1)} ${yFor(visible[i].usd ?? 0).toFixed(1)}`);
+  }
+  const linePath = lineCmds.join(' ');
+  const areaPath = linePath
+    ? `${linePath} L${xFor(visible.length - 1).toFixed(1)} ${(padT + plotH).toFixed(1)} L${xFor(firstNonZero).toFixed(1)} ${(padT + plotH).toFixed(1)} Z`
+    : '';
+
+  // Forecast: a dashed magenta extension from the last real point to
+  // the end-of-month projected total. Compute its X position as if
+  // there were N more days appended at the same step.
+  const forecastUSD = currentMonth?.forecastUSD;
+  let forecastSvg = '';
+  if (Number.isFinite(forecastUSD) && forecastUSD > 0 && visible.length > 1) {
+    // Forecast is *added to MTD* internally — but the chart shows
+    // per-day spend, not cumulative. We draw the forecast as a target
+    // line at (mtd + remaining_days * average_remaining), reduced to
+    // a simple terminal point: use the average daily rate implied by
+    // forecast vs. days remaining for a smooth tail.
+    const monthEnd = new Date();
+    monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1, 0); // last day of current month
+    const today = new Date(visible[todayIdx].date + 'T00:00:00Z');
+    const remaining = Math.max(1, Math.ceil((monthEnd - today) / 86400000));
+    const lastValue = visible[todayIdx].usd ?? 0;
+    // Imply a daily rate that sums (with MTD) to forecastUSD.
+    // We don't know MTD here, but the line endpoint just needs to be
+    // visually plausible — taking forecast/30 as the daily target.
+    const targetDaily = forecastUSD / 30;
+    const projectedX = padL + (todayIdx + remaining) * stepX;
+    const x1 = xFor(todayIdx);
+    const y1 = yFor(lastValue);
+    // Cap the projected x to within the right padding so it doesn't
+    // run off the chart; rescale max if the projection exceeds it.
+    const maxX = W - padR;
+    const x2 = Math.min(projectedX, maxX);
+    const y2 = yFor(Math.min(targetDaily, maxUsd));
+    forecastSvg = `<path class="cost-chart__forecast-line" d="M${x1.toFixed(1)} ${y1.toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)}" />`;
+  }
+
+  // Y-axis labels: 0, mid, max.
+  const yLabels = [0, maxUsd / 2, maxUsd].map((v) => {
+    const y = yFor(v);
+    return `<text class="cost-chart__y-label" x="${padL - 4}" y="${(y + 3).toFixed(1)}">${formatUSD(v, { currency })}</text>`;
+  }).join('');
+
+  // X-axis: just first / today / (forecast end). Avoid label collision
+  // when the series is short.
+  const xLabels = [
+    { idx: firstNonZero, label: formatShortDate(visible[firstNonZero].date) },
+    { idx: todayIdx,     label: formatShortDate(visible[todayIdx].date) + ' • today' },
+  ].map(({ idx, label }) => {
+    const x = xFor(idx);
+    const anchor = idx === 0 ? 'start' : idx === visible.length - 1 ? 'end' : 'middle';
+    return `<text class="cost-chart__axis-text" x="${x.toFixed(1)}" y="${(H - 6).toFixed(1)}" text-anchor="${anchor}">${label}</text>`;
+  }).join('');
+
+  // Horizontal gridlines at the y-label positions.
+  const gridLines = [0.25, 0.5, 0.75, 1].map((frac) => {
+    const y = padT + plotH * (1 - frac);
+    return `<line class="cost-chart__grid" x1="${padL}" x2="${W - padR}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" />`;
+  }).join('');
+
+  // Today vertical marker.
+  const todayMarker = `<line class="cost-chart__today-marker" x1="${xFor(todayIdx).toFixed(1)}" x2="${xFor(todayIdx).toFixed(1)}" y1="${padT}" y2="${padT + plotH}" />`;
+
+  // Screen-reader fallback: a hidden data table that lists every
+  // value in `visible`. The chart itself is role="img" with a
+  // descriptive aria-label, and points back to this table for detail.
+  const tableId = 'cost-chart-table-' + Math.random().toString(36).slice(2, 8);
+  const labelId = tableId + '-label';
+  const ariaLabel = `Daily hosting cost for the last ${visible.length} days. Maximum ${formatUSD(maxUsd, { currency })}. Most recent ${formatShortDate(visible[todayIdx].date)} at ${formatUSD(visible[todayIdx].usd ?? 0, { currency })}.`;
+  const rows = visible.map((d) => `<tr><td>${escapeHtml(d.date)}</td><td>${escapeHtml(formatUSD(d.usd ?? 0, { currency }))}</td></tr>`).join('');
+  const srTable = `
+    <table class="sr-only" id="${tableId}" aria-label="Daily hosting cost values">
+      <caption>Daily hosting cost, last ${visible.length} days</caption>
+      <thead><tr><th scope="col">Date</th><th scope="col">USD</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  return `
+    <svg class="cost-chart" viewBox="0 0 ${W} ${H}" role="img"
+         aria-labelledby="${labelId}" aria-describedby="${tableId}"
+         xmlns="http://www.w3.org/2000/svg">
+      <title id="${labelId}">${escapeHtml(ariaLabel)}</title>
+      <defs>
+        <linearGradient id="cost-area-gradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stop-color="rgba(0, 212, 255, 0.45)"/>
+          <stop offset="80%" stop-color="rgba(0, 212, 255, 0.02)"/>
+        </linearGradient>
+        <filter id="cost-line-glow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="2" result="blur"/>
+          <feMerge>
+            <feMergeNode in="blur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+      <g aria-hidden="true">
+        ${gridLines}
+        ${yLabels}
+      </g>
+      ${areaPath ? `<path class="cost-chart__area" d="${areaPath}" />` : ''}
+      ${linePath ? `<path class="cost-chart__line" d="${linePath}" />` : ''}
+      ${forecastSvg}
+      ${todayMarker}
+      <g aria-hidden="true">${xLabels}</g>
+    </svg>
+    ${srTable}`;
+}
+
+function renderCostChart(data) {
+  const wrap = document.getElementById('cost-chart-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = buildCostChartSvg(data?.daily, data?.currentMonth, data?.currency);
+}
+
+function renderCostServices(data) {
+  const container = document.getElementById('cost-services');
+  if (!container) return;
+  // Preserve the leading label, then list each service as a chip.
+  const items = (data?.byService || []).filter((s) => s.usd > 0);
+  if (items.length === 0) {
+    container.innerHTML = '<span class="cost-services__label" aria-hidden="true">By service:</span>'
+      + '<span class="cost-card__placeholder">no spend recorded</span>';
+    return;
+  }
+  const chips = items.map((s) => `
+    <span class="cost-chip" role="listitem">
+      ${escapeHtml(s.service.replace(/^Amazon /, ''))}
+      <span class="cost-chip__amount">${escapeHtml(formatUSD(s.usd, { currency: data?.currency }))}</span>
+    </span>
+  `).join('');
+  container.innerHTML = '<span class="cost-services__label" aria-hidden="true">By service:</span>' + chips;
+}
+
+function renderCostCrosscheck(data) {
+  const el = document.getElementById('cost-crosscheck');
+  if (!el) return;
+  const cc = data?.crosscheck;
+  if (!cc) { el.hidden = true; return; }
+  const drift = cc.untaggedDriftUSD ?? 0;
+  if (drift < 0.005) {
+    // Effectively zero — every charge accounted for by the Project tag.
+    el.classList.add('cost-crosscheck--ok');
+    el.classList.remove('cost-crosscheck--warn');
+    el.innerHTML = `<strong>Tag check ✓</strong> &mdash; all ${escapeHtml(formatUSD(cc.accountWideUSD, { currency: data?.currency }))} this month is tagged <code>Project=pso-server</code>.`;
+  } else {
+    // Untagged drift — almost always the Lightsail bundle, which AWS
+    // bills at the account level and doesn't propagate through tag
+    // filters. Flag it so any *other* untagged spend (e.g. a new
+    // resource added without the default_tags inheritance) shows up
+    // distinctly later.
+    el.classList.remove('cost-crosscheck--ok');
+    const driftStr = formatUSD(drift, { currency: data?.currency });
+    const totalStr = formatUSD(cc.accountWideUSD, { currency: data?.currency });
+    el.innerHTML = `<strong>Tag check</strong> &mdash; ${escapeHtml(driftStr)} of ${escapeHtml(totalStr)} this month isn't covered by the <code>Project</code> tag. Lightsail bundle charges don't honor tag filters at the AWS Billing layer; the account-wide figure above is the authoritative number.`;
+  }
+  el.hidden = false;
+}
+
+function renderCostAsOf(data) {
+  const el = document.getElementById('cost-asof');
+  if (!el) return;
+  if (!data?.asOf) { el.textContent = '—'; return; }
+  const d = new Date(data.asOf);
+  el.textContent = `as of ${d.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })} · ${escapeHtml(data?.stalenessNote || '')}`.trim();
+}
+
+function renderCostCardError(message) {
+  const wrap = document.getElementById('cost-chart-wrap');
+  if (wrap) wrap.innerHTML = `<p class="cost-card__placeholder">Cost data unavailable: ${escapeHtml(message)}</p>`;
+}
+
+async function refreshCostCard() {
+  try {
+    const data = await fetchJSON('cost');
+    if (!data || data.error) {
+      renderCostCardError(data?.error || 'unknown error');
+      return;
+    }
+    renderCostNumbers(data);
+    renderCostChart(data);
+    renderCostServices(data);
+    renderCostCrosscheck(data);
+    renderCostAsOf(data);
+  } catch (err) {
+    console.warn('[cost] refresh failed:', err.message);
+    renderCostCardError(err.message);
+  }
+}
+
 // ---------- Countdown to July 20, 2026 ----------
 //
 // Targets local midnight on the destination day so the visible day count
@@ -3994,6 +4541,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // hard reload always picks up the latest if needed.
   refreshBuildInfo();
   setInterval(refreshBuildInfo, 60 * 60 * 1000);
+
+  // Hosting cost. The backend caches /api/cost for 12h (Cost Explorer
+  // itself lags real spend by ~24h, so polling faster gains nothing
+  // truthful). One hourly refresh handles cache-rotation edges.
+  refreshCostCard();
+  setInterval(refreshCostCard, 60 * 60 * 1000);
 });
 </script>
 

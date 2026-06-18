@@ -44,3 +44,15 @@ output "backup_secret_access_key" {
   sensitive   = true
   description = "Secret access key for the backup IAM user. Sensitive — propagated to the instance via deploy.yml."
 }
+
+output "cost_reader_access_key_id" {
+  value       = aws_iam_access_key.cost_reader.id
+  sensitive   = true
+  description = "Access key ID for the cost-reader IAM user. Sensitive — read at deploy time and written to the instance .env."
+}
+
+output "cost_reader_secret_access_key" {
+  value       = aws_iam_access_key.cost_reader.secret
+  sensitive   = true
+  description = "Secret access key for the cost-reader IAM user. Sensitive — read at deploy time and written to the instance .env."
+}

@@ -16,6 +16,11 @@ import { dirname, join } from 'node:path';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
+import {
+  CostExplorerClient,
+  GetCostAndUsageCommand,
+  GetCostForecastCommand,
+} from '@aws-sdk/client-cost-explorer';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -533,12 +538,13 @@ app.get('/api/characters', async (req, res) => {
   }
 });
 
+// Sub-resources handled by dedicated routes registered below — none of
+// them proxy newserv, so they must fall through this allowlist handler
+// to their own routes.
+const RESERVED_RESOURCES = new Set(['build', 'cost']);
+
 app.get('/api/:resource', async (req, res, next) => {
-  // Reserved sub-resources are handled by dedicated routes registered
-  // below; defer to Express's router so /api/build hits its dedicated
-  // handler instead of falling through the allowlist (which it isn't
-  // in — /api/build doesn't proxy newserv, it queries GitHub).
-  if (req.params.resource === 'build') return next();
+  if (RESERVED_RESOURCES.has(req.params.resource)) return next();
   const route = ALLOWLIST.get(req.params.resource);
   if (!route) {
     return res.status(404).json({ error: 'unknown resource' });
@@ -688,6 +694,206 @@ app.get('/api/build', async (_req, res) => {
   } catch (err) {
     console.error(`[api/build] ${err.message}`);
     res.status(502).json({ error: 'build info unavailable' });
+  }
+});
+
+// =========================================================================
+// /api/cost — hosting cost from AWS Cost Explorer
+//
+// Powers the Live-section "Hosting cost" card: a small MTD figure, an
+// end-of-month forecast, a 30-day daily-spend chart, a per-service
+// breakdown, and a tag-filtered-vs-account-wide cross-check.
+//
+// Cost discipline. Cost Explorer charges $0.01 per API request. Each
+// cache miss makes 4 calls:
+//   1) GetCostAndUsage, daily, last 60 days, no group  — chart + month sums
+//   2) GetCostAndUsage, monthly, current month, group=SERVICE  — breakdown
+//   3) GetCostAndUsage, monthly, current month, Tag filter      — crosscheck
+//   4) GetCostForecast, MONTHLY                                 — forecast
+//
+// Cache TTL = 12h. Cost Explorer data itself lags real spend by ~24h, so
+// refreshing more often than that buys nothing real. 2 misses/day × 4
+// calls = ~$2.40/month worst case, with the dashboard's rare-visitor
+// pattern keeping it lower in practice.
+//
+// Resilience. Any single CE call that fails is reported in the response
+// `errors` field but doesn't break the rest — e.g. if the forecast call
+// errors (it returns "insufficient history" for fresh accounts), the
+// MTD/chart/breakdown still render with a small "forecast unavailable"
+// note on the card.
+//
+// Auth. Reads AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY from the
+// container env (written into /home/ubuntu/pso-server/.env by the
+// deploy workflow from the AWS_COST_READER_* GitHub secrets, which in
+// turn were emitted by terraform output on the cost-reader IAM user).
+// The user has only ce:GetCostAndUsage + ce:GetCostForecast — no other
+// AWS access.
+// =========================================================================
+
+const COST_INFO_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+const COST_PROJECT_TAG = 'Project';
+const COST_PROJECT_VALUE = 'pso-server';
+
+let costInfoCache = null;
+let costExplorerClient = null;
+
+function getCostExplorerClient() {
+  if (costExplorerClient) return costExplorerClient;
+  if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
+    return null;
+  }
+  // Cost Explorer is a global service but its single API endpoint lives
+  // in us-east-1. We force the region rather than reading from env so a
+  // misconfigured AWS_REGION can't silently misroute the calls.
+  costExplorerClient = new CostExplorerClient({ region: 'us-east-1' });
+  return costExplorerClient;
+}
+
+// ISO-date helpers. Cost Explorer takes inclusive start, exclusive end.
+function isoDate(d) { return d.toISOString().slice(0, 10); }
+function startOfMonth(d) { return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)); }
+function nextMonth(d) { return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)); }
+function daysAgo(d, n) { const r = new Date(d); r.setUTCDate(r.getUTCDate() - n); return r; }
+
+function monthLabel(d) {
+  return d.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
+async function fetchCostInfo() {
+  const client = getCostExplorerClient();
+  if (!client) {
+    return { error: 'AWS credentials not configured', errors: [] };
+  }
+
+  // Resolve windows once so all four calls reference the same notion of
+  // "today" / "this month" — avoids edge cases where the calls span a
+  // UTC-midnight boundary mid-request.
+  const now = new Date();
+  const thisMonthStart = startOfMonth(now);
+  const nextMonthStart = nextMonth(now);
+  const lastMonthStart = startOfMonth(daysAgo(thisMonthStart, 1));
+  const dailyStart = daysAgo(now, 60);
+  // Cost Explorer's daily granularity rounds to UTC days; end is
+  // exclusive, so to cover "today" we ask for tomorrow.
+  const dailyEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+
+  const errors = [];
+  const safeRun = async (label, fn) => {
+    try { return await fn(); }
+    catch (err) { errors.push({ label, message: err.message }); return null; }
+  };
+
+  // 1) Daily, last 60 days. Used to build both the chart and the
+  //    current-month + last-month sums (cheaper than separate monthly
+  //    calls per period).
+  const dailyRes = await safeRun('daily', () => client.send(new GetCostAndUsageCommand({
+    TimePeriod: { Start: isoDate(dailyStart), End: isoDate(dailyEnd) },
+    Granularity: 'DAILY',
+    Metrics: ['UnblendedCost'],
+  })));
+
+  // 2) Monthly, current month, grouped by service. Used for the
+  //    per-service chip breakdown.
+  const serviceRes = await safeRun('byService', () => client.send(new GetCostAndUsageCommand({
+    TimePeriod: { Start: isoDate(thisMonthStart), End: isoDate(nextMonthStart) },
+    Granularity: 'MONTHLY',
+    Metrics: ['UnblendedCost'],
+    GroupBy: [{ Type: 'DIMENSION', Key: 'SERVICE' }],
+  })));
+
+  // 3) Monthly, current month, tag-filtered. Same window as the
+  //    account-wide MTD; the difference between this and the account-
+  //    wide sum is the "untagged drift" cross-check.
+  const tagFilteredRes = await safeRun('tagFiltered', () => client.send(new GetCostAndUsageCommand({
+    TimePeriod: { Start: isoDate(thisMonthStart), End: isoDate(nextMonthStart) },
+    Granularity: 'MONTHLY',
+    Metrics: ['UnblendedCost'],
+    Filter: { Tags: { Key: COST_PROJECT_TAG, Values: [COST_PROJECT_VALUE] } },
+  })));
+
+  // 4) End-of-month forecast. Window is "today through first-of-next-
+  //    month" with MONTHLY granularity, so AWS returns a single
+  //    aggregate value covering the rest of the current month — what
+  //    we want to add to MTD for the end-of-month projection.
+  //    Most prone to fail (insufficient history on young accounts) —
+  //    caller treats null gracefully.
+  const forecastRes = await safeRun('forecast', () => client.send(new GetCostForecastCommand({
+    TimePeriod: { Start: isoDate(now), End: isoDate(nextMonthStart) },
+    Granularity: 'MONTHLY',
+    Metric: 'UNBLENDED_COST',
+  })));
+
+  // Build the daily series + monthly sums from the daily response.
+  const daily = [];
+  let thisMonthSum = 0;
+  let lastMonthSum = 0;
+  for (const row of dailyRes?.ResultsByTime ?? []) {
+    const date = row.TimePeriod?.Start;
+    const usd = Number(row.Total?.UnblendedCost?.Amount ?? 0);
+    if (!date) continue;
+    daily.push({ date, usd });
+    const d = new Date(date + 'T00:00:00Z');
+    if (d >= thisMonthStart && d < nextMonthStart) thisMonthSum += usd;
+    if (d >= lastMonthStart && d < thisMonthStart) lastMonthSum += usd;
+  }
+
+  // Per-service chips, sorted by spend descending so the largest line
+  // items render first. Cost Explorer returns the SERVICE name verbatim
+  // ("Amazon Lightsail", "Amazon Simple Storage Service", …).
+  const byService = ((serviceRes?.ResultsByTime?.[0]?.Groups) ?? [])
+    .map((g) => ({
+      service: g.Keys?.[0] ?? 'Unknown',
+      usd: Number(g.Metrics?.UnblendedCost?.Amount ?? 0),
+    }))
+    .filter((s) => s.usd > 0)
+    .sort((a, b) => b.usd - a.usd);
+
+  const tagFilteredUSD = Number(
+    tagFilteredRes?.ResultsByTime?.[0]?.Total?.UnblendedCost?.Amount ?? 0,
+  );
+
+  const forecastUSD = forecastRes?.Total?.Amount
+    ? Number(forecastRes.Total.Amount)
+    : null;
+
+  return {
+    asOf: new Date().toISOString(),
+    currency: 'USD',
+    currentMonth: {
+      label: `${monthLabel(thisMonthStart)} (MTD)`,
+      spendUSD: thisMonthSum,
+      forecastUSD,
+    },
+    lastMonth: {
+      label: monthLabel(lastMonthStart),
+      spendUSD: lastMonthSum,
+    },
+    daily,
+    byService,
+    crosscheck: {
+      tagFilteredUSD,
+      accountWideUSD: thisMonthSum,
+      // Positive drift = there's spend in the account that isn't tagged
+      // Project=pso-server. With Phase 1 cleanup this should be ~$0.
+      untaggedDriftUSD: Math.max(0, thisMonthSum - tagFilteredUSD),
+    },
+    stalenessNote: 'Cost Explorer data lags real spend by ~24h.',
+    errors: errors.length > 0 ? errors : null,
+    error: null,
+  };
+}
+
+app.get('/api/cost', async (_req, res) => {
+  try {
+    const now = Date.now();
+    if (!costInfoCache || now - costInfoCache.at > COST_INFO_TTL_MS) {
+      const info = await fetchCostInfo();
+      costInfoCache = { at: now, info };
+    }
+    res.json(costInfoCache.info);
+  } catch (err) {
+    console.error(`[api/cost] ${err.message}`);
+    res.status(502).json({ error: 'cost info unavailable', detail: err.message });
   }
 });
 
