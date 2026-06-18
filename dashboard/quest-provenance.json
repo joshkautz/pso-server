@@ -16,7 +16,8 @@
     "Catalog audit: 243 of 260 quests are Sega-authored (classify=original). 17 are community-authored (classify=custom).",
     "The 17 custom quests are: q000 (soulja224466, 2006), q075 (Aleron Ives's 'Aberrant Grove', brought in by Matt Swift 2025), q253 (Matt Swift's 'Story Flag Fixer' utility, 2024), and the 14 Solo Challenge quests Matt Swift added in 2024 (q8811-q8819 Ep1, q8821-q8825 Ep2) which take Sega's multiplayer-only Challenge mode and make it solo-playable.",
     "Earlier counts of '2 custom' were wrong — the Solo Challenge mode quests were missed because they live in the challenge-solo-ep1/ep2 categories rather than the download/ folder, and q075's reclassification took confirming Matt Swift's git commit log.",
-    "Year distribution: 20 from 2000 (DC v1), 57 from 2001 (DC v2 + events), 80 from 2003 (GC), 99 from 2004 (BB Sega-originals), 1 from 2006 (q000 soulja224466), 15 from 2024 (Matt Swift contributions), 1 from 2025 (Aleron Ives via Matt Swift)."
+    "Year distribution: 20 from 2000 (DC v1), 57 from 2001 (DC v2 + events), 80 from 2003 (GC), 99 from 2004 (BB Sega-originals), 1 from 2006 (q000 soulja224466), 15 from 2024 (Matt Swift contributions), 1 from 2025 (Aleron Ives via Matt Swift).",
+    "2026-06-18 update: installed 28 new Ephinea custom quests (q605-q668) from the phantasmal-world mirror, and reclassified 29 already-bundled Ephinea quests (Endless Nightmare, Phantasmal World, War of Limits, New Mop-Up Operation, Point of Disaster, The Robots' Reckoning, Maximum Attack Ver2/4th Stage) from original->custom. Catalog now tracks 74 custom of 288 total entries. All Ephinea quests are Blue Burst format (BB clients only)."
   ],
   "0": {
     "classify": "custom",
@@ -715,52 +716,52 @@
     "notes": "Sega Extermination quest, included with original disc release."
   },
   "108": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Endless Nightmare #1",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2000,
     "platform": "Dreamcast",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/Endless_Nightmare_#1",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/extermination/Endless%20Nightmare%20%231.qst",
     "category": "Extermination",
     "episode": 1,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "109": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Endless Nightmare #2",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2000,
     "platform": "Dreamcast",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/Endless_Nightmare_#2",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/extermination/Endless%20Nightmare%20%232.qst",
     "category": "Extermination",
     "episode": 1,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "110": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Endless Nightmare #3",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2000,
     "platform": "Dreamcast",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/Endless_Nightmare_#3",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/extermination/Endless%20Nightmare%20%233.qst",
     "category": "Extermination",
     "episode": 1,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "111": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Endless Nightmare #4",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2000,
     "platform": "Dreamcast",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/Endless_Nightmare_#4",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/extermination/Endless%20Nightmare%20%234.qst",
     "category": "Extermination",
     "episode": 1,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "117": {
     "classify": "original",
@@ -907,40 +908,40 @@
     "notes": "Sega solo-only quest."
   },
   "144": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Maximum Attack 4th Stage -A-",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2000,
     "platform": "Dreamcast",
     "distribution": "event",
-    "sourceUrl": "https://wiki.pioneer2.net/w/Maximum_Attack_4th_Stage_-A-",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/maximum_attack/MA4%20-1A-.qst",
     "category": "Events",
     "episode": 1,
-    "notes": "Sega event quest (holiday/seasonal/promotional); originally limited-time release."
+    "notes": "Sega event quest (holiday/seasonal/promotional); originally limited-time release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "145": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Maximum Attack 4th Stage -B-",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2000,
     "platform": "Dreamcast",
     "distribution": "event",
-    "sourceUrl": "https://wiki.pioneer2.net/w/Maximum_Attack_4th_Stage_-B-",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/maximum_attack/MA4%20-1B-.qst",
     "category": "Events",
     "episode": 1,
-    "notes": "Sega event quest (holiday/seasonal/promotional); originally limited-time release."
+    "notes": "Sega event quest (holiday/seasonal/promotional); originally limited-time release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "146": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Maximum Attack 4th Stage -C-",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2000,
     "platform": "Dreamcast",
     "distribution": "event",
-    "sourceUrl": "https://wiki.pioneer2.net/w/Maximum_Attack_4th_Stage_-C-",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/maximum_attack/MA4%20-1C-.qst",
     "category": "Events",
     "episode": 1,
-    "notes": "Sega event quest (holiday/seasonal/promotional); originally limited-time release."
+    "notes": "Sega event quest (holiday/seasonal/promotional); originally limited-time release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "147": {
     "classify": "original",
@@ -1459,64 +1460,64 @@
     "notes": "Sega event quest (holiday/seasonal/promotional); originally limited-time release."
   },
   "233": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Phantasmal World #1",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2003,
     "platform": "GameCube",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/Phantasmal_World_#1",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/extermination/Phantasmal%20World%20%231.qst",
     "category": "Extermination",
     "episode": 2,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "234": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Phantasmal World #2",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2003,
     "platform": "GameCube",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/Phantasmal_World_#2",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/extermination/Phantasmal%20World%20%232.qst",
     "category": "Extermination",
     "episode": 2,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "235": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Phantasmal World #3",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2003,
     "platform": "GameCube",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/Phantasmal_World_#3",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/extermination/Phantasmal%20World%20%233.qst",
     "category": "Extermination",
     "episode": 2,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "236": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Phantasmal World #4",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2003,
     "platform": "GameCube",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/Phantasmal_World_#4",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/extermination/Phantasmal%20World%20%234.qst",
     "category": "Extermination",
     "episode": 2,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "237": {
-    "classify": "original",
+    "classify": "custom",
     "name": "MAXIMUM ATTACK 1 Ver2",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2003,
     "platform": "GameCube",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/MAXIMUM_ATTACK_1_Ver2",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/maximum_attack/Maximum%20Attack%201%20Ver2.qst",
     "category": "Virtual Reality",
     "episode": 1,
-    "notes": "Sega Virtual Reality lobby teleport quest."
+    "notes": "Sega Virtual Reality lobby teleport quest. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "238": {
     "classify": "original",
@@ -1591,40 +1592,40 @@
     "notes": "Sega event quest (holiday/seasonal/promotional); originally limited-time release."
   },
   "303": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Maximum Attack 4th Stage -4A-",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "event",
-    "sourceUrl": "https://wiki.pioneer2.net/w/Maximum_Attack_4th_Stage_-4A-",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/maximum_attack/MA4%20-4A-.qst",
     "category": "Events",
     "episode": 4,
-    "notes": "Sega event quest (holiday/seasonal/promotional); originally limited-time release."
+    "notes": "Sega event quest (holiday/seasonal/promotional); originally limited-time release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "304": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Maximum Attack 4th Stage -4B-",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "event",
-    "sourceUrl": "https://wiki.pioneer2.net/w/Maximum_Attack_4th_Stage_-4B-",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/maximum_attack/MA4%20-4B-.qst",
     "category": "Events",
     "episode": 4,
-    "notes": "Sega event quest (holiday/seasonal/promotional); originally limited-time release."
+    "notes": "Sega event quest (holiday/seasonal/promotional); originally limited-time release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "305": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Maximum Attack 4th Stage -4C-",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "event",
-    "sourceUrl": "https://wiki.pioneer2.net/w/Maximum_Attack_4th_Stage_-4C-",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/maximum_attack/MA4%20-4C-.qst",
     "category": "Events",
     "episode": 4,
-    "notes": "Sega event quest (holiday/seasonal/promotional); originally limited-time release."
+    "notes": "Sega event quest (holiday/seasonal/promotional); originally limited-time release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "306": {
     "classify": "original",
@@ -1663,16 +1664,16 @@
     "notes": "Sega Virtual Reality lobby teleport quest."
   },
   "314": {
-    "classify": "original",
+    "classify": "custom",
     "name": "MAXIMUM ATTACK 3 Ver2",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/MAXIMUM_ATTACK_3_Ver2",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/maximum_attack/Maximum%20Attack%203%20Ver2.qst",
     "category": "Virtual Reality",
     "episode": 4,
-    "notes": "Sega Virtual Reality lobby teleport quest."
+    "notes": "Sega Virtual Reality lobby teleport quest. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "315": {
     "classify": "original",
@@ -2311,16 +2312,16 @@
     "notes": "Sega Shops lobby teleport quest."
   },
   "494": {
-    "classify": "original",
+    "classify": "custom",
     "name": "MAXIMUM ATTACK 2 Ver2",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2003,
     "platform": "GameCube",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/MAXIMUM_ATTACK_2_Ver2",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/maximum_attack/Maximum%20Attack%202%20Ver2.qst",
     "category": "Virtual Reality",
     "episode": 2,
-    "notes": "Sega Virtual Reality lobby teleport quest."
+    "notes": "Sega Virtual Reality lobby teleport quest. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "497": {
     "classify": "original",
@@ -2503,148 +2504,148 @@
     "notes": "Sega BB Episode 4 government quest."
   },
   "709": {
-    "classify": "original",
+    "classify": "custom",
     "name": "Point of Disaster",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/Point_of_Disaster",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/extermination/Point%20of%20Disaster.qst",
     "category": "Team",
     "episode": 4,
-    "notes": "Sega Team quest (BB-only)."
+    "notes": "Sega Team quest (BB-only). Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "710": {
-    "classify": "original",
+    "classify": "custom",
     "name": "The Robots' Reckoning",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/The_Robots'_Reckoning",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/extermination/The%20Robots%27%20Reckoning.qst",
     "category": "Team",
     "episode": 4,
-    "notes": "Sega Team quest (BB-only)."
+    "notes": "Sega Team quest (BB-only). Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "811": {
-    "classify": "original",
+    "classify": "custom",
     "name": "War of Limits 1",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/War_of_Limits_1",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/extermination/War%20of%20Limits%201.qst",
     "category": "Extermination",
     "episode": 4,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "812": {
-    "classify": "original",
+    "classify": "custom",
     "name": "War of Limits 2",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/War_of_Limits_2",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/extermination/War%20of%20Limits%202.qst",
     "category": "Extermination",
     "episode": 4,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "813": {
-    "classify": "original",
+    "classify": "custom",
     "name": "War of Limits 3",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/War_of_Limits_3",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/extermination/War%20of%20Limits%203.qst",
     "category": "Extermination",
     "episode": 4,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "814": {
-    "classify": "original",
+    "classify": "custom",
     "name": "War of Limits 4",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/War_of_Limits_4",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/extermination/War%20of%20Limits%204.qst",
     "category": "Extermination",
     "episode": 4,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "815": {
-    "classify": "original",
+    "classify": "custom",
     "name": "War of Limits 5",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/War_of_Limits_5",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/extermination/War%20of%20Limits%205.qst",
     "category": "Extermination",
     "episode": 4,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "816": {
-    "classify": "original",
+    "classify": "custom",
     "name": "New Mop-Up Operation #1",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/New_Mop-Up_Operation_#1",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/extermination/New%20Mop-Up%20Operation%20%231.qst",
     "category": "Extermination",
     "episode": 4,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "817": {
-    "classify": "original",
+    "classify": "custom",
     "name": "New Mop-Up Operation #2",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/New_Mop-Up_Operation_#2",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/extermination/New%20Mop-Up%20Operation%20%232.qst",
     "category": "Extermination",
     "episode": 4,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "818": {
-    "classify": "original",
+    "classify": "custom",
     "name": "New Mop-Up Operation #3",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/New_Mop-Up_Operation_#3",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/extermination/New%20Mop-Up%20Operation%20%233.qst",
     "category": "Extermination",
     "episode": 4,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "819": {
-    "classify": "original",
+    "classify": "custom",
     "name": "New Mop-Up Operation #4",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/New_Mop-Up_Operation_#4",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/extermination/New%20Mop-Up%20Operation%20%234.qst",
     "category": "Extermination",
     "episode": 4,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "820": {
-    "classify": "original",
+    "classify": "custom",
     "name": "New Mop-Up Operation #5",
-    "author": "Sega",
+    "author": "Ephinea",
     "year": 2004,
     "platform": "Blue Burst",
     "distribution": "disc-included",
-    "sourceUrl": "https://wiki.pioneer2.net/w/New_Mop-Up_Operation_#5",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/extermination/New%20Mop-Up%20Operation%20%235.qst",
     "category": "Extermination",
     "episode": 4,
-    "notes": "Sega Extermination quest, included with original disc release."
+    "notes": "Sega Extermination quest, included with original disc release. Reclassified original->custom on 2026-06-18: this is an Ephinea server custom/event quest (not a Sega-authored quest), bundled in newserv's base set at this number. Authorship is Ephinea staff/community; some Maximum Attack variants derive from earlier Schthack community quests."
   },
   "999": {
     "classify": "original",
@@ -3137,5 +3138,341 @@
     "category": "Hidden",
     "episode": 1,
     "notes": "Sega hidden/testing quest."
+  },
+  "605": {
+    "classify": "custom",
+    "name": "Maximum Attack S",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/maximum_attack/Maximum%20Attack%20S%20E1.qst",
+    "category": "Extermination",
+    "episode": 1,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "606": {
+    "classify": "custom",
+    "name": "Random Attack Xrd Stage",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/maximum_attack/Random%20Attack%20Xrd%20E1.qst",
+    "category": "Extermination",
+    "episode": 1,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "610": {
+    "classify": "custom",
+    "name": "Dark Research 2.0",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/retrieval/Dark%20Research%202.0.qst",
+    "category": "Retrieval",
+    "episode": 1,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "611": {
+    "classify": "custom",
+    "name": "Simulator 2.0",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/vr/Simulator%202.0.qst",
+    "category": "Virtual Reality",
+    "episode": 1,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "612": {
+    "classify": "custom",
+    "name": "Mine Offensive",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/vr/Mine%20Offensive.qst",
+    "category": "Virtual Reality",
+    "episode": 1,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "613": {
+    "classify": "custom",
+    "name": "Christmas Fiasco",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/event/Christmas%20Fiasco.qst",
+    "category": "Events",
+    "episode": 1,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "614": {
+    "classify": "custom",
+    "name": "Maximum Attack E: Caves",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/event/MAE%20Caves.qst",
+    "category": "Events",
+    "episode": 1,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "615": {
+    "classify": "custom",
+    "name": "Maximum Attack E: Forest",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/event/MAE%20Forest.qst",
+    "category": "Events",
+    "episode": 1,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "616": {
+    "classify": "custom",
+    "name": "Maximum Attack E: Mines",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/event/MAE%20Mines.qst",
+    "category": "Events",
+    "episode": 1,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "617": {
+    "classify": "custom",
+    "name": "Maximum Attack E: Ruins",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_1/guild/event/MAE%20Ruins.qst",
+    "category": "Events",
+    "episode": 1,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "624": {
+    "classify": "custom",
+    "name": "Gal Da Val's Darkness",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/extermination/Gal%20Dal%20Val%27s%20Darkness.qst",
+    "category": "Extermination",
+    "episode": 2,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "626": {
+    "classify": "custom",
+    "name": "Maximum Attack S",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/maximum_attack/Maximum%20Attack%20S.qst",
+    "category": "Extermination",
+    "episode": 2,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "627": {
+    "classify": "custom",
+    "name": "Random Attack Xrd Stage",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/maximum_attack/Random%20Attack%20Xrd%20II.qst",
+    "category": "Extermination",
+    "episode": 2,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "628": {
+    "classify": "custom",
+    "name": "Maximum Attack 4th Stage -2A-",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/maximum_attack/MA4%20-2A-.qst",
+    "category": "Extermination",
+    "episode": 2,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "629": {
+    "classify": "custom",
+    "name": "Maximum Attack 4th Stage -2B-",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/maximum_attack/MA4%20-2B-.qst",
+    "category": "Extermination",
+    "episode": 2,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "630": {
+    "classify": "custom",
+    "name": "Maximum Attack 4th Stage -2C-",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/maximum_attack/MA4%20-2C-.qst",
+    "category": "Extermination",
+    "episode": 2,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "631": {
+    "classify": "custom",
+    "name": "Maximum Attack E: Gal Da Val",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/maximum_attack/MAE%20GDV.qst",
+    "category": "Extermination",
+    "episode": 2,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "632": {
+    "classify": "custom",
+    "name": "Maximum Attack E: VR",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/maximum_attack/MAE%20VR.qst",
+    "category": "Extermination",
+    "episode": 2,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "633": {
+    "classify": "custom",
+    "name": "Dolmolm Research",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/retrieval/Dolmolm%20Research.qst",
+    "category": "Retrieval",
+    "episode": 2,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "634": {
+    "classify": "custom",
+    "name": "Christmas Fiasco",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/event/Christmas%20Fiasco%20II.qst",
+    "category": "Events",
+    "episode": 2,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "635": {
+    "classify": "custom",
+    "name": "Maximum Attack E: CCA",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/event/MAE%20CCA.qst",
+    "category": "Events",
+    "episode": 2,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "636": {
+    "classify": "custom",
+    "name": "Maximum Attack E: Seabed",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/event/MAE%20Seabed.qst",
+    "category": "Events",
+    "episode": 2,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "637": {
+    "classify": "custom",
+    "name": "Maximum Attack E: Spaceship",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/event/MAE%20Spaceship.qst",
+    "category": "Events",
+    "episode": 2,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "638": {
+    "classify": "custom",
+    "name": "Maximum Attack E: Temple",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/event/MAE%20Temple.qst",
+    "category": "Events",
+    "episode": 2,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "639": {
+    "classify": "custom",
+    "name": "Maximum Attack E: Tower",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_2/guild/event/MAE%20Tower.qst",
+    "category": "Events",
+    "episode": 2,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "663": {
+    "classify": "custom",
+    "name": "Maximum Attack S",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/maximum_attack/Maximum%20Attack%20S.qst",
+    "category": "Extermination",
+    "episode": 4,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "667": {
+    "classify": "custom",
+    "name": "Maximum Attack E: Episode 4",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/maximum_attack/MAE%204.qst",
+    "category": "Extermination",
+    "episode": 4,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
+  },
+  "668": {
+    "classify": "custom",
+    "name": "Christmas Fiasco",
+    "author": "Ephinea",
+    "year": null,
+    "platform": "Blue Burst",
+    "distribution": "community-archive",
+    "sourceUrl": "https://github.com/DaanVandenBosch/phantasmal-world/blob/master/web/assets-generation/src/main/resources/ephinea/ship-config/quest/episode_4/guild/event/Christmas%20Fiasco%20IV.qst",
+    "category": "Events",
+    "episode": 4,
+    "notes": "Ephinea server custom quest, installed 2026-06-18 from the phantasmal-world mirror of Ephinea's ship-config quest tree. Blue Burst format (BB-only playable). Not present in newserv's bundled set."
   }
 }

@@ -74,6 +74,81 @@ notes and on the dashboard. Items in this catalog are flagged with a
 > quest files for a private friends' server is normal; wholesale rehosting of
 > another server's branded catalog is a different thing.
 
+> **Owner decision (2026-06-18):** proceed with the full Ephinea tree, each
+> credited to Ephinea in provenance + on the dashboard. See the install
+> results below.
+
+---
+
+## Install results — 2026-06-18
+
+The first install pass against the Ephinea tree surfaced a notable fact:
+**newserv already bundles a large chunk of Ephinea's custom quests** in its
+base set — but our provenance had them mislabeled as Sega `original`. So the
+57 quests we pulled split three ways:
+
+### ✅ Newly installed — 28 quests (`server/quests/`, BB-only)
+
+Not present in newserv's bundle; downloaded, decoded, verified via
+`newserv check-quests`, and assigned numbers in the free **600–699** block.
+
+| # | Quest (in-game name) | Ep | Category |
+|---|---|---|---|
+| q605 | Maximum Attack S | 1 | Extermination |
+| q606 | Random Attack Xrd Stage | 1 | Extermination |
+| q610 | Dark Research 2.0 | 1 | Retrieval |
+| q611 | Simulator 2.0 | 1 | Virtual Reality |
+| q612 | Mine Offensive | 1 | Virtual Reality |
+| q613 | Christmas Fiasco | 1 | Events |
+| q614–q617 | Maximum Attack E: Caves / Forest / Mines / Ruins | 1 | Events |
+| q624 | Gal Da Val's Darkness | 2 | Extermination |
+| q626 | Maximum Attack S | 2 | Extermination |
+| q627 | Random Attack Xrd Stage | 2 | Extermination |
+| q628–q630 | Maximum Attack 4th Stage -2A- / -2B- / -2C- | 2 | Extermination |
+| q631 | Maximum Attack E: Gal Da Val | 2 | Extermination |
+| q632 | Maximum Attack E: VR | 2 | Extermination |
+| q633 | Dolmolm Research | 2 | Retrieval |
+| q634 | Christmas Fiasco | 2 | Events |
+| q635–q639 | Maximum Attack E: CCA / Seabed / Spaceship / Temple / Tower | 2 | Events |
+| q663 | Maximum Attack S | 4 | Extermination |
+| q667 | Maximum Attack E: Episode 4 | 4 | Extermination |
+| q668 | Christmas Fiasco | 4 | Events |
+
+### ♻️ Already bundled — 29 quests (reclassified, not re-installed)
+
+These Ephinea quests already ship in newserv at their original numbers; we
+**reclassified them in `quest-provenance.json` from `original` → `custom`**
+(author Sega → Ephinea) rather than installing duplicates. Installing copies
+would have shown each quest twice in the in-game menu.
+
+- Endless Nightmare #1–#4 → bundled **q108–q111**
+- Maximum Attack 4th Stage -1A/-1B/-1C- → bundled **q144–q146**
+- Phantasmal World #1–#4 → bundled **q233–q236**
+- Maximum Attack 1 Ver2 → bundled **q237**
+- Maximum Attack 4th Stage -4A/-4B/-4C- → bundled **q303–q305**
+- Maximum Attack 3 Ver2 → bundled **q314**
+- Maximum Attack 2 Ver2 → bundled **q494**
+- Point of Disaster → bundled **q709**; The Robots' Reckoning → **q710**
+- War of Limits 1–5 → bundled **q811–q815**
+- New Mop-Up Operation #1–#5 → bundled **q816–q820**
+
+### ⏭️ Skipped / deferred
+
+- **Borderline-provenance names** (Forsaken Friends, Rescue From Ragol,
+  Tyrell's Ego, Sugoruku, Dream Messenger, Revisiting Darkness, Reach for the
+  Dream, Respective Tomorrow, Beyond The Horizon, LOGiN) — left `catalogued`,
+  not installed. Many are likely renamed Sega-originals; needs per-file
+  confirmation before tagging custom.
+- **Mop Up Operation #1–4, Today's Rate, Lost weapons series, Towards the
+  Future, Labyrinthine Trial, Fragments of a Memory, etc.** — Sega-originals
+  in the Ephinea tree; intentionally skipped (already covered by the bundled
+  Sega set).
+
+> **Caveat — all Ephinea quests are Blue Burst format.** They're playable by
+> BB clients only. Our GameCube-centric group won't see them in-game until
+> someone connects via Blue Burst; they appear on the dashboard quest list
+> regardless (tagged Episode + Custom).
+
 ---
 
 ## Source registry
@@ -228,4 +303,5 @@ then **500–599**, then **600–699**.
 
 | Date | Change |
 |---|---|
-| 2026-06-18 | Document created. Source registry verified. Ephinea custom tree (Ep 1/2/4) catalogued from the phantasmal-world mirror; download + `decode-qst` pipeline proven on "Endless Nightmare #1" (internal q108). Nothing installed yet — gray-bucket items pending owner decision on provenance. |
+| 2026-06-18 | Document created. Source registry verified. Ephinea custom tree (Ep 1/2/4) catalogued from the phantasmal-world mirror; download + `decode-qst` pipeline proven. |
+| 2026-06-18 | Owner approved the full Ephinea tree. Installed **28 new** Ephinea quests (q605–q668, BB) into `server/quests/`; found **29 already bundled** in newserv and reclassified them `original`→`custom` in `quest-provenance.json`; skipped 1 name-dup (Maximum Attack 2 Ver2 = bundled q494) + borderline-provenance names. Custom-classified quests in the dashboard: 17 → **74**. See "Install results" above. |
