@@ -1282,21 +1282,21 @@
          from "actual spend" cyan
      ----------------------------------------------------------------- */
   .cost-card {
-    /* No margin-top — sits inside the .activity grid now, gap handled
-       by the parent. Layered background: glass + faint cyan radial
-       glow in the top-left so the card has a soft "live readout" feel
-       rather than a flat panel. Repeated 1px dot grid for the lobby-
-       compass vibe. */
-    background:
-      radial-gradient(circle at 5% 10%, rgba(0, 212, 255, 0.05), transparent 35%),
-      radial-gradient(circle at 95% 90%, rgba(255, 46, 133, 0.04), transparent 40%),
-      var(--bg-surface);
+    /* Sits inside the .activity grid; the parent handles the gap. Flat
+       surface + 1px border are inherited from .panel, identical to the
+       sibling cards, so the frame — especially the bottom edge — reads
+       just as crisply. Lifts on hover like the .player / .quest cards. */
     position: relative;
+    transition: transform 0.15s ease, border-color 0.15s ease;
     /* View Transitions: name the element so Chrome/Edge/Safari 18+
        smoothly animate its layout shift (collapsed grid cell ⇄
        expanded full-width row). Browsers without VT support snap
        instantly — graceful degradation. */
     view-transition-name: cost-card;
+  }
+  .cost-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--line-strong);
   }
   /* Expanded state: span the full activity grid row so the card sits
      by itself on row 2 with games + drops occupying row 1. The grid
@@ -1306,17 +1306,6 @@
       grid-column: 1 / -1;
     }
   }
-  .cost-card::before {
-    /* Inner highlight stripe under the top border — PSO menus carry a
-       brighter cyan rim on the inside of the frame. */
-    content: "";
-    position: absolute;
-    top: 1px; left: var(--space-3); right: var(--space-3);
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.35), transparent);
-    pointer-events: none;
-  }
-
   /* The whole card is the clickable toggle. Pointer cursor signals it;
      hover brightens the title; keyboard focus shows a ring. */
   .cost-card { cursor: pointer; }
@@ -1326,31 +1315,10 @@
     outline-offset: 3px;
   }
 
-  /* ---- Header: just the title + the single full-width underline,
-     exactly like the sibling cards' .panel h3. ---- */
-  .cost-card__header {
-    margin: 0 0 var(--space-4);
-    padding: 0 0 var(--space-3);
-    border-bottom: 1px solid var(--line-soft);
-    transition: border-color 0.15s ease;
-  }
-  .cost-card:hover .cost-card__header { border-bottom-color: var(--line-strong); }
+  /* The title is a plain <h3> inside .panel, so `.panel h3` already gives
+     it the single full-width underline + spacing — identical to the
+     sibling cards. We only animate the hover-brighten here. */
   .cost-card__title {
-    /* Neutralize the inherited .panel h3 rule (which would add a SECOND,
-       shorter underline under just the title text) — the header above
-       owns the single full-width line. */
-    margin: 0;
-    padding: 0;
-    border: 0;
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-high);
     transition: color 0.15s ease;
   }
   /* Collapsed preview — the cost card's equivalent of the sibling cards'
@@ -1415,7 +1383,6 @@
   @media (prefers-reduced-motion: reduce) {
     .cost-card,
     .cost-card__title,
-    .cost-card__header,
     .cost-card__preview,
     .cost-card__details-wrap { transition: none !important; }
   }
@@ -2034,15 +2001,13 @@
              keyboard-activatable (Enter/Space) and the pointer cursor
              signals clickability — no chevron needed. aria-expanded /
              aria-controls describe the collapsible region for AT. -->
-        <section class="panel cost-card" id="cost-card" data-expanded="false"
+        <div class="panel cost-card" id="cost-card" data-expanded="false"
                  role="button" tabindex="0"
                  aria-expanded="false" aria-controls="cost-card-details"
                  aria-label="Server costs — click to expand or collapse">
-          <div class="cost-card__header">
-            <h3 class="cost-card__title">
-              <span aria-hidden="true">◇</span> Server Costs
-            </h3>
-          </div>
+          <h3 class="cost-card__title">
+            <span aria-hidden="true">◇</span> Server Costs
+          </h3>
 
           <!-- Collapsed preview: an ultra-minimal sparkline of daily spend
                + a small MTD caption, filling the collapsed body the way
@@ -2102,7 +2067,7 @@
               <p class="cost-crosscheck" id="cost-crosscheck" hidden></p>
             </div>
           </div>
-        </section>
+        </div>
       </div>
     </div>
   </section>
