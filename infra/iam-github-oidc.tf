@@ -78,7 +78,8 @@ locals {
   backup_bucket_arn   = "arn:aws:s3:::${var.instance_name}-backups-${data.aws_caller_identity.current.account_id}"
   role_arn            = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/github-actions-${var.instance_name}"
   oidc_provider_arn   = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
-  backup_user_arn     = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/${var.instance_name}-backup"
+  backup_user_arn      = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/${var.instance_name}-backup"
+  cost_reader_user_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/${var.instance_name}-cost-reader"
 }
 
 data "aws_caller_identity" "current" {}
@@ -208,7 +209,13 @@ data "aws_iam_policy_document" "github_actions" {
     resources = [local.oidc_provider_arn]
   }
   statement {
-    sid = "IAMBackupUser"
+    # CI maintains the per-IAM-user state for both the S3-backup user
+    # and the Cost Explorer reader. Same set of read+update actions for
+    # both, scoped to exactly these two user ARNs (no IAM-wide wildcard).
+    # Initial CreateUser still has to happen via a local `terraform
+    # apply` from josh's machine — we deliberately don't grant CI
+    # iam:CreateUser to keep new-account provisioning manual.
+    sid = "IAMManagedUsers"
     actions = [
       "iam:GetUser",
       "iam:ListUserTags",
@@ -223,7 +230,10 @@ data "aws_iam_policy_document" "github_actions" {
       "iam:TagUser",
       "iam:UntagUser",
     ]
-    resources = [local.backup_user_arn]
+    resources = [
+      local.backup_user_arn,
+      local.cost_reader_user_arn,
+    ]
   }
 
   # sts: GetCallerIdentity is implicitly called by every aws CLI invocation.
