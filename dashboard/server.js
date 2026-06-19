@@ -106,7 +106,7 @@ const CLASS_NAME_TO_INDEX = Object.freeze({
 // =========================================================================
 
 const ALLOWLIST = new Map([
-  ['summary',    { path: '/y/summary',     strip: stripSensitive }],
+  ['summary',    { path: '/y/summary',     strip: stripSummary }],
   ['lobbies',    { path: '/y/lobbies',     strip: stripPlayerIdentities }],
   ['server',     { path: '/y/server',      strip: passthrough }],
   ['quests',     { path: '/y/data/quests', strip: passthrough }],
@@ -127,25 +127,71 @@ const ALLOWLIST = new Map([
 
 function passthrough(data) { return data; }
 
-function stripSensitive(data) {
-  // newserv's /y/summary returns top-level counts plus per-client info.
-  // Keep counts, drop per-client identifiers (player names are OK if
-  // you want a "now playing" list; account IDs, IPs, and session
-  // tokens are not).
-  if (data && typeof data === 'object') {
-    const clean = { ...data };
-    for (const k of ['accounts', 'clients', 'proxy_clients']) {
-      if (Array.isArray(clean[k])) {
-        clean[k] = clean[k].map((c) => ({
-          name: c.name,
-          version: c.version,
-          // intentionally drop: account_id, session_id, remote_address
-        }));
-      }
-    }
-    return clean;
+// PSO text fields carry a leading language marker — a tab (0x09) followed by a
+// language letter, "\tE" (English) or "\tJ" (Japanese) — and may contain inline
+// "\tCx" colour codes. newserv returns game names raw, so a game the player
+// named "k" arrives as "\tEk" (the tab collapses in HTML, leaving the stray
+// "E"). Strip the markers for display. Character names are decoded upstream and
+// don't carry this, so it only matters for game names.
+function cleanPsoText(s) {
+  if (typeof s !== 'string') return s;
+  return s
+    .replace(/\t[Cc][0-9A-Fa-f]/g, '') // inline colour codes (\tC6 = red, …)
+    .replace(/^\t[EJ]/, '')            // leading language marker (\tE / \tJ)
+    .replace(/\t/g, ' ')              // any remaining tab → space
+    .trim();
+}
+
+// Fields of a /y/summary game object that are safe to expose publicly. Used as
+// an allowlist so a future newserv addition can't silently leak through.
+const SAFE_GAME_FIELDS = [
+  'ID', 'Players', 'Episode', 'Difficulty', 'Mode', 'SectionID',
+  'HasPassword', 'CheatsEnabled',
+  'QuestSelectionInProgress', 'QuestInProgress', 'JoinableQuestInProgress',
+  'BattleInProgress', 'IsSpectatorTeam', 'MapNumber', // Episode 3 games
+];
+
+function stripSummary(data) {
+  // /y/summary = { Server: {counts…}, Clients: [...], Games: [...] }.
+  //
+  // The Server counts are safe. Clients carry AccountID — which for disc
+  // versions equals the player's PSO serial number, half their login
+  // credential, and is exactly what the AccountToken HMAC scheme elsewhere
+  // exists to keep out of the browser. Allowlist the display fields explicitly
+  // and drop everything else (newserv keys are PascalCase — an earlier
+  // lowercase denylist here matched nothing and leaked the whole record).
+  if (!data || typeof data !== 'object') return data;
+  const clean = { ...data };
+
+  if (Array.isArray(clean.Clients)) {
+    clean.Clients = clean.Clients.map((c) => ({
+      ID:        c.ID,         // ephemeral session id — not the account id
+      Name:      c.Name,
+      Version:   c.Version,
+      Level:     c.Level,
+      Class:     c.Class,
+      SectionID: c.SectionID,
+      LobbyID:   c.LobbyID,    // joins a client to its game (game.ID)
+      // dropped: AccountID, Language, IsOnProxy
+    }));
   }
-  return data;
+
+  if (Array.isArray(clean.Games)) {
+    clean.Games = clean.Games.map((g) => {
+      const out = { Name: cleanPsoText(g.Name) };
+      for (const k of SAFE_GAME_FIELDS) {
+        if (g[k] !== undefined) out[k] = g[k];
+      }
+      // Surface only the active quest's name, never the full quest object.
+      if (g.Quest && typeof g.Quest === 'object') {
+        const qn = g.Quest.Name ?? g.Quest.name ?? null;
+        if (qn) out.QuestName = cleanPsoText(qn);
+      }
+      return out;
+    });
+  }
+
+  return clean;
 }
 
 function stripPlayerIdentities(data) {
