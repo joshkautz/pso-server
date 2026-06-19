@@ -17,7 +17,7 @@
   // public address as their DNS server address in PSO's network configuration.
 
   // Server's name (maximum 16 characters). This appears in the upper-right corner of the screen while in lobbies.
-  "ServerName": "PSO Josh",
+  "ServerName": "Surly",
 
   // User to run the server as. If present, newserv will attempt to switch to this user's permissions after loading its
   // configuration and opening listening sockets. The special value $SUDO_USER causes newserv to look up the desired
