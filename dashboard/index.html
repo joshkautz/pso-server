@@ -583,6 +583,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
     gap: var(--space-3);
+    align-items: start; /* don't stretch shorter cards to the online roster's height */
   }
   .metric {
     background: var(--bg-surface);
@@ -722,24 +723,32 @@
   .dd-with-icon { display: flex; align-items: center; }
   .dd-muted { color: var(--text-low); font-size: 0.85rem; }
 
-  /* ---- "Hunters online" mini-roster (under the count) ---- */
+  /* ---- "Hunters online" roster — one card per connected player ---- */
   .online-hunters {
-    list-style: none; margin: var(--space-2) 0 0; padding: 0;
-    display: flex; flex-direction: column; gap: var(--space-1);
+    margin: var(--space-4) 0 0; padding: 0;
+    display: flex; flex-wrap: wrap; gap: var(--space-2);
   }
   .online-hunters:empty { display: none; }
-  .online-hunter {
+  .online-hunter-card {
     display: flex; align-items: center; gap: var(--space-2);
-    font-size: 0.82rem; color: var(--text-mid); min-width: 0;
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg-elevated);
+    border: 1px solid var(--line-subtle);
+    border-radius: var(--radius-md);
+    min-width: 0; max-width: 100%;
   }
-  .online-hunter__name {
+  .online-hunter-card__body {
+    display: flex; flex-direction: column; min-width: 0; line-height: 1.2;
+  }
+  .online-hunter-card__name {
+    color: var(--text-high); font-weight: 600; font-size: 0.85rem;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    color: var(--text-high); font-weight: 500;
   }
-  .online-hunter__level {
-    margin-left: auto; color: var(--text-low);
-    font-family: var(--font-mono); font-size: 0.75rem; flex: none;
+  .online-hunter-card__meta {
+    color: var(--text-mid); font-size: 0.72rem; font-family: var(--font-mono);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  .section-icon--hunter { width: 26px; height: 26px; }
 
   /* ---- Game modal roster — one row per player in the game ---- */
   .game-roster {
@@ -2052,7 +2061,7 @@
           </div>
           <div class="metric__value" id="metric-online" aria-live="polite">—</div>
           <div class="metric__delta" id="metric-online-delta"></div>
-          <ul class="online-hunters" id="online-hunters" aria-label="Players currently online"></ul>
+          <div class="online-hunters" id="online-hunters" role="list" aria-label="Players currently online"></div>
         </article>
 
         <article class="metric" role="listitem" aria-labelledby="m-uptime">
@@ -2958,14 +2967,18 @@ function renderOnlineHunters() {
     String(a.Name ?? '').localeCompare(String(b.Name ?? ''), undefined, { sensitivity: 'base' }),
   );
   root.innerHTML = sorted.map((c) => {
-    const name  = c.Name ? escapeHtml(String(c.Name)) : 'Unknown';
-    const level = Number.isFinite(c.Level) ? `Lv ${escapeHtml(String(c.Level))}` : '';
+    const name = c.Name ? escapeHtml(String(c.Name)) : 'Unknown';
+    const lvl  = Number.isFinite(c.Level) ? `Lv ${escapeHtml(String(c.Level))}` : '';
+    const cls  = c.Class ? escapeHtml(String(c.Class)) : '';
+    const meta = [lvl, cls].filter(Boolean).join(' · ');
     return `
-      <li class="online-hunter">
-        ${sectionIdIcon(c.SectionID, 'section-icon--inline')}
-        <span class="online-hunter__name" title="${name}">${name}</span>
-        ${level ? `<span class="online-hunter__level">${level}</span>` : ''}
-      </li>`;
+      <div class="online-hunter-card" role="listitem">
+        ${sectionIdIcon(c.SectionID, 'section-icon--hunter')}
+        <div class="online-hunter-card__body">
+          <span class="online-hunter-card__name" title="${name}">${name}</span>
+          ${meta ? `<span class="online-hunter-card__meta">${meta}</span>` : ''}
+        </div>
+      </div>`;
   }).join('');
 }
 
