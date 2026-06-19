@@ -1040,8 +1040,8 @@ app.use(express.static(__dirname, { extensions: ['html'] }));
 //   - drop NotifyGame (game-internal flag)
 //   - drop messages with NotifyServer=false (they're game-local, not
 //     intended for the public ticker)
-//   - the first message on connect is a server-hello (NewservVersion
-//     field), not a drop event — skip those
+//   - the first message on connect is a server-hello ({ServerType,
+//     BuildTime, Revision}), not a drop — skip anything without item data
 //
 // Per-client messages are wrapped as {type, ...} so future event kinds
 // (server status, etc.) can ride the same stream.
@@ -1094,10 +1094,16 @@ function connectToNewservDropsStream() {
       console.warn(`[drops] non-JSON from newserv: ${err.message}`);
       return;
     }
-    // The server-version hello fires on every connect — discard it.
-    if (msg && typeof msg.NewservVersion === 'string') return;
+    if (!msg || typeof msg !== 'object') return;
+    // newserv sends a server-version hello on every (re)connect —
+    // { ServerType, BuildTime, Revision } — which is NOT a drop. A stale check
+    // here looked for a `NewservVersion` field newserv never sends, so the
+    // hello slipped through and surfaced as a phantom "Unknown / ?" drop every
+    // time the proxy reconnected (e.g. on each dashboard deploy). Forward only
+    // messages shaped like a real drop — those always carry item data.
+    if (typeof msg.ItemData !== 'string' && typeof msg.ItemDescription !== 'string') return;
     // Only forward drops flagged as global notifications.
-    if (msg && msg.NotifyServer === false) return;
+    if (msg.NotifyServer === false) return;
 
     const out = sanitizeDropMessage(msg);
     if (!out) return;
