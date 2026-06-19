@@ -741,54 +741,41 @@
   .dd-with-icon { display: flex; align-items: center; }
   .dd-muted { color: var(--text-low); font-size: 0.85rem; }
 
-  /* ---- "Hunters online" roster — one card per connected player ---- */
-  .online-hunters {
-    margin: var(--space-4) 0 0; padding: 0;
-    display: flex; flex-wrap: wrap; gap: var(--space-2);
-  }
-  .online-hunters:empty { display: none; }
-  .online-hunter-card {
-    display: flex; align-items: center; gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
-    background: var(--bg-elevated);
-    border: 1px solid var(--line-subtle);
-    border-radius: var(--radius-md);
-    min-width: 0; max-width: 100%;
-  }
-  .online-hunter-card__body {
-    display: flex; flex-direction: column; min-width: 0; line-height: 1.2;
-  }
-  .online-hunter-card__name {
-    color: var(--text-high); font-weight: 600; font-size: 0.85rem;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .online-hunter-card__meta {
-    color: var(--text-mid); font-size: 0.72rem; font-family: var(--font-mono);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .section-icon--hunter { width: 26px; height: 26px; }
-
-  /* ---- Game modal roster — one row per player in the game ---- */
-  .game-roster {
+  /* ---- Hunter card (shared) ----
+     One card per player: section icon + name + class, with level on the right.
+     Used by BOTH the game-modal roster and the "Hunters online" list, so the
+     two are pixel-identical. A player still on the Select Character screen
+     renders an "Unknown" placeholder card in the very same format. */
+  .hunter-list {
     list-style: none; margin: 0; padding: 0;
     display: flex; flex-direction: column; gap: var(--space-2);
   }
-  .game-roster__row {
+  #online-hunters.hunter-list { margin-top: var(--space-4); } /* sits below the count */
+  .hunter-list:empty { display: none; }
+  .hunter-card {
     display: flex; align-items: center; gap: var(--space-3);
     padding: var(--space-2) var(--space-3);
     background: var(--bg-elevated);
     border: 1px solid var(--line-subtle);
     border-radius: var(--radius-sm);
   }
-  .game-roster__id { display: flex; flex-direction: column; min-width: 0; }
-  .game-roster__name {
+  .hunter-card__id { display: flex; flex-direction: column; min-width: 0; }
+  .hunter-card__name {
     color: var(--text-high); font-weight: 600; font-size: 0.9rem;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .game-roster__sub { color: var(--text-mid); font-size: 0.78rem; font-family: var(--font-mono); }
-  .game-roster__level {
+  .hunter-card__sub { color: var(--text-mid); font-size: 0.78rem; font-family: var(--font-mono); }
+  .hunter-card__level {
     margin-left: auto; color: var(--cyan-primary);
     font-family: var(--font-display); font-weight: 700; font-size: 0.95rem; flex: none;
+  }
+  /* Placeholder section icon for an Unknown hunter (no character chosen yet). */
+  .section-icon--unknown {
+    width: 26px; height: 26px; box-sizing: border-box;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--bg-base); border: 1px solid var(--line-subtle);
+    border-radius: 50%; color: var(--text-low);
+    font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; flex: none;
   }
 
   .empty-state {
@@ -2079,7 +2066,7 @@
           </div>
           <div class="metric__value" id="metric-online" aria-live="polite">—</div>
           <div class="metric__delta" id="metric-online-delta"></div>
-          <div class="online-hunters" id="online-hunters" role="list" aria-label="Players currently online"></div>
+          <div class="hunter-list" id="online-hunters" role="list" aria-label="Players currently online"></div>
         </article>
 
         <article class="metric" role="listitem" aria-labelledby="m-uptime">
@@ -2995,10 +2982,33 @@ function renderGames() {
   gameCardSignatures = nextSignatures;
 }
 
-// Render the compact list of currently-connected players inside the "Hunters
-// online" metric card, below the count. Each row shows the player's section-ID
-// icon, name and level. onlineClients comes straight from /api/summary Clients
-// (sanitised server-side — no account id). Empty list → nothing rendered.
+// Shared "hunter card": section icon + name + class, with level on the right.
+// Used by both the "Hunters online" list and the game-modal roster so they are
+// identical. A player still on the Select Character screen has null fields —
+// render an "Unknown" placeholder card in the same format (a "?" icon, "?" for
+// class and level) rather than a bare entry.
+function renderHunterCard(c) {
+  const hasName = c && c.Name && String(c.Name).trim();
+  const name = hasName ? escapeHtml(String(c.Name)) : 'Unknown';
+  const cls  = (c && c.Class) ? escapeHtml(String(c.Class)) : '?';
+  const lvl  = (c && Number.isFinite(c.Level)) ? `Lv ${escapeHtml(String(c.Level))}` : '?';
+  const icon = (c && SECTION_IDS.has(c.SectionID))
+    ? sectionIdIcon(c.SectionID, 'section-icon--roster')
+    : '<span class="section-icon--unknown" aria-hidden="true">?</span>';
+  return `
+    <div class="hunter-card" role="listitem">
+      ${icon}
+      <div class="hunter-card__id">
+        <span class="hunter-card__name" title="${name}">${name}</span>
+        <span class="hunter-card__sub">${cls}</span>
+      </div>
+      <span class="hunter-card__level">${lvl}</span>
+    </div>`;
+}
+
+// Render the currently-connected players inside the "Hunters online" metric
+// card, below the count, as hunter cards. onlineClients comes straight from
+// /api/summary Clients (sanitised server-side — no account id).
 function renderOnlineHunters() {
   const root = document.getElementById('online-hunters');
   if (!root) return;
@@ -3006,25 +3016,13 @@ function renderOnlineHunters() {
     root.innerHTML = '';
     return;
   }
-  // Highest level first, then name — stable, sensible ordering across polls.
+  // Highest level first, then name; Unknown (no character yet, level 0) sinks
+  // to the bottom. Stable across polls.
   const sorted = [...onlineClients].sort((a, b) =>
     (Number(b.Level) || 0) - (Number(a.Level) || 0) ||
     String(a.Name ?? '').localeCompare(String(b.Name ?? ''), undefined, { sensitivity: 'base' }),
   );
-  root.innerHTML = sorted.map((c) => {
-    const name = c.Name ? escapeHtml(String(c.Name)) : 'Unknown';
-    const lvl  = Number.isFinite(c.Level) ? `Lv ${escapeHtml(String(c.Level))}` : '';
-    const cls  = c.Class ? escapeHtml(String(c.Class)) : '';
-    const meta = [lvl, cls].filter(Boolean).join(' · ');
-    return `
-      <div class="online-hunter-card" role="listitem">
-        ${sectionIdIcon(c.SectionID, 'section-icon--hunter')}
-        <div class="online-hunter-card__body">
-          <span class="online-hunter-card__name" title="${name}">${name}</span>
-          ${meta ? `<span class="online-hunter-card__meta">${meta}</span>` : ''}
-        </div>
-      </div>`;
-  }).join('');
+  root.innerHTML = sorted.map((c) => renderHunterCard(c)).join('');
 }
 
 const PLAYER_PAGE_SIZE = 24;
@@ -4292,20 +4290,7 @@ function renderGameModal(game) {
   const roster = rosterForGame(game.id);
   const rosterHtml = roster.length === 0
     ? `<p class="quest-modal__placeholder">No players in this game right now.</p>`
-    : `<ul class="game-roster">${roster.map((c) => {
-        const name = c.Name ? escapeHtml(String(c.Name)) : 'Unknown';
-        const cls  = c.Class ? escapeHtml(String(c.Class)) : '—';
-        const lvl  = Number.isFinite(c.Level) ? `Lv ${escapeHtml(String(c.Level))}` : '';
-        return `
-          <li class="game-roster__row">
-            ${sectionIdIcon(c.SectionID, 'section-icon--roster')}
-            <div class="game-roster__id">
-              <span class="game-roster__name" title="${name}">${name}</span>
-              <span class="game-roster__sub">${cls}</span>
-            </div>
-            <span class="game-roster__level">${lvl}</span>
-          </li>`;
-      }).join('')}</ul>`;
+    : `<div class="hunter-list" role="list">${roster.map((c) => renderHunterCard(c)).join('')}</div>`;
 
   bodyEl.innerHTML = `
     <dl class="quest-modal__meta">
