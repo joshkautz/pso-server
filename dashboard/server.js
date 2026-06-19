@@ -107,7 +107,10 @@ const CLASS_NAME_TO_INDEX = Object.freeze({
 
 const ALLOWLIST = new Map([
   ['summary',    { path: '/y/summary',     strip: stripSummary }],
-  ['lobbies',    { path: '/y/lobbies',     strip: stripPlayerIdentities }],
+  // NB: /y/lobbies is intentionally NOT exposed. The dashboard reads live
+  // games + players from /y/summary instead, and the raw lobby objects carry
+  // per-client detail (incl. remote addresses) that isn't worth sanitising
+  // for an endpoint nothing consumes.
   ['server',     { path: '/y/server',      strip: passthrough }],
   ['quests',     { path: '/y/data/quests', strip: passthrough }],
   ['accounts',   { path: '/y/accounts',    strip: stripAccountIdentities }],
@@ -192,20 +195,6 @@ function stripSummary(data) {
   }
 
   return clean;
-}
-
-function stripPlayerIdentities(data) {
-  // /y/lobbies returns games + lobby occupancy. Player names are fine
-  // to show; remote addresses are not.
-  if (Array.isArray(data)) {
-    return data.map((lobby) => ({
-      ...lobby,
-      players: Array.isArray(lobby.players)
-        ? lobby.players.map((p) => ({ name: p.name, version: p.version }))
-        : lobby.players,
-    }));
-  }
-  return data;
 }
 
 // /y/accounts returns full Account records — license details (with PSO
