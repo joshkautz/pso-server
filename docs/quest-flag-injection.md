@@ -95,15 +95,20 @@ hand-kept in parallel:
 A quest's actual areas aren't in the script (they're set via register-driven
 `map_designate`) but ARE in its map: `disassemble-quest-map --bb q###-bb.dat`
 lists every entity with a `floor=` (0 = Pioneer 2, 1-2 Forest, 3-5 Caves, 6-7
-Mines, 8-10 Ruins, 11-14 bosses). Scanning the Episode-1 repeatables this way
-picked **q101 "Mop-up Operation #1"** for a level-3 character: Pioneer 2 +
-Forest 1 only, no boss, `no_gset`. (q237 MAXIMUM ATTACK 1 is a long horde and
-q58 Lost HEAT SWORD ends at the Dragon — both rejected.)
+Mines, 8-10 Ruins, 11-14 bosses). But area alone isn't enough — also exclude
+**timed** quests (`show_timer` / `winset_time` / `ba_set_time_limit` in the
+script) and prefer a low **enemy count** (the map's `EnemySetEntry` total),
+because a low-level character can't beat a clock or a horde. Final pick for a
+level-3 character: **q126 "Good Luck!"** — Pioneer 2 + Forest 1, no boss,
+**untimed**, only **26 enemies**, solo, `no_gset`. (Rejected: q58 Lost HEAT
+SWORD ends at the Dragon; q101 Mop-up #1 and q237 MAXIMUM ATTACK 1 are timed —
+q101's timer beat the level-3 character on the first attempt.)
 
 ## Next steps
 
-1. Play-test **q101** (flag `0x2D3`, deployed) — and optionally q237 (flag
-   `0x2D2`) — to resolve the open questions above.
+1. Play-test **q126** (flag `0x2D4`, deployed) to resolve the open questions
+   above. (q101 `0x2D3` and q237 `0x2D2` are also injected — valid, but timed /
+   too hard for a level-3 character to clear.)
 2. Build the injection generator (image's vanilla quest + flag spec → injected
    `.bin` + sidecar) and run it across the 118 repeatables.
 3. Dashboard: show per-player clear **counts** for repeatable quests.
