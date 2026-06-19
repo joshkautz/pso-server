@@ -583,7 +583,8 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
     gap: var(--space-3);
-    align-items: start; /* don't stretch shorter cards to the online roster's height */
+    /* default align-items: stretch — all metric cards share the tallest's
+       height (the online roster), so the row stays visually even. */
   }
   .metric {
     background: var(--bg-surface);
@@ -707,6 +708,23 @@
     color: var(--cyan-primary);
   }
   .game__count-max { color: var(--text-low); font-size: 0.85rem; }
+  .game__quest {
+    margin-top: var(--space-1);
+    display: flex; align-items: center; gap: 4px;
+    font-size: 0.72rem; font-family: var(--font-mono);
+    color: var(--cyan-bright);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .game__quest--idle { color: var(--text-low); }
+  /* Brief cyan pulse when a game's live values change between polls (player
+     joins, quest starts) — the card analogue of the player modal's updates. */
+  @keyframes gameCardPulse {
+    0%   { border-color: var(--cyan-bright);
+           box-shadow: 0 0 0 1px var(--cyan-glow), 0 0 14px var(--cyan-glow); }
+    100% { border-color: var(--line-subtle); box-shadow: none; }
+  }
+  .game--updated { animation: gameCardPulse 1.1s ease-out; }
+  @media (prefers-reduced-motion: reduce) { .game--updated { animation: none; } }
 
   /* ---- Section-ID icons ---- (one 64px PNG per PSO section, downscaled) */
   .section-icon {
@@ -2915,13 +2933,20 @@ function adaptGame(g) {
 
 // ---------- Renderers ----------
 
+// Per-game signature from the last render, so renderGames() can pulse a card
+// when its live values change (a player joins, a quest starts) — the card-level
+// analogue of the player modal's live value updates.
+let gameCardSignatures = new Map();
+
 function renderGames() {
   const root = document.getElementById('games-list');
   if (!root) return;
   if (games.length === 0) {
     root.innerHTML = `<li class="empty-state">No active games right now — be the first.</li>`;
+    gameCardSignatures = new Map();
     return;
   }
+  const nextSignatures = new Map();
   root.innerHTML = games.map((g) => {
     // Episode · Difficulty · Mode, skipping any the server didn't report.
     const meta = [formatEpisode(g.episode), g.difficulty, g.mode]
@@ -2931,23 +2956,43 @@ function renderGames() {
     const lock = g.hasPassword
       ? '<span class="game__lock" title="Password protected" aria-label="Password protected">🔒</span>'
       : '';
+    // Surface quest activity on the card itself so a quest starting is visible
+    // without opening the modal — updated on every poll like the rest of the card.
+    let quest = '';
+    if (g.questInProgress) {
+      const label = g.questName ? escapeHtml(g.questName) : 'Quest in progress';
+      quest = `<div class="game__quest" title="${label}"><span aria-hidden="true">⚔</span> ${label}</div>`;
+    } else if (g.questSelection) {
+      quest = `<div class="game__quest game__quest--idle">Selecting a quest…</div>`;
+    }
+
+    // Pulse the card when its live values changed since the last poll. New
+    // cards (no prior signature) don't pulse, so first appearance doesn't flash.
+    const id  = String(g.id);
+    const sig = [g.players, g.questInProgress ? 1 : 0, g.questSelection ? 1 : 0,
+                 g.questName || '', g.difficulty, g.mode].join('|');
+    nextSignatures.set(id, sig);
+    const changed = gameCardSignatures.has(id) && gameCardSignatures.get(id) !== sig;
+
     // role=button + data-game-id makes the card open the game modal — same
     // clickable pattern as player/quest cards (see setupGameCardClicks).
     return `
-    <li class="game" role="button" tabindex="0"
+    <li class="game${changed ? ' game--updated' : ''}" role="button" tabindex="0"
         aria-haspopup="dialog"
         aria-label="Open details for game ${escapeHtml(g.name)}"
-        data-game-id="${escapeHtml(String(g.id))}">
+        data-game-id="${escapeHtml(id)}">
       ${sectionIdIcon(g.sectionId, 'section-icon--game')}
       <div class="game__info">
         <p class="game__name">${escapeHtml(g.name)}${lock}</p>
         <div class="game__meta">${meta}</div>
+        ${quest}
       </div>
       <div class="game__count" aria-label="${escapeHtml(String(g.players))} of 4 hunters">
         ${escapeHtml(String(g.players))}<span class="game__count-max">/4</span>
       </div>
     </li>`;
   }).join('');
+  gameCardSignatures = nextSignatures;
 }
 
 // Render the compact list of currently-connected players inside the "Hunters
