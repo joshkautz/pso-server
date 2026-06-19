@@ -1306,6 +1306,21 @@
   .quest-agg strong { color: var(--text-high); font-family: var(--font-display); font-size: 1.05em; }
   .quest-agg__rate strong { color: var(--success); }
   .quest-agg__grind { color: var(--warning); }
+  /* "Who still needs this quest" — the coordination prompt. */
+  .quest-needs {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+    margin-bottom: var(--space-3); font-size: 0.85rem;
+  }
+  .quest-needs__label {
+    color: var(--warning); font-weight: 600; text-transform: uppercase;
+    font-size: 0.7rem; letter-spacing: 0.05em;
+  }
+  .quest-needs__name {
+    padding: 0.15rem 0.5rem; border-radius: 999px;
+    background: rgba(255, 184, 74, 0.12); border: 1px solid rgba(255, 184, 74, 0.35);
+    color: var(--warning); font-size: 0.8rem;
+  }
+  .quest-needs--done { color: var(--success); font-weight: 600; }
 
   /* -----------------------------------------------------------------
      Player inventory
@@ -1341,6 +1356,9 @@
     letter-spacing: 0.06em;
   }
   .inventory-item__name { color: var(--text-mid); word-break: break-word; }
+  /* Rare items in gold, matching the in-game rare colour. */
+  .inventory-item--rare .inventory-item__name { color: var(--warning); font-weight: 600; }
+  .inventory-item--rare .inventory-item__kind { color: var(--warning); opacity: 0.65; }
   /* Inventory freshness disclaimer — small, low-key note above the list
      for disc-version characters where the snapshot can lag real state. */
   .inventory-staleness {
@@ -2879,6 +2897,10 @@ function adaptQuest(q) {
     // quest so we always have them.
     maxPlayers:       Number.isInteger(meta.MaxPlayers) ? meta.MaxPlayers : null,
     joinable:         typeof meta.Joinable === 'boolean' ? meta.Joinable : null,
+    // Clear flag — the who-needs-what view intersects this against each
+    // character's saved QuestFlags to tell who has EVER cleared the quest.
+    // null when the quest records no clear (the 11 no-success quests).
+    completionFlag:   (Number.isInteger(meta.CompletionFlag) && meta.CompletionFlag >= 0) ? meta.CompletionFlag : null,
     // Per-quest play data isn't on the bulk /api/quests payload — the modal
     // fetches it per quest from /api/quest/:num/plays on open. Leave these
     // null in the card view so the progress bar stays hidden and the footer
@@ -3702,6 +3724,20 @@ async function fetchQuestPlays(questNum) {
   );
 }
 
+// True if a character's saved QuestFlags include this completion flag — i.e.
+// they have EVER cleared the quest (retroactive, across any difficulty). This
+// is the backbone of the who-needs-what view: the game persists these flags, so
+// it reflects clears from long before we started logging.
+function charHasCompletionFlag(char, flag) {
+  if (!Number.isInteger(flag)) return false;
+  const qf = char && char.QuestFlags;
+  if (!qf || typeof qf !== 'object') return false;
+  for (const arr of Object.values(qf)) {
+    if (Array.isArray(arr) && arr.includes(flag)) return true;
+  }
+  return false;
+}
+
 function renderQuestPlays(questNum, list, error, completions = []) {
   const container = document.getElementById('quest-modal-plays');
   if (!container) return;
@@ -3726,52 +3762,67 @@ function renderQuestPlays(questNum, list, error, completions = []) {
     .map((e) => [key(e), e.CompletionCount || 0]));
   const roster = Array.isArray(characters) ? characters : [];
 
+  // The quest's clear flag lets us read each character's SAVED completion state
+  // from their QuestFlags — retroactive "who has ever cleared it", the heart of
+  // who-needs-what. null for the handful of quests that record no clear.
+  const quest = quests.find((q) => parseInt(String(q.id).substring(1), 10) === questNum);
+  const completionFlag = quest ? quest.completionFlag : null;
+  const trackable = Number.isInteger(completionFlag);
+
   // Prefer the full roster (so non-players show muted). Fall back to just
   // the players if /api/characters hasn't resolved yet.
   const source = roster.length
-    ? roster.map((c) => ({ name: c.Name, plays: playCounts.get(key(c)) || 0, clears: clearCounts.get(key(c)) || 0 }))
-    : players.map((e) => ({ name: e.Name, plays: e.PlayCount || 0, clears: clearCounts.get(key(e)) || 0 }));
+    ? roster.map((c) => ({ name: c.Name, plays: playCounts.get(key(c)) || 0, clears: clearCounts.get(key(c)) || 0, savedClear: charHasCompletionFlag(c, completionFlag) }))
+    : players.map((e) => ({ name: e.Name, plays: e.PlayCount || 0, clears: clearCounts.get(key(e)) || 0, savedClear: false }));
 
   if (source.length === 0) {
     container.innerHTML = `<p class="quest-modal__placeholder">No one's played it yet.</p>`;
     return;
   }
 
+  const isCleared = (s) => s.savedClear || s.clears > 0;
   const cards = source
     .slice()
     .sort((a, b) =>
-      (Number(b.clears > 0) - Number(a.clears > 0)) ||
+      (Number(isCleared(b)) - Number(isCleared(a))) ||
       (Number(b.plays > 0) - Number(a.plays > 0)) ||
       (b.plays - a.plays) ||
       String(a.name ?? '').localeCompare(String(b.name ?? ''), undefined, { sensitivity: 'base' }))
     .map((s) => {
       const name    = escapeHtml(String(s.name ?? '?').trim() || '?');
       const played  = s.plays > 0;
-      const cleared = s.clears > 0;
+      const cleared = isCleared(s);
       const tick    = (played || cleared) ? '<span class="completion-card__check" aria-hidden="true">✓</span>' : '';
       const cls     = cleared ? 'completion-card--cleared' : played ? 'completion-card--done' : 'completion-card--todo';
-      const tip     = cleared ? `Cleared ${s.clears}× in ${s.plays} attempt${s.plays === 1 ? '' : 's'}`
-                    : played  ? `${s.plays} attempt${s.plays === 1 ? '' : 's'}, no clear yet`
-                    : 'Not played yet';
+      const tip     = cleared
+                      ? (s.clears > 0 ? `Cleared ${s.clears}× in ${s.plays} attempt${s.plays === 1 ? '' : 's'}` : 'Cleared (saved progress)')
+                      : played ? `${s.plays} attempt${s.plays === 1 ? '' : 's'}, no clear yet`
+                      : 'Not played yet';
       return `<li class="completion-card ${cls}" title="${tip}">${tick}${name}</li>`;
     })
     .join('');
 
-  // Per-quest aggregate across all hunters: attempts, who, clears, clear rate.
+  // Who-needs-what summary: cleared (retroactive, saved flags) vs still needs.
+  const cleared = source.filter(isCleared);
+  const needed  = trackable ? source.filter((x) => !isCleared(x)) : [];
   const totalAttempts = source.reduce((s, x) => s + x.plays, 0);
-  const totalClears   = source.reduce((s, x) => s + x.clears, 0);
-  const uniquePlayers = source.filter((x) => x.plays > 0).length;
-  const rate = totalAttempts > 0 ? Math.round((totalClears / totalAttempts) * 100) : 0;
-  const aggHtml = totalAttempts > 0 ? `
+  const aggHtml = `
     <div class="quest-agg">
-      <span><strong>${totalAttempts}</strong> attempt${totalAttempts === 1 ? '' : 's'}</span>
-      <span><strong>${uniquePlayers}</strong> hunter${uniquePlayers === 1 ? '' : 's'}</span>
-      <span><strong>${totalClears}</strong> clear${totalClears === 1 ? '' : 's'}</span>
-      ${totalClears > 0 ? `<span class="quest-agg__rate"><strong>${rate}%</strong> clear rate</span>` : `<span class="quest-agg__grind">not cleared yet</span>`}
-    </div>` : '';
+      ${trackable
+        ? `<span><strong>${cleared.length}</strong> of <strong>${source.length}</strong> cleared</span>`
+        : `<span class="quest-agg__grind">this quest doesn't record clears</span>`}
+      ${totalAttempts > 0 ? `<span><strong>${totalAttempts}</strong> total attempt${totalAttempts === 1 ? '' : 's'}</span>` : ''}
+    </div>`;
 
-  container.innerHTML = aggHtml + `
-    <ul class="completion-grid" aria-label="Quest plays by character">${cards}</ul>
+  // The coordination prompt: who still needs to do this quest.
+  const needsHtml = !trackable ? '' : (needed.length === 0
+    ? `<div class="quest-needs quest-needs--done">✓ Everyone has cleared this</div>`
+    : `<div class="quest-needs"><span class="quest-needs__label">Still needs</span>${needed
+        .map((x) => `<span class="quest-needs__name">${escapeHtml(String(x.name ?? '?').trim() || '?')}</span>`)
+        .join('')}</div>`);
+
+  container.innerHTML = aggHtml + needsHtml + `
+    <ul class="completion-grid" aria-label="Quest completion by character">${cards}</ul>
   `;
 }
 
@@ -4264,8 +4315,11 @@ function renderInventoryItem(item, key) {
   const rk = key != null
     ? ` data-rk="${escapeHtml(String(key))}" data-value="${escapeHtml(item.Name || '')}"`
     : '';
+  // Rare items render in gold, like the in-game rare colour (server sets Rare
+  // via the BB item-parameter table's is_item_rare).
+  const rare = item && item.Rare ? ' inventory-item--rare' : '';
   return `
-    <li class="inventory-item"${rk}>
+    <li class="inventory-item${rare}"${rk}>
       <span class="inventory-item__kind">${escapeHtml(item.Kind || 'item')}</span>
       <span class="inventory-item__name">${escapeHtml(item.Name || 'Unknown')}</span>
     </li>

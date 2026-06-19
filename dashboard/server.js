@@ -430,12 +430,17 @@ function stripCharacters(rawCharacters, rawAccounts, levelTables) {
       PlayTimeSeconds: isBBSnapshot ? (typeof c.PlayTimeSeconds === 'number' ? c.PlayTimeSeconds : null) : null,
       // Inventory passthrough — already sanitized server-side:
       // newserv's /y/characters resolves names via describe_item and
-      // returns just {Name, Kind, Equipped} per entry. No raw item
+      // returns just {Name, Kind, Equipped, Rare} per entry. No raw item
       // bytes / IDs reach the dashboard. Inventory is more useful than
       // EXP for disc versions because gear changes are infrequent
       // enough that "as of last lobby return" is still good UI — we
       // pass it through for every version, BB or not.
       Inventory:       Array.isArray(c.Inventory) ? c.Inventory : [],
+      // Saved per-difficulty quest-completion flags (set flag indices). The
+      // frontend intersects these with each quest's CompletionFlag to show
+      // which quests a hunter has EVER cleared — retroactive, the backbone of
+      // the who-needs-what view. Not sensitive (game progress); no PII here.
+      QuestFlags:      (c.QuestFlags && typeof c.QuestFlags === 'object') ? c.QuestFlags : null,
     });
   }
   return out;
