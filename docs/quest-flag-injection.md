@@ -90,10 +90,20 @@ hand-kept in parallel:
   regenerate and fail if it differs from the committed copy.
 - **Dashboard** → reads the same live API + sidecars, so it can't drift.
 
+## Picking a level-appropriate test quest
+
+A quest's actual areas aren't in the script (they're set via register-driven
+`map_designate`) but ARE in its map: `disassemble-quest-map --bb q###-bb.dat`
+lists every entity with a `floor=` (0 = Pioneer 2, 1-2 Forest, 3-5 Caves, 6-7
+Mines, 8-10 Ruins, 11-14 bosses). Scanning the Episode-1 repeatables this way
+picked **q101 "Mop-up Operation #1"** for a level-3 character: Pioneer 2 +
+Forest 1 only, no boss, `no_gset`. (q237 MAXIMUM ATTACK 1 is a long horde and
+q58 Lost HEAT SWORD ends at the Dragon — both rejected.)
+
 ## Next steps
 
-1. Deploy injected `q237` + sidecar `{"CompletionFlag": 722}` (graceful quest
-   reload, no disconnect) and play-test it to resolve the open questions.
+1. Play-test **q101** (flag `0x2D3`, deployed) — and optionally q237 (flag
+   `0x2D2`) — to resolve the open questions above.
 2. Build the injection generator (image's vanilla quest + flag spec → injected
    `.bin` + sidecar) and run it across the 118 repeatables.
 3. Dashboard: show per-player clear **counts** for repeatable quests.
