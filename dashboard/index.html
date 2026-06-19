@@ -1290,6 +1290,22 @@
     opacity: 0.5;
   }
   .completion-card__check { font-size: 0.72rem; }
+  /* Cleared (CompletionFlag) — stronger than merely "played" (cyan). */
+  .completion-card--cleared {
+    background: rgba(95, 255, 170, 0.13);
+    border-color: rgba(95, 255, 170, 0.45);
+    color: var(--success);
+  }
+  /* Per-quest aggregate strip at the top of the quest modal's plays grid. */
+  .quest-agg {
+    display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4);
+    margin-bottom: var(--space-3); padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--line-subtle);
+    font-size: 0.82rem; color: var(--text-mid);
+  }
+  .quest-agg strong { color: var(--text-high); font-family: var(--font-display); font-size: 1.05em; }
+  .quest-agg__rate strong { color: var(--success); }
+  .quest-agg__grind { color: var(--warning); }
 
   /* -----------------------------------------------------------------
      Player inventory
@@ -1371,6 +1387,20 @@
   }
   .char-completion-row:last-child { border-bottom: 0; }
   .char-completion-row__name { color: var(--text-mid); word-break: break-word; }
+  /* Verbose per-quest outcome cue (attempts / clears / rate). */
+  .outcome-stat { font-family: var(--font-mono); font-size: 0.82em; white-space: nowrap; }
+  .outcome-stat--grind   { color: var(--warning); }
+  .outcome-stat--cleared { color: var(--success); }
+  .outcome-stat__check   { font-weight: 700; }
+  /* Quest-log summary strip at the top of a character's "Quests played". */
+  .quest-log-summary {
+    display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4);
+    margin-bottom: var(--space-3); padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--line-subtle);
+    font-size: 0.8rem; color: var(--text-mid);
+  }
+  .quest-log-summary strong { color: var(--text-high); font-family: var(--font-display); font-size: 1.05em; }
+  .quest-log-summary__grind strong { color: var(--warning); }
   .char-completion-row__diffs {
     display: inline-flex;
     flex-wrap: wrap;
@@ -3656,13 +3686,23 @@ function openQuestModal(questId) {
 }
 
 async function fetchQuestPlays(questNum) {
-  const data = await fetchJSON(`quest/${questNum}/plays`);
-  // Could already be navigated away — guard with the data-attribute so
-  // we don't write stale data into a modal showing a different quest.
-  renderQuestPlays(questNum, Array.isArray(data) ? data : []);
+  // Plays (attempts) + completions (clears) together so the modal can show a
+  // per-quest aggregate. Completions degrade to empty on an older newserv.
+  const [playsRaw, completionsRaw] = await Promise.all([
+    fetchJSON(`quest/${questNum}/plays`),
+    fetchJSON(`quest/${questNum}/completions`).catch(() => []),
+  ]);
+  // Could already be navigated away — renderQuestPlays guards on the
+  // data-attribute so stale data isn't written into a different quest's modal.
+  renderQuestPlays(
+    questNum,
+    Array.isArray(playsRaw) ? playsRaw : [],
+    null,
+    Array.isArray(completionsRaw) ? completionsRaw : [],
+  );
 }
 
-function renderQuestPlays(questNum, list, error) {
+function renderQuestPlays(questNum, list, error, completions = []) {
   const container = document.getElementById('quest-modal-plays');
   if (!container) return;
   // The data-quest-number attribute was set with the quest number the
@@ -3680,14 +3720,17 @@ function renderQuestPlays(questNum, list, error) {
   // LastPlayedUsecs}); the full roster is the already-loaded `characters`
   // snapshot. A character is matched on AccountToken+SlotIndex.
   const players = Array.isArray(list) ? list : [];
-  const playCounts = new Map(players.map((e) => [`${e.AccountToken}:${e.SlotIndex}`, e.PlayCount || 0]));
+  const key = (x) => `${x.AccountToken}:${x.SlotIndex}`;
+  const playCounts  = new Map(players.map((e) => [key(e), e.PlayCount || 0]));
+  const clearCounts = new Map((Array.isArray(completions) ? completions : [])
+    .map((e) => [key(e), e.CompletionCount || 0]));
   const roster = Array.isArray(characters) ? characters : [];
 
   // Prefer the full roster (so non-players show muted). Fall back to just
   // the players if /api/characters hasn't resolved yet.
   const source = roster.length
-    ? roster.map((c) => ({ name: c.Name, plays: playCounts.get(`${c.AccountToken}:${c.SlotIndex}`) || 0 }))
-    : players.map((e) => ({ name: e.Name, plays: e.PlayCount || 0 }));
+    ? roster.map((c) => ({ name: c.Name, plays: playCounts.get(key(c)) || 0, clears: clearCounts.get(key(c)) || 0 }))
+    : players.map((e) => ({ name: e.Name, plays: e.PlayCount || 0, clears: clearCounts.get(key(e)) || 0 }));
 
   if (source.length === 0) {
     container.innerHTML = `<p class="quest-modal__placeholder">No one's played it yet.</p>`;
@@ -3697,20 +3740,37 @@ function renderQuestPlays(questNum, list, error) {
   const cards = source
     .slice()
     .sort((a, b) =>
+      (Number(b.clears > 0) - Number(a.clears > 0)) ||
       (Number(b.plays > 0) - Number(a.plays > 0)) ||
       (b.plays - a.plays) ||
       String(a.name ?? '').localeCompare(String(b.name ?? ''), undefined, { sensitivity: 'base' }))
     .map((s) => {
-      const name   = escapeHtml(String(s.name ?? '?').trim() || '?');
-      const played = s.plays > 0;
-      const tick   = played ? '<span class="completion-card__check" aria-hidden="true">✓</span>' : '';
-      const cls    = played ? 'completion-card--done' : 'completion-card--todo';
-      const tip    = played ? `Played ${s.plays}×` : 'Not played yet';
+      const name    = escapeHtml(String(s.name ?? '?').trim() || '?');
+      const played  = s.plays > 0;
+      const cleared = s.clears > 0;
+      const tick    = (played || cleared) ? '<span class="completion-card__check" aria-hidden="true">✓</span>' : '';
+      const cls     = cleared ? 'completion-card--cleared' : played ? 'completion-card--done' : 'completion-card--todo';
+      const tip     = cleared ? `Cleared ${s.clears}× in ${s.plays} attempt${s.plays === 1 ? '' : 's'}`
+                    : played  ? `${s.plays} attempt${s.plays === 1 ? '' : 's'}, no clear yet`
+                    : 'Not played yet';
       return `<li class="completion-card ${cls}" title="${tip}">${tick}${name}</li>`;
     })
     .join('');
 
-  container.innerHTML = `
+  // Per-quest aggregate across all hunters: attempts, who, clears, clear rate.
+  const totalAttempts = source.reduce((s, x) => s + x.plays, 0);
+  const totalClears   = source.reduce((s, x) => s + x.clears, 0);
+  const uniquePlayers = source.filter((x) => x.plays > 0).length;
+  const rate = totalAttempts > 0 ? Math.round((totalClears / totalAttempts) * 100) : 0;
+  const aggHtml = totalAttempts > 0 ? `
+    <div class="quest-agg">
+      <span><strong>${totalAttempts}</strong> attempt${totalAttempts === 1 ? '' : 's'}</span>
+      <span><strong>${uniquePlayers}</strong> hunter${uniquePlayers === 1 ? '' : 's'}</span>
+      <span><strong>${totalClears}</strong> clear${totalClears === 1 ? '' : 's'}</span>
+      ${totalClears > 0 ? `<span class="quest-agg__rate"><strong>${rate}%</strong> clear rate</span>` : `<span class="quest-agg__grind">not cleared yet</span>`}
+    </div>` : '';
+
+  container.innerHTML = aggHtml + `
     <ul class="completion-grid" aria-label="Quest plays by character">${cards}</ul>
   `;
 }
@@ -4048,6 +4108,22 @@ const DIFFICULTY_PILL_LABEL = {
 };
 const DIFFICULTY_PILL_ORDER = ['Normal', 'Hard', 'VHard', 'Ultimate'];
 
+// Verbose per-quest outcome line: attempts (loads) vs clears (CompletionFlag).
+// Tells the story of a character's relationship with a quest at a glance —
+// "5 attempts · ✓ 3 cleared · 60%", or the in-progress "2 attempts · not
+// cleared yet". (Failures vs. plain quits get split out once FailureFlag
+// tracking lands — for now a non-clear is just "not cleared".)
+function renderOutcomeStat(attempts, clears) {
+  if (attempts <= 0 && clears <= 0) return '';
+  const aLbl = `${attempts} attempt${attempts === 1 ? '' : 's'}`;
+  if (clears <= 0) {
+    return `<span class="outcome-stat outcome-stat--grind" title="${attempts} attempts, no clear yet">${aLbl} · not cleared yet</span>`;
+  }
+  const rate = attempts > 0 ? Math.round((clears / attempts) * 100) : 100;
+  const rateLbl = attempts > 1 ? ` · ${rate}%` : '';
+  return `<span class="outcome-stat outcome-stat--cleared" title="${clears} clear(s) across ${attempts} attempt(s)">${aLbl} · <span class="outcome-stat__check">✓</span> ${clears} cleared${rateLbl}</span>`;
+}
+
 async function fetchCharacterQuestPlays(accountToken, slotIndex) {
   // Fetch plays + completions together. Completions only exist for quests with a
   // mapped CompletionFlag, so this list may be empty; a failure (e.g. an older
@@ -4122,17 +4198,11 @@ function renderCharacterQuestPlays(accountToken, slotIndex, list, error, complet
   const groupsHtml = episodeOrder.map((episode) => {
     const rows = groups.get(episode).map(({ entry, q }) => {
       const name = q ? q.name : `Quest #${entry.QuestNumber}`;
-      const playCount = Number.isInteger(entry.PlayCount) ? entry.PlayCount : 0;
-      // Show a subtle ×N when a quest has been played more than once.
-      const countBadge = playCount > 1
-        ? ` <span style="color: var(--text-low); font-weight: normal; font-size: 0.85em;" title="${playCount} plays">×${playCount}</span>`
-        : '';
-      // Reliable "cleared" marker (only present for quests with a mapped
-      // CompletionFlag that this character has actually completed).
+      // Attempts (loads) vs clears (CompletionFlag-driven, only for mapped quests).
+      const attempts = Number.isInteger(entry.PlayCount) ? entry.PlayCount : 0;
       const comp = completedByQuest.get(entry.QuestNumber);
-      const clearedBadge = comp
-        ? ` <span style="color: var(--success, #5fcf80); font-weight: 600; font-size: 0.78em; margin-left: 6px;" title="Cleared${(comp.CompletionCount > 1) ? ' ' + comp.CompletionCount + ' times' : ''}">✓ cleared</span>`
-        : '';
+      const clears = comp ? (Number.isInteger(comp.CompletionCount) ? comp.CompletionCount : 1) : 0;
+      const stat = renderOutcomeStat(attempts, clears);
       const pills = (Array.isArray(entry.Difficulties) ? entry.Difficulties : [])
         .slice()
         .sort((a, b) => DIFFICULTY_PILL_ORDER.indexOf(a) - DIFFICULTY_PILL_ORDER.indexOf(b))
@@ -4144,7 +4214,7 @@ function renderCharacterQuestPlays(accountToken, slotIndex, list, error, complet
         .join('');
       return `
         <li class="char-completion-row">
-          <span class="char-completion-row__name">${escapeHtml(name)}${countBadge}${clearedBadge}</span>
+          <span class="char-completion-row__name">${escapeHtml(name)}${stat ? ' ' + stat : ''}</span>
           <span class="char-completion-row__diffs">${pills}</span>
         </li>
       `;
@@ -4157,7 +4227,25 @@ function renderCharacterQuestPlays(accountToken, slotIndex, list, error, complet
     `;
   }).join('');
 
-  container.innerHTML = groupsHtml;
+  // Verbose summary across every quest this character has touched.
+  const totalQuests = list.length;
+  const totalAttempts = list.reduce((s, e) => s + (Number.isInteger(e.PlayCount) ? e.PlayCount : 0), 0);
+  let clearedQuests = 0, totalClears = 0;
+  for (const e of list) {
+    const comp = completedByQuest.get(e.QuestNumber);
+    if (comp) { clearedQuests++; totalClears += (Number.isInteger(comp.CompletionCount) ? comp.CompletionCount : 1); }
+  }
+  const grinding = totalQuests - clearedQuests; // played but not yet cleared
+  const summaryHtml = `
+    <div class="quest-log-summary">
+      <span><strong>${totalQuests}</strong> quest${totalQuests === 1 ? '' : 's'} played</span>
+      <span><strong>${clearedQuests}</strong> cleared</span>
+      <span><strong>${totalAttempts}</strong> total attempt${totalAttempts === 1 ? '' : 's'}</span>
+      ${totalClears > clearedQuests ? `<span><strong>${totalClears}</strong> total clears</span>` : ''}
+      ${grinding > 0 ? `<span class="quest-log-summary__grind"><strong>${grinding}</strong> still grinding</span>` : ''}
+    </div>
+  `;
+  container.innerHTML = summaryHtml + groupsHtml;
 }
 
 // Item rendering order: weapons → armor → shield → units → mags → tools →
