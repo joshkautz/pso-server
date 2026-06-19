@@ -2995,6 +2995,14 @@ function renderHunterCard(c) {
   const icon = (c && SECTION_IDS.has(c.SectionID))
     ? sectionIdIcon(c.SectionID, 'section-icon--roster')
     : '<span class="section-icon--unknown" aria-hidden="true">?</span>';
+  // Pulse the level when it changes — character finished loading off the select
+  // screen, or levelled up while you watch. Keyed by the stable client ID so the
+  // right card animates, and a hunter coming online pulses in (gold, like a
+  // level-up). No ID (shouldn't happen) ⇒ no key ⇒ no animation, just renders.
+  const id = c && c.ID != null ? String(c.ID) : null;
+  const lvlRk = id
+    ? ` data-rk="hunter-${escapeHtml(id)}-lv" data-value="${escapeHtml(String(c && Number.isFinite(c.Level) ? c.Level : ''))}" data-gold="1"`
+    : '';
   return `
     <div class="hunter-card" role="listitem">
       ${icon}
@@ -3002,7 +3010,7 @@ function renderHunterCard(c) {
         <span class="hunter-card__name" title="${name}">${name}</span>
         <span class="hunter-card__sub">${cls}</span>
       </div>
-      <span class="hunter-card__level">${lvl}</span>
+      <span class="hunter-card__level"${lvlRk}>${lvl}</span>
     </div>`;
 }
 
@@ -3014,6 +3022,7 @@ function renderOnlineHunters() {
   if (!root) return;
   if (!Array.isArray(onlineClients) || onlineClients.length === 0) {
     root.innerHTML = '';
+    root.dataset.rvInit = ''; // reset so the next populate seeds silently (no flash)
     return;
   }
   // Highest level first, then name; Unknown (no character yet, level 0) sinks
@@ -3022,7 +3031,9 @@ function renderOnlineHunters() {
     (Number(b.Level) || 0) - (Number(a.Level) || 0) ||
     String(a.Name ?? '').localeCompare(String(b.Name ?? ''), undefined, { sensitivity: 'base' }),
   );
-  root.innerHTML = sorted.map((c) => renderHunterCard(c)).join('');
+  // renderReactive pulses a hunter whose level changed and any card that newly
+  // appeared (someone joined / finished loading their character).
+  renderReactive(root, sorted.map((c) => renderHunterCard(c)).join(''));
 }
 
 const PLAYER_PAGE_SIZE = 24;
@@ -3858,20 +3869,36 @@ function applyPlayerModalLiveUpdate(c) {
     const el = bodyEl.querySelector(`[data-stat="${key}"]`);
     if (!el) continue;
     const v       = values[key];
-    const prevRaw = el.dataset.value === '' ? null : Number(el.dataset.value);
     const nextStr = v.raw == null ? '' : String(v.raw);
     if (el.dataset.value === nextStr) continue; // unchanged — leave it alone
     el.innerHTML     = v.display;
     el.dataset.value = nextStr;
-    if (prevRaw != null && v.raw != null && v.raw > prevRaw) bumpStat(el, key);
+    // Pulse on any change (meseta/level gold, the rest cyan). data-value is
+    // seeded by the initial render, so an unchanged value never flashes on the
+    // first poll after the modal opens.
+    bumpEl(el, key === 'meseta' || key === 'level');
   }
+  // Inventory isn't part of the [data-stat] grid — reconcile it separately so a
+  // newly picked-up or newly equipped item updates and pulses without a refresh.
+  applyInventoryLiveUpdate(c);
 }
 
-// Brief PSO-HUD-style flourish when a value increases: a quick scale pulse plus
-// a cyan power-up glow for EXP / stats / play-time, gold (--warning) for Meseta
-// and level-ups. Restart-safe so rapid consecutive gains each get their pulse.
-function bumpStat(el, key) {
-  const gold = key === 'meseta' || key === 'level';
+// =========================================================================
+// Reactive value updates — the shared "value changed → brief PSO-HUD pulse"
+// behind every live field. A quick scale + glow: cyan for stats / counts /
+// text, gold (--warning) for Meseta and level-ups. Three entry points:
+//   bumpEl(el, gold)          — just play the pulse on one element.
+//   setReactive(el, raw, html)— set a standalone field, pulsing on change.
+//   renderReactive(box, html) — swap a container's HTML, pulsing only the
+//                               [data-rk] fields that changed or newly appeared
+//                               (silent on first paint / when fresh=true). Lets
+//                               the existing full-innerHTML renderers animate
+//                               per-field without a rewrite.
+// =========================================================================
+
+// Restart-safe so rapid consecutive changes each get their own pulse.
+function bumpEl(el, gold = false) {
+  if (!el) return;
   el.classList.remove('stat-bump', 'stat-bump--gold');
   void el.offsetWidth; // force reflow so the animation restarts even mid-play
   el.classList.add('stat-bump');
@@ -3879,6 +3906,47 @@ function bumpStat(el, key) {
   el.addEventListener('animationend', () => {
     el.classList.remove('stat-bump', 'stat-bump--gold');
   }, { once: true });
+}
+
+// Standalone field (e.g. the online-count metric): seeds silently the first
+// time, then swaps text + pulses whenever `raw` differs from last time.
+function setReactive(el, raw, html, gold = false) {
+  if (!el) return;
+  const next = raw == null ? '' : String(raw);
+  const initialised = el.dataset.rv === '1';
+  if (initialised && el.dataset.value === next) return; // unchanged
+  el.innerHTML = html != null ? html : escapeHtml(next);
+  const changed = initialised && el.dataset.value !== next;
+  el.dataset.value = next;
+  el.dataset.rv = '1';
+  if (changed) bumpEl(el, gold);
+}
+
+// Container re-render that pulses each [data-rk] field whose data-value changed
+// or that newly appeared. First paint (or fresh=true — e.g. a modal opening
+// onto a different subject) seeds silently so nothing flashes on open. A field
+// carrying data-gold="1" opts into the gold palette.
+function renderReactive(box, html, fresh = false) {
+  if (!box) return;
+  const initialised = box.dataset.rvInit === '1';
+  const prev = new Map();
+  if (initialised && !fresh) {
+    box.querySelectorAll('[data-rk]').forEach((el) => prev.set(el.dataset.rk, el.dataset.value ?? ''));
+  }
+  box.innerHTML = html;
+  box.dataset.rvInit = '1';
+  if (!initialised || fresh) return; // silent seed
+  box.querySelectorAll('[data-rk]').forEach((el) => {
+    const key = el.dataset.rk;
+    const now = el.dataset.value ?? '';
+    if (!prev.has(key) || prev.get(key) !== now) bumpEl(el, el.dataset.gold === '1');
+  });
+}
+
+// Reconcile the player modal's inventory in place from a fresh snapshot.
+function applyInventoryLiveUpdate(c) {
+  const box = document.getElementById('player-modal-inventory');
+  if (box) renderReactive(box, renderInventoryInner(c));
 }
 
 function renderPlayerModalCharacter(c, titleEl, subEl, bodyEl) {
@@ -4102,16 +4170,27 @@ function inventoryKindRank(kind) {
   return i < 0 ? INVENTORY_KIND_ORDER.length : i;
 }
 
-function renderInventoryItem(item) {
+function renderInventoryItem(item, key) {
+  // data-rk lets renderReactive() pulse this item when it's newly acquired or
+  // newly equipped (see renderInventoryInner for how keys are assigned).
+  const rk = key != null
+    ? ` data-rk="${escapeHtml(String(key))}" data-value="${escapeHtml(item.Name || '')}"`
+    : '';
   return `
-    <li class="inventory-item">
+    <li class="inventory-item"${rk}>
       <span class="inventory-item__kind">${escapeHtml(item.Kind || 'item')}</span>
       <span class="inventory-item__name">${escapeHtml(item.Name || 'Unknown')}</span>
     </li>
   `;
 }
 
+// Wrapper id lets applyInventoryLiveUpdate() reconcile + pulse changed items on
+// each poll without re-rendering (and re-fetching) the rest of the modal body.
 function renderInventorySections(c) {
+  return `<div id="player-modal-inventory">${renderInventoryInner(c)}</div>`;
+}
+
+function renderInventoryInner(c) {
   const inventory = Array.isArray(c.Inventory) ? c.Inventory : [];
   if (inventory.length === 0) {
     return `
@@ -4131,6 +4210,17 @@ function renderInventorySections(c) {
   const equipped = inventory.filter((i) => i.Equipped).sort(sortByKindThenName);
   const other    = inventory.filter((i) => !i.Equipped).sort(sortByKindThenName);
 
+  // Stable, content-based per-item key (kind|name|equipped) plus an occurrence
+  // index, so duplicate stacks are handled and only the *added* one pulses when
+  // a count rises; equipping an item changes its key (u→e) so it pulses too.
+  const occ = new Map();
+  const keyFor = (i) => {
+    const base = `${i.Kind || '?'}|${i.Name || '?'}|${i.Equipped ? 'e' : 'u'}`;
+    const n = occ.get(base) || 0;
+    occ.set(base, n + 1);
+    return `${base}|${n}`;
+  };
+
   // For non-BB characters the inventory snapshot lags real state by
   // however long it's been since the player returned to the lobby (the
   // server only learns about inventory mid-session via 6x item
@@ -4146,7 +4236,7 @@ function renderInventorySections(c) {
       <h3>Equipped <span style="color: var(--text-low); font-weight: normal; font-size: 0.85em;">(${equipped.length})</span></h3>
       ${stalenessNote}
       ${equipped.length > 0
-        ? `<ul class="inventory-list">${equipped.map(renderInventoryItem).join('')}</ul>`
+        ? `<ul class="inventory-list">${equipped.map((i) => renderInventoryItem(i, keyFor(i))).join('')}</ul>`
         : `<p class="quest-modal__placeholder">Nothing equipped.</p>`}
     </section>
   `;
@@ -4154,7 +4244,7 @@ function renderInventorySections(c) {
   const otherBlock = other.length > 0 ? `
     <section class="quest-modal__section" aria-label="Inventory items">
       <h3>Inventory <span style="color: var(--text-low); font-weight: normal; font-size: 0.85em;">(${other.length} of ${30 - equipped.length} free)</span></h3>
-      <ul class="inventory-list">${other.map(renderInventoryItem).join('')}</ul>
+      <ul class="inventory-list">${other.map((i) => renderInventoryItem(i, keyFor(i))).join('')}</ul>
     </section>
   ` : '';
 
@@ -4266,12 +4356,12 @@ function openGameModal(id) {
 
   gameModalReturnFocus = document.activeElement;
   openGameModalId = String(id);
-  renderGameModal(game);
+  renderGameModal(game, true); // fresh: seed silently so opening doesn't flash
   modal.showModal();
   modal.querySelector('[data-action="close-game-modal"]')?.focus();
 }
 
-function renderGameModal(game) {
+function renderGameModal(game, fresh = false) {
   const titleEl = document.getElementById('game-modal-title');
   const subEl   = document.getElementById('game-modal-subtitle');
   const bodyEl  = document.getElementById('game-modal-body');
@@ -4280,11 +4370,14 @@ function renderGameModal(game) {
   titleEl.innerHTML = `${sectionIdIcon(game.sectionId, 'section-icon--title')}${escapeHtml(game.name)}`;
   if (subEl) subEl.textContent = `Game #${game.id}`;
 
-  // Quest status line: name when we have it, else the in-progress/selecting state.
+  // Quest status line: name when we have it, else the in-progress/selecting
+  // state. questKey is the stable comparison key behind it so the field pulses
+  // on a real state change ("No quest" → "Selecting…" → a quest name).
   let questLine = 'No quest in progress';
-  if (game.questName)            questLine = escapeHtml(game.questName);
-  else if (game.questInProgress) questLine = 'Quest in progress';
-  else if (game.questSelection)  questLine = 'Selecting a quest…';
+  let questKey  = 'none';
+  if (game.questName)            { questLine = escapeHtml(game.questName); questKey = `q:${game.questName}`; }
+  else if (game.questInProgress) { questLine = 'Quest in progress';       questKey = 'inprogress'; }
+  else if (game.questSelection)  { questLine = 'Selecting a quest…';      questKey = 'selecting'; }
 
   const yesno  = (b) => (b ? 'Yes' : 'No');
   const roster = rosterForGame(game.id);
@@ -4292,14 +4385,17 @@ function renderGameModal(game) {
     ? `<p class="quest-modal__placeholder">No players in this game right now.</p>`
     : `<div class="hunter-list" role="list">${roster.map((c) => renderHunterCard(c)).join('')}</div>`;
 
-  bodyEl.innerHTML = `
+  // renderReactive pulses the Quest / Players cells (and any roster level) that
+  // changed since the last poll. fresh=true on open seeds silently so switching
+  // between games doesn't flash the new one's values.
+  renderReactive(bodyEl, `
     <dl class="quest-modal__meta">
       <dt>Episode</dt><dd>${escapeHtml(String(game.episode ?? '—'))}</dd>
       <dt>Difficulty</dt><dd>${escapeHtml(String(game.difficulty ?? '—'))}</dd>
       <dt>Mode</dt><dd>${escapeHtml(String(game.mode ?? '—'))}</dd>
       <dt>Section ID</dt><dd class="dd-with-icon">${sectionIdIcon(game.sectionId, 'section-icon--inline')}${escapeHtml(String(game.sectionId ?? '—'))}</dd>
-      <dt>Players</dt><dd>${escapeHtml(String(game.players))}<span class="dd-muted">/4</span></dd>
-      <dt>Quest</dt><dd>${questLine}</dd>
+      <dt>Players</dt><dd data-rk="players" data-value="${escapeHtml(String(game.players))}">${escapeHtml(String(game.players))}<span class="dd-muted">/4</span></dd>
+      <dt>Quest</dt><dd data-rk="quest" data-value="${escapeHtml(questKey)}">${questLine}</dd>
       <dt>Password</dt><dd>${yesno(game.hasPassword)}</dd>
       <dt>Cheats</dt><dd>${yesno(game.cheatsEnabled)}</dd>
     </dl>
@@ -4308,7 +4404,7 @@ function renderGameModal(game) {
       <h3>In this game</h3>
       ${rosterHtml}
     </section>
-  `;
+  `, fresh);
 }
 
 // Re-render the open game modal from fresh poll data so its roster and stats
@@ -4439,7 +4535,12 @@ async function refreshLive() {
         if (el && v != null) el.textContent = v;
       };
       const srv = s?.Server ?? {};
-      set('metric-online',         srv.ClientCount);
+      // Online count pulses when it changes (someone joined/left); uptime ticks
+      // every poll so it stays a plain assignment (no constant flashing).
+      const onlineEl = document.getElementById('metric-online');
+      if (onlineEl && srv.ClientCount != null) {
+        setReactive(onlineEl, srv.ClientCount, escapeHtml(String(srv.ClientCount)));
+      }
       // Guard against a bogus start time. If newserv reports
       // StartTimeUsecs <= 0 (uninitialized creation_time), its UptimeUsecs
       // is absolute epoch-now (~56 years) and StartTime is 1970 — show a
@@ -4475,7 +4576,7 @@ async function refreshLive() {
       // the badge and the cards always agree.
       quests = raw.map(adaptQuest).filter(Boolean);
       const el = document.getElementById('metric-quests');
-      if (el) el.textContent = String(quests.length);
+      if (el) setReactive(el, quests.length, escapeHtml(String(quests.length)));
       renderQuests();
     }),
     fetchJSON('accounts').then((data) => {
@@ -4506,8 +4607,8 @@ async function refreshLive() {
         String(a.Name).localeCompare(String(b.Name), undefined, { sensitivity: 'base' }),
       ) : [];
       renderPlayers();
-      // If a character modal is open, live-update its numbers from this fresh
-      // snapshot — values that rose since the last poll pulse (see bumpStat).
+      // If a character modal is open, live-update its stats + inventory from
+      // this fresh snapshot — any changed value pulses (see applyPlayerModalLiveUpdate).
       if (openPlayerModalKey && openPlayerModalKey.startsWith('char:')) {
         const modal = document.getElementById('player-modal');
         if (modal?.open) {
