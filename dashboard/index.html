@@ -1105,6 +1105,41 @@
   }
   .quest-modal__meta dt { color: var(--text-low); }
   .quest-modal__meta dd { margin: 0; color: var(--text-high); }
+
+  /* ---- Live "value went up" flourish (player modal) ----
+     When the 15s poll brings a higher EXP / Meseta / stat while the modal is
+     open, applyPlayerModalLiveUpdate() drops .stat-bump (or .stat-bump--gold)
+     on that cell. A quick scale + cyan power-up glow echoes the PSO HUD; Meseta
+     and level-ups flash gold (--warning). transform-origin is the left edge so
+     multi-digit numbers grow rightward without nudging their grid column, and
+     transform never reflows neighbours. */
+  @keyframes statBump {
+    0%   { transform: scale(1); }
+    14%  { transform: scale(1.18);
+           color: var(--cyan-bright);
+           text-shadow: 0 0 8px var(--cyan-glow), 0 0 16px var(--cyan-glow); }
+    100% { transform: scale(1); }
+  }
+  @keyframes statBumpGold {
+    0%   { transform: scale(1); }
+    14%  { transform: scale(1.18);
+           color: var(--warning);
+           text-shadow: 0 0 8px rgba(255, 184, 74, 0.55), 0 0 16px rgba(255, 184, 74, 0.4); }
+    100% { transform: scale(1); }
+  }
+  .stat-bump {
+    transform-origin: left center;
+    animation: statBump 0.85s cubic-bezier(0.22, 0.9, 0.3, 1);
+  }
+  .stat-bump--gold { animation-name: statBumpGold; }
+
+  /* Respect reduced-motion: keep the colour cue, drop the scale pulse. */
+  @media (prefers-reduced-motion: reduce) {
+    @keyframes statBump     { 0%, 100% { color: var(--text-high); } 30% { color: var(--cyan-bright); } }
+    @keyframes statBumpGold { 0%, 100% { color: var(--text-high); } 30% { color: var(--warning); } }
+    .stat-bump { transform: none; animation-duration: 0.6s; }
+  }
+
   .quest-modal__section {
     border-top: 1px solid var(--line-subtle);
     padding-top: var(--space-4);
@@ -3483,6 +3518,12 @@ function setupQuestCardClicks() {
 
 let playerModalReturnFocus = null;
 
+// Key (e.g. "char:<AccountToken>:<SlotIndex>") of the character whose modal is
+// currently open, or null. refreshLive() reads this to live-update the open
+// modal's numbers from each fresh /api/characters poll — see
+// applyPlayerModalLiveUpdate().
+let openPlayerModalKey = null;
+
 function findPlayerByKey(key) {
   if (!key) return null;
   if (key.startsWith('char:')) {
@@ -3509,6 +3550,7 @@ function openPlayerModal(key) {
   if (!item || !modal || !titleEl || !bodyEl) return;
 
   playerModalReturnFocus = document.activeElement;
+  openPlayerModalKey = key;
 
   // Two shapes: character (from /api/characters) vs account (from
   // /api/accounts). Pick which renderer to use.
@@ -3522,6 +3564,83 @@ function openPlayerModal(key) {
   modal.querySelector('[data-action="close-player-modal"]')?.focus();
 }
 
+// Single source of truth for the player modal's animatable numeric cells.
+// Both the initial render and the 15s live-update read from here, so the two
+// can never drift. Each entry is { raw, display }:
+//   • raw     — the comparable number (null when not meaningful, e.g. the
+//               explanatory dash shown for disc-version EXP/play-time). Drives
+//               the increase-detection animation.
+//   • display — the escaped HTML shown in the value cell.
+function playerModalStatValues(c) {
+  const stats = c.Stats || {};
+  const fmt   = (n) => (Number.isFinite(n) ? n.toLocaleString() : '—');
+  const num   = (n) => (Number.isFinite(n) ? n : null);
+  // EXP / to-next / play-time are only server-authoritative for Blue Burst
+  // snapshots; disc versions get an explanatory dash and never animate.
+  const live  = c.IsBBSnapshot === true;
+
+  const expDisplay = live
+    ? escapeHtml(fmt(c.EXP))
+    : `<span title="Disc versions don't track EXP server-side — refreshes on lobby return.">—</span>`;
+  const toNextDisplay = live && Number.isFinite(c.EXPToNextLevel)
+    ? escapeHtml(fmt(c.EXPToNextLevel))
+    : `<span title="Computed from the BB level table; only meaningful when EXP is live.">—</span>`;
+  const playTimeStr = live ? formatPlayTime(c.PlayTimeSeconds) : null;
+  const playTimeDisplay = playTimeStr
+    ? escapeHtml(playTimeStr)
+    : `<span title="Play time isn't in the disc-version network protocol — only Blue Burst tracks it server-side.">—</span>`;
+
+  return {
+    level:    { raw: num(c.Level),                        display: escapeHtml(String(c.Level)) },
+    exp:      { raw: live ? num(c.EXP) : null,            display: expDisplay },
+    toNext:   { raw: live ? num(c.EXPToNextLevel) : null, display: toNextDisplay },
+    meseta:   { raw: num(c.Meseta),                       display: escapeHtml(fmt(c.Meseta)) },
+    playTime: { raw: live ? num(c.PlayTimeSeconds) : null, display: playTimeDisplay },
+    ATP: { raw: num(stats.ATP), display: escapeHtml(fmt(stats.ATP)) },
+    DFP: { raw: num(stats.DFP), display: escapeHtml(fmt(stats.DFP)) },
+    MST: { raw: num(stats.MST), display: escapeHtml(fmt(stats.MST)) },
+    ATA: { raw: num(stats.ATA), display: escapeHtml(fmt(stats.ATA)) },
+    EVP: { raw: num(stats.EVP), display: escapeHtml(fmt(stats.EVP)) },
+    LCK: { raw: num(stats.LCK), display: escapeHtml(fmt(stats.LCK)) },
+    HP:  { raw: num(stats.HP),  display: escapeHtml(fmt(stats.HP))  },
+  };
+}
+
+// Re-flow the open player modal's numeric cells from a freshly-polled
+// character object, animating any value that went UP. Driven by refreshLive()
+// — never on first open, so the initial numbers don't bump. Cells whose value
+// is unchanged are left untouched (no needless reflow, no animation restart).
+function applyPlayerModalLiveUpdate(c) {
+  const bodyEl = document.getElementById('player-modal-body');
+  if (!bodyEl) return;
+  const values = playerModalStatValues(c);
+  for (const key of Object.keys(values)) {
+    const el = bodyEl.querySelector(`[data-stat="${key}"]`);
+    if (!el) continue;
+    const v       = values[key];
+    const prevRaw = el.dataset.value === '' ? null : Number(el.dataset.value);
+    const nextStr = v.raw == null ? '' : String(v.raw);
+    if (el.dataset.value === nextStr) continue; // unchanged — leave it alone
+    el.innerHTML     = v.display;
+    el.dataset.value = nextStr;
+    if (prevRaw != null && v.raw != null && v.raw > prevRaw) bumpStat(el, key);
+  }
+}
+
+// Brief PSO-HUD-style flourish when a value increases: a quick scale pulse plus
+// a cyan power-up glow for EXP / stats / play-time, gold (--warning) for Meseta
+// and level-ups. Restart-safe so rapid consecutive gains each get their pulse.
+function bumpStat(el, key) {
+  const gold = key === 'meseta' || key === 'level';
+  el.classList.remove('stat-bump', 'stat-bump--gold');
+  void el.offsetWidth; // force reflow so the animation restarts even mid-play
+  el.classList.add('stat-bump');
+  if (gold) el.classList.add('stat-bump--gold');
+  el.addEventListener('animationend', () => {
+    el.classList.remove('stat-bump', 'stat-bump--gold');
+  }, { once: true });
+}
+
 function renderPlayerModalCharacter(c, titleEl, subEl, bodyEl) {
   titleEl.textContent = c.Name;
   // Subtitle is just the slot — we used to include "Account #<id>" here
@@ -3531,24 +3650,14 @@ function renderPlayerModalCharacter(c, titleEl, subEl, bodyEl) {
   // a player's multiple characters.
   if (subEl) subEl.textContent = `Slot ${c.SlotIndex}`;
 
-  const cls    = CLASS_DETAILS[c.Class] || { role: '—', race: '—', gender: '—' };
-  const stats  = c.Stats || {};
-  const fmt    = (n) => (Number.isFinite(n) ? n.toLocaleString() : '—');
+  const cls = CLASS_DETAILS[c.Class] || { role: '—', race: '—', gender: '—' };
 
-  // EXP / play-time trust gate. The backend nulls these out unless the
-  // character's last snapshot was taken from a Blue Burst session
-  // (IsBBSnapshot), where they're server-authoritative. For disc versions
-  // the values are stale until the client's next 61/98 upload, and an
-  // account holding both BB and disc licenses no longer hides BB EXP.
-  const showLiveFields = c.IsBBSnapshot === true;
-  const totalExpHtml   = showLiveFields ? escapeHtml(fmt(c.EXP)) : '<span title="Disc versions don\'t track EXP server-side — refreshes on lobby return.">—</span>';
-  const toNextHtml     = showLiveFields && Number.isFinite(c.EXPToNextLevel)
-    ? escapeHtml(fmt(c.EXPToNextLevel))
-    : '<span title="Computed from the BB level table; only meaningful when EXP is live.">—</span>';
-  const playTimeStr    = showLiveFields ? formatPlayTime(c.PlayTimeSeconds) : null;
-  const playTimeHtml   = playTimeStr
-    ? escapeHtml(playTimeStr)
-    : '<span title="Play time isn\'t in the disc-version network protocol — only Blue Burst tracks it server-side.">—</span>';
+  // Every animatable numeric value (EXP, Meseta, level, play-time, base stats)
+  // comes from one source so the initial render and the live poll-update
+  // (applyPlayerModalLiveUpdate) stay in lock-step. v[key] = { raw, display }.
+  // The disc-version EXP/play-time trust gate lives in playerModalStatValues:
+  // those values are only server-authoritative for Blue Burst snapshots.
+  const v = playerModalStatValues(c);
 
   bodyEl.innerHTML = `
     <dl class="quest-modal__meta">
@@ -3556,23 +3665,23 @@ function renderPlayerModalCharacter(c, titleEl, subEl, bodyEl) {
       <dt>Race</dt><dd>${escapeHtml(cls.race)}</dd>
       <dt>Gender</dt><dd>${escapeHtml(cls.gender)}</dd>
       <dt>Section ID</dt><dd>${escapeHtml(c.SectionID)}</dd>
-      <dt>Level</dt><dd>${escapeHtml(String(c.Level))}</dd>
-      <dt>Total EXP</dt><dd>${totalExpHtml}</dd>
-      <dt>To next level</dt><dd>${toNextHtml}</dd>
-      <dt>Meseta</dt><dd>${escapeHtml(fmt(c.Meseta))}</dd>
-      <dt>Play time</dt><dd>${playTimeHtml}</dd>
+      <dt>Level</dt><dd data-stat="level" data-value="${v.level.raw ?? ''}">${v.level.display}</dd>
+      <dt>Total EXP</dt><dd data-stat="exp" data-value="${v.exp.raw ?? ''}">${v.exp.display}</dd>
+      <dt>To next level</dt><dd data-stat="toNext" data-value="${v.toNext.raw ?? ''}">${v.toNext.display}</dd>
+      <dt>Meseta</dt><dd data-stat="meseta" data-value="${v.meseta.raw ?? ''}">${v.meseta.display}</dd>
+      <dt>Play time</dt><dd data-stat="playTime" data-value="${v.playTime.raw ?? ''}">${v.playTime.display}</dd>
     </dl>
 
     <section class="quest-modal__section" aria-label="Base stats">
       <h3>Base stats</h3>
       <dl class="quest-modal__meta">
-        <dt>ATP (attack power)</dt><dd>${escapeHtml(fmt(stats.ATP))}</dd>
-        <dt>DFP (defense)</dt><dd>${escapeHtml(fmt(stats.DFP))}</dd>
-        <dt>MST (mental strength)</dt><dd>${escapeHtml(fmt(stats.MST))}</dd>
-        <dt>ATA (accuracy)</dt><dd>${escapeHtml(fmt(stats.ATA))}</dd>
-        <dt>EVP (evasion)</dt><dd>${escapeHtml(fmt(stats.EVP))}</dd>
-        <dt>LCK (luck)</dt><dd>${escapeHtml(fmt(stats.LCK))}</dd>
-        <dt>HP</dt><dd>${escapeHtml(fmt(stats.HP))}</dd>
+        <dt>ATP (attack power)</dt><dd data-stat="ATP" data-value="${v.ATP.raw ?? ''}">${v.ATP.display}</dd>
+        <dt>DFP (defense)</dt><dd data-stat="DFP" data-value="${v.DFP.raw ?? ''}">${v.DFP.display}</dd>
+        <dt>MST (mental strength)</dt><dd data-stat="MST" data-value="${v.MST.raw ?? ''}">${v.MST.display}</dd>
+        <dt>ATA (accuracy)</dt><dd data-stat="ATA" data-value="${v.ATA.raw ?? ''}">${v.ATA.display}</dd>
+        <dt>EVP (evasion)</dt><dd data-stat="EVP" data-value="${v.EVP.raw ?? ''}">${v.EVP.display}</dd>
+        <dt>LCK (luck)</dt><dd data-stat="LCK" data-value="${v.LCK.raw ?? ''}">${v.LCK.display}</dd>
+        <dt>HP</dt><dd data-stat="HP" data-value="${v.HP.raw ?? ''}">${v.HP.display}</dd>
       </dl>
     </section>
 
@@ -3858,6 +3967,7 @@ function setupPlayerModal() {
   });
 
   modal.addEventListener('close', () => {
+    openPlayerModalKey = null;
     if (playerModalReturnFocus?.focus) {
       playerModalReturnFocus.focus();
     }
@@ -4034,6 +4144,15 @@ async function refreshLive() {
         String(a.Name).localeCompare(String(b.Name), undefined, { sensitivity: 'base' }),
       ) : [];
       renderPlayers();
+      // If a character modal is open, live-update its numbers from this fresh
+      // snapshot — values that rose since the last poll pulse (see bumpStat).
+      if (openPlayerModalKey && openPlayerModalKey.startsWith('char:')) {
+        const modal = document.getElementById('player-modal');
+        if (modal?.open) {
+          const fresh = findPlayerByKey(openPlayerModalKey);
+          if (fresh && 'Name' in fresh) applyPlayerModalLiveUpdate(fresh);
+        }
+      }
     }),
   ]);
 }
