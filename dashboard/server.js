@@ -185,10 +185,17 @@ function stripSummary(data) {
       for (const k of SAFE_GAME_FIELDS) {
         if (g[k] !== undefined) out[k] = g[k];
       }
-      // Surface only the active quest's name, never the full quest object.
+      // Surface the active quest's name (and number), never the full object.
+      // newserv's Quest json is { Metadata, Versions[] } with a per-language
+      // Name on each version — Versions[0] is often Japanese — so pull the
+      // English name, falling back to the first version that has one.
       if (g.Quest && typeof g.Quest === 'object') {
-        const qn = g.Quest.Name ?? g.Quest.name ?? null;
-        if (qn) out.QuestName = cleanPsoText(qn);
+        const versions = Array.isArray(g.Quest.Versions) ? g.Quest.Versions : [];
+        const pick = versions.find((v) => v && v.Language === 'English' && v.Name)
+                  || versions.find((v) => v && v.Name);
+        if (pick && pick.Name) out.QuestName = cleanPsoText(pick.Name);
+        const num = g.Quest.Metadata && g.Quest.Metadata.QuestNumber;
+        if (Number.isInteger(num)) out.QuestNumber = num;
       }
       return out;
     });
