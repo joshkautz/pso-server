@@ -672,11 +672,25 @@
     border: 1px solid var(--line-subtle);
     border-radius: var(--radius-md);
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: auto 1fr auto; /* section icon · info · count */
     gap: var(--space-3);
     align-items: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
   }
-  .game__name { font-weight: 600; font-size: 0.95rem; margin: 0 0 var(--space-1); }
+  .game:hover,
+  .game:focus-visible {
+    border-color: var(--cyan-glow);
+    background: var(--cyan-soft);
+    transform: translateY(-1px);
+  }
+  .game:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--cyan-glow); }
+  .game__info { min-width: 0; } /* lets the name truncate instead of overflowing */
+  .game__name {
+    font-weight: 600; font-size: 0.95rem; margin: 0 0 var(--space-1);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .game__lock { margin-left: var(--space-1); font-size: 0.8rem; }
   .game__meta {
     display: flex;
     flex-wrap: wrap;
@@ -690,6 +704,64 @@
     font-size: 1.25rem;
     font-weight: 700;
     color: var(--cyan-primary);
+  }
+  .game__count-max { color: var(--text-low); font-size: 0.85rem; }
+
+  /* ---- Section-ID icons ---- (one 64px PNG per PSO section, downscaled) */
+  .section-icon {
+    display: inline-block;
+    width: 20px; height: 20px;
+    vertical-align: middle;
+    object-fit: contain;
+    flex: none;
+  }
+  .section-icon--inline { margin-right: 6px; }
+  .section-icon--game   { width: 28px; height: 28px; }
+  .section-icon--roster { width: 26px; height: 26px; }
+  .section-icon--title  { width: 24px; height: 24px; margin-right: 8px; vertical-align: -4px; }
+  .dd-with-icon { display: flex; align-items: center; }
+  .dd-muted { color: var(--text-low); font-size: 0.85rem; }
+
+  /* ---- "Hunters online" mini-roster (under the count) ---- */
+  .online-hunters {
+    list-style: none; margin: var(--space-2) 0 0; padding: 0;
+    display: flex; flex-direction: column; gap: var(--space-1);
+  }
+  .online-hunters:empty { display: none; }
+  .online-hunter {
+    display: flex; align-items: center; gap: var(--space-2);
+    font-size: 0.82rem; color: var(--text-mid); min-width: 0;
+  }
+  .online-hunter__name {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--text-high); font-weight: 500;
+  }
+  .online-hunter__level {
+    margin-left: auto; color: var(--text-low);
+    font-family: var(--font-mono); font-size: 0.75rem; flex: none;
+  }
+
+  /* ---- Game modal roster — one row per player in the game ---- */
+  .game-roster {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: var(--space-2);
+  }
+  .game-roster__row {
+    display: flex; align-items: center; gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg-elevated);
+    border: 1px solid var(--line-subtle);
+    border-radius: var(--radius-sm);
+  }
+  .game-roster__id { display: flex; flex-direction: column; min-width: 0; }
+  .game-roster__name {
+    color: var(--text-high); font-weight: 600; font-size: 0.9rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .game-roster__sub { color: var(--text-mid); font-size: 0.78rem; font-family: var(--font-mono); }
+  .game-roster__level {
+    margin-left: auto; color: var(--cyan-primary);
+    font-family: var(--font-display); font-weight: 700; font-size: 0.95rem; flex: none;
   }
 
   .empty-state {
@@ -1980,6 +2052,7 @@
           </div>
           <div class="metric__value" id="metric-online" aria-live="polite">—</div>
           <div class="metric__delta" id="metric-online-delta"></div>
+          <ul class="online-hunters" id="online-hunters" aria-label="Players currently online"></ul>
         </article>
 
         <article class="metric" role="listitem" aria-labelledby="m-uptime">
@@ -2446,6 +2519,32 @@
 </dialog>
 
 <!-- ================================================================ -->
+<!-- Game (instance) details modal                                    -->
+<!-- ================================================================ -->
+<!-- Same native-<dialog> pattern as the player modal: focus trap, ESC +
+     backdrop + close-button close, return-focus to the originating game
+     card. Populated by openGameModal() from the live /api/summary data,
+     and live-refreshed by refreshOpenGameModal() on each 15s poll. -->
+<dialog id="game-modal" class="quest-modal" aria-labelledby="game-modal-title">
+  <div class="quest-modal__inner">
+    <header class="quest-modal__head">
+      <div>
+        <p class="quest-modal__number" id="game-modal-subtitle" aria-hidden="true">—</p>
+        <h2 class="quest-modal__title" id="game-modal-title">Game</h2>
+      </div>
+      <button type="button" class="quest-modal__close"
+              aria-label="Close game details"
+              data-action="close-game-modal">
+        <span aria-hidden="true">×</span>
+      </button>
+    </header>
+    <div class="quest-modal__body" id="game-modal-body">
+      <!-- Populated by openGameModal() -->
+    </div>
+  </div>
+</dialog>
+
+<!-- ================================================================ -->
 <!-- Quest details modal                                              -->
 <!-- ================================================================ -->
 <!-- Native <dialog> handles focus trapping, ESC-to-close, and the
@@ -2510,16 +2609,17 @@ async function fetchJSON(path) {
 }
 
 // ---------- Live data buffers ----------
-// Populated by refreshLive() from /api/lobbies, /api/accounts,
+// Populated by refreshLive() from /api/summary, /api/accounts,
 // /api/characters, and the rare-drops WebSocket. Empty by default so the
 // page shows an honest empty state before the first API response lands,
 // not flashes of stale fake data — see commit 5346011 for the cautionary
 // tale.
 
-let games      = [];
-let drops      = [];
-let players    = []; // from /api/accounts — name + platforms only, shown until /api/characters lands
-let characters = []; // from /api/characters — preferred when populated (auto-snapshot fills this)
+let games         = []; // from /api/summary Games — live game instances ("Now playing")
+let drops         = [];
+let onlineClients = []; // from /api/summary Clients — connected players (who's online + per-game roster)
+let players       = []; // from /api/accounts — name + platforms only, shown until /api/characters lands
+let characters    = []; // from /api/characters — preferred when populated (auto-snapshot fills this)
 
 // ---------- Quest catalog ----------
 // Populated from /api/quests on first refreshLive(). Empty until then so
@@ -2757,6 +2857,53 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;');
 }
 
+// ---------- Section IDs ----------
+// The 10 PSO section IDs. Each has a 64px icon at
+// /assets/section-ids/<lowercase>.png (copied in by dashboard/Dockerfile).
+// newserv reports SectionID as exactly one of these (name_for_section_id).
+const SECTION_IDS = new Set([
+  'Viridia', 'Greenill', 'Skyly', 'Bluefull', 'Purplenum',
+  'Pinkal', 'Redria', 'Oran', 'Yellowboze', 'Whitill',
+]);
+
+// Inline <img> for a section ID's icon, or '' when the id is missing/unknown,
+// so an unexpected value degrades to no-icon rather than a broken image. `cls`
+// is appended to the base .section-icon class for size/spacing variants.
+function sectionIdIcon(sectionId, cls = '') {
+  if (!SECTION_IDS.has(sectionId)) return '';
+  const file = sectionId.toLowerCase();
+  return `<img class="section-icon ${cls}" src="/assets/section-ids/${escapeHtml(file)}.png" `
+       + `alt="${escapeHtml(sectionId)} section ID" title="${escapeHtml(sectionId)}" `
+       + `width="20" height="20" loading="lazy" decoding="async">`;
+}
+
+// "Episode 1" → "Ep 1" for the compact game cards. Accepts the raw newserv
+// string ("Episode 1/2/4") or a bare number; falls back to the input as-is.
+function formatEpisode(ep) {
+  if (ep == null) return '';
+  const m = String(ep).match(/(\d+)/);
+  return m ? `Ep ${m[1]}` : String(ep);
+}
+
+// Adapt a /y/summary game object into the shape renderGames() and the game
+// modal use. Names arrive already marker-cleaned from the server (cleanPsoText).
+function adaptGame(g) {
+  return {
+    id:              g.ID,
+    name:            (typeof g.Name === 'string' && g.Name) ? g.Name : `Game ${g.ID}`,
+    episode:         g.Episode ?? null,
+    difficulty:      g.Difficulty ?? null,
+    mode:            g.Mode ?? null,
+    sectionId:       g.SectionID ?? null,
+    players:         Number.isFinite(g.Players) ? g.Players : 0,
+    hasPassword:     g.HasPassword === true,
+    cheatsEnabled:   g.CheatsEnabled === true,
+    questInProgress: g.QuestInProgress === true || g.JoinableQuestInProgress === true,
+    questSelection:  g.QuestSelectionInProgress === true,
+    questName:       (typeof g.QuestName === 'string' && g.QuestName) ? g.QuestName : null,
+  };
+}
+
 // ---------- Renderers ----------
 
 function renderGames() {
@@ -2766,23 +2913,60 @@ function renderGames() {
     root.innerHTML = `<li class="empty-state">No active games right now — be the first.</li>`;
     return;
   }
-  root.innerHTML = games.map((g) => `
-    <li class="game">
-      <div>
-        <p class="game__name">${escapeHtml(g.name)}</p>
-        <div class="game__meta">
-          <span>Ep ${escapeHtml(String(g.episode))}</span>
-          <span aria-hidden="true">·</span>
-          <span>${escapeHtml(String(g.difficulty))}</span>
-          <span aria-hidden="true">·</span>
-          <span>${escapeHtml(String(g.mode))}</span>
-        </div>
+  root.innerHTML = games.map((g) => {
+    // Episode · Difficulty · Mode, skipping any the server didn't report.
+    const meta = [formatEpisode(g.episode), g.difficulty, g.mode]
+      .filter(Boolean)
+      .map((x) => `<span>${escapeHtml(String(x))}</span>`)
+      .join('<span aria-hidden="true">·</span>');
+    const lock = g.hasPassword
+      ? '<span class="game__lock" title="Password protected" aria-label="Password protected">🔒</span>'
+      : '';
+    // role=button + data-game-id makes the card open the game modal — same
+    // clickable pattern as player/quest cards (see setupGameCardClicks).
+    return `
+    <li class="game" role="button" tabindex="0"
+        aria-haspopup="dialog"
+        aria-label="Open details for game ${escapeHtml(g.name)}"
+        data-game-id="${escapeHtml(String(g.id))}">
+      ${sectionIdIcon(g.sectionId, 'section-icon--game')}
+      <div class="game__info">
+        <p class="game__name">${escapeHtml(g.name)}${lock}</p>
+        <div class="game__meta">${meta}</div>
       </div>
       <div class="game__count" aria-label="${escapeHtml(String(g.players))} of 4 hunters">
-        ${escapeHtml(String(g.players))}<span style="color: var(--text-low); font-size: 0.85rem;">/4</span>
+        ${escapeHtml(String(g.players))}<span class="game__count-max">/4</span>
       </div>
-    </li>
-  `).join('');
+    </li>`;
+  }).join('');
+}
+
+// Render the compact list of currently-connected players inside the "Hunters
+// online" metric card, below the count. Each row shows the player's section-ID
+// icon, name and level. onlineClients comes straight from /api/summary Clients
+// (sanitised server-side — no account id). Empty list → nothing rendered.
+function renderOnlineHunters() {
+  const root = document.getElementById('online-hunters');
+  if (!root) return;
+  if (!Array.isArray(onlineClients) || onlineClients.length === 0) {
+    root.innerHTML = '';
+    return;
+  }
+  // Highest level first, then name — stable, sensible ordering across polls.
+  const sorted = [...onlineClients].sort((a, b) =>
+    (Number(b.Level) || 0) - (Number(a.Level) || 0) ||
+    String(a.Name ?? '').localeCompare(String(b.Name ?? ''), undefined, { sensitivity: 'base' }),
+  );
+  root.innerHTML = sorted.map((c) => {
+    const name  = c.Name ? escapeHtml(String(c.Name)) : 'Unknown';
+    const level = Number.isFinite(c.Level) ? `Lv ${escapeHtml(String(c.Level))}` : '';
+    return `
+      <li class="online-hunter">
+        ${sectionIdIcon(c.SectionID, 'section-icon--inline')}
+        <span class="online-hunter__name" title="${name}">${name}</span>
+        ${level ? `<span class="online-hunter__level">${level}</span>` : ''}
+      </li>`;
+  }).join('');
 }
 
 const PLAYER_PAGE_SIZE = 24;
@@ -2937,7 +3121,7 @@ function renderCharacterCard(c) {
           <span aria-hidden="true">·</span>
           <span class="player__class">${escapeHtml(c.Class)}</span>
         </p>
-        <p class="player__section">${escapeHtml(c.SectionID)}</p>
+        <p class="player__section">${sectionIdIcon(c.SectionID, 'section-icon--inline')}${escapeHtml(c.SectionID)}</p>
       </div>
     </article>
   `;
@@ -3664,7 +3848,7 @@ function renderPlayerModalCharacter(c, titleEl, subEl, bodyEl) {
       <dt>Class</dt><dd>${escapeHtml(c.Class)} <span style="color: var(--text-low);">(${escapeHtml(cls.role)})</span></dd>
       <dt>Race</dt><dd>${escapeHtml(cls.race)}</dd>
       <dt>Gender</dt><dd>${escapeHtml(cls.gender)}</dd>
-      <dt>Section ID</dt><dd>${escapeHtml(c.SectionID)}</dd>
+      <dt>Section ID</dt><dd class="dd-with-icon">${sectionIdIcon(c.SectionID, 'section-icon--inline')}${escapeHtml(c.SectionID)}</dd>
       <dt>Level</dt><dd data-stat="level" data-value="${v.level.raw ?? ''}">${v.level.display}</dd>
       <dt>Total EXP</dt><dd data-stat="exp" data-value="${v.exp.raw ?? ''}">${v.exp.display}</dd>
       <dt>To next level</dt><dd data-stat="toNext" data-value="${v.toNext.raw ?? ''}">${v.toNext.display}</dd>
@@ -3996,6 +4180,142 @@ function setupPlayerCardClicks() {
   });
 }
 
+// ---------- Game (instance) modal ----------
+// Click a "Now playing" card to see the game's details and who's in it. Data
+// is the same /api/summary payload the cards render from; the roster is the
+// join Client.LobbyID == Game.ID. Mirrors the player-modal pattern.
+
+let gameModalReturnFocus = null;
+let openGameModalId = null; // ID of the game whose modal is open, or null
+
+function findGameById(id) {
+  return games.find((g) => String(g.id) === String(id)) || null;
+}
+
+// Players currently in a game = connected clients whose LobbyID matches it.
+function rosterForGame(gameId) {
+  if (!Array.isArray(onlineClients)) return [];
+  return onlineClients
+    .filter((c) => String(c.LobbyID) === String(gameId))
+    .sort((a, b) =>
+      (Number(b.Level) || 0) - (Number(a.Level) || 0) ||
+      String(a.Name ?? '').localeCompare(String(b.Name ?? ''), undefined, { sensitivity: 'base' }),
+    );
+}
+
+function openGameModal(id) {
+  const game  = findGameById(id);
+  const modal = document.getElementById('game-modal');
+  if (!game || !modal) return;
+
+  gameModalReturnFocus = document.activeElement;
+  openGameModalId = String(id);
+  renderGameModal(game);
+  modal.showModal();
+  modal.querySelector('[data-action="close-game-modal"]')?.focus();
+}
+
+function renderGameModal(game) {
+  const titleEl = document.getElementById('game-modal-title');
+  const subEl   = document.getElementById('game-modal-subtitle');
+  const bodyEl  = document.getElementById('game-modal-body');
+  if (!titleEl || !bodyEl) return;
+
+  titleEl.innerHTML = `${sectionIdIcon(game.sectionId, 'section-icon--title')}${escapeHtml(game.name)}`;
+  if (subEl) subEl.textContent = `Game #${game.id}`;
+
+  // Quest status line: name when we have it, else the in-progress/selecting state.
+  let questLine = 'No quest in progress';
+  if (game.questName)            questLine = escapeHtml(game.questName);
+  else if (game.questInProgress) questLine = 'Quest in progress';
+  else if (game.questSelection)  questLine = 'Selecting a quest…';
+
+  const yesno  = (b) => (b ? 'Yes' : 'No');
+  const roster = rosterForGame(game.id);
+  const rosterHtml = roster.length === 0
+    ? `<p class="quest-modal__placeholder">No players in this game right now.</p>`
+    : `<ul class="game-roster">${roster.map((c) => {
+        const name = c.Name ? escapeHtml(String(c.Name)) : 'Unknown';
+        const cls  = c.Class ? escapeHtml(String(c.Class)) : '—';
+        const lvl  = Number.isFinite(c.Level) ? `Lv ${escapeHtml(String(c.Level))}` : '';
+        return `
+          <li class="game-roster__row">
+            ${sectionIdIcon(c.SectionID, 'section-icon--roster')}
+            <div class="game-roster__id">
+              <span class="game-roster__name" title="${name}">${name}</span>
+              <span class="game-roster__sub">${cls}</span>
+            </div>
+            <span class="game-roster__level">${lvl}</span>
+          </li>`;
+      }).join('')}</ul>`;
+
+  bodyEl.innerHTML = `
+    <dl class="quest-modal__meta">
+      <dt>Episode</dt><dd>${escapeHtml(String(game.episode ?? '—'))}</dd>
+      <dt>Difficulty</dt><dd>${escapeHtml(String(game.difficulty ?? '—'))}</dd>
+      <dt>Mode</dt><dd>${escapeHtml(String(game.mode ?? '—'))}</dd>
+      <dt>Section ID</dt><dd class="dd-with-icon">${sectionIdIcon(game.sectionId, 'section-icon--inline')}${escapeHtml(String(game.sectionId ?? '—'))}</dd>
+      <dt>Players</dt><dd>${escapeHtml(String(game.players))}<span class="dd-muted">/4</span></dd>
+      <dt>Quest</dt><dd>${questLine}</dd>
+      <dt>Password</dt><dd>${yesno(game.hasPassword)}</dd>
+      <dt>Cheats</dt><dd>${yesno(game.cheatsEnabled)}</dd>
+    </dl>
+
+    <section class="quest-modal__section" aria-label="Players in this game">
+      <h3>In this game</h3>
+      ${rosterHtml}
+    </section>
+  `;
+}
+
+// Re-render the open game modal from fresh poll data so its roster and stats
+// live-update. If the game has ended (gone from the list), close the modal.
+function refreshOpenGameModal() {
+  if (!openGameModalId) return;
+  const modal = document.getElementById('game-modal');
+  if (!modal || !modal.open) return;
+  const game = findGameById(openGameModalId);
+  if (!game) { modal.close(); return; }
+  renderGameModal(game);
+}
+
+function setupGameModal() {
+  const modal = document.getElementById('game-modal');
+  if (!modal) return;
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) { modal.close(); return; }
+    if (e.target.closest('[data-action="close-game-modal"]')) modal.close();
+  });
+
+  modal.addEventListener('close', () => {
+    openGameModalId = null;
+    if (gameModalReturnFocus?.focus) gameModalReturnFocus.focus();
+    gameModalReturnFocus = null;
+  });
+}
+
+function setupGameCardClicks() {
+  const list = document.getElementById('games-list');
+  if (!list) return;
+
+  list.addEventListener('click', (e) => {
+    const card = e.target.closest('.game');
+    if (!card) return;
+    const id = card.dataset.gameId;
+    if (id) openGameModal(id);
+  });
+
+  list.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const card = e.target.closest('.game');
+    if (!card) return;
+    e.preventDefault();
+    const id = card.dataset.gameId;
+    if (id) openGameModal(id);
+  });
+}
+
 // ---------- Wire up filter chips + search ----------
 
 function setupChipBehavior() {
@@ -4039,8 +4359,8 @@ function setupSearch() {
 // newserv's /y/summary returns:
 //   { Server: { ClientCount, GameCount, LobbyCount, ServerName, UptimeUsecs, ... },
 //     Games: [...], Clients: [...] }
-// /y/lobbies returns an array of lobby objects, each with IsGame, ClientIDs
-// (array of clientId-or-null), Block, ID, MaxClients, AllowedVersions, ...
+// Games drive "Now playing"; Clients (joined to a game by Client.LobbyID ==
+// Game.ID) drive the "Hunters online" list and each game's roster.
 // /y/data/quests returns { Quests: [...] }.
 // Field names are PascalCase — match newserv's JSON, not our mock shape.
 
@@ -4086,25 +4406,24 @@ async function refreshLive() {
       set('metric-uptime',         startValid ? formatUptime(srv.UptimeUsecs) : '—');
       set('metric-uptime-delta',   startValid ? formatStartedAt(srv.StartTime) : '');
       setServerStatus(true);
+
+      // /api/summary also carries the live game instances (Games) and the
+      // connected players (Clients), with Client.LobbyID == Game.ID joining a
+      // player to its game. Drive "Now playing" and the "Hunters online"
+      // roster from this one payload. Always reassign the globals (even when
+      // empty) so the renderers fall through to their empty states rather than
+      // showing stale data. Wrapped so a render hiccup can't flip server
+      // status or kill the page — the fetch already succeeded here.
+      try {
+        games         = Array.isArray(s?.Games)   ? s.Games.map(adaptGame) : [];
+        onlineClients = Array.isArray(s?.Clients) ? s.Clients : [];
+        renderGames();
+        renderOnlineHunters();
+        refreshOpenGameModal();
+      } catch (err) {
+        console.warn('[live] games/online render failed:', err);
+      }
     }).catch(() => setServerStatus(false)),
-    fetchJSON('lobbies').then((lobbies) => {
-      if (!Array.isArray(lobbies)) return;
-      // Always reassign the global — even when there are 0 games we
-      // want renderGames() to fall through to the empty state, not
-      // keep showing whatever the last refresh produced.
-      games = lobbies
-        .filter((l) => l.IsGame === true)
-        .map((l) => ({
-          name:       l.Name       ?? `Game ${l.ID}`,
-          episode:    l.Episode    ?? 1,
-          difficulty: l.Difficulty ?? 'Normal',
-          mode:       l.Mode       ?? 'Normal',
-          players:    Array.isArray(l.ClientIDs)
-                        ? l.ClientIDs.filter((x) => x != null).length
-                        : 0,
-        }));
-      renderGames();
-    }),
     fetchJSON('quests').then((data) => {
       const raw = Array.isArray(data?.Quests) ? data.Quests : [];
       // Adapt newserv's rich /y/data/quests payload into card shape,
@@ -4951,6 +5270,8 @@ document.addEventListener('DOMContentLoaded', () => {
   setupPlayerControls();
   setupPlayerModal();
   setupPlayerCardClicks();
+  setupGameModal();
+  setupGameCardClicks();
   setupClientDownloads();
   setupNav();
   setupScrollSpy();

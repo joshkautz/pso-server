@@ -23,6 +23,9 @@ RUN npm install --omit=dev
 COPY index.html ./
 COPY quest-provenance.json ./
 COPY server.js ./
+# Section-ID icons, served at /assets/section-ids/<sectionid>.png via
+# express.static (see server.js). One 64px PNG per PSO section ID.
+COPY assets ./assets
 
 ENV NODE_ENV=production
 ENV PORT=8080
